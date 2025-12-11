@@ -34,4 +34,4 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python /projects/spy-divergence.py
+        run: python /projects/spy-divergence/spy-divergence.py
