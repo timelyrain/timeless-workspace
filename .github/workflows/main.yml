@@ -1,1 +1,32 @@
-test
+name: spy divergence agent
+
+on:
+  schedule:
+    # Runs every 5 minutes between 9:30 AM and 4:00 PM EST (Mon-Fri)
+    # UTC conversion: 9:30 AM - 4:00 PM EST = 1:30 PM - 8:00 PM UTC (13:30-20:00)
+    # Using 13-20 to cover 1 PM - 8 PM UTC range, which includes 9:30 AM - 4:00 PM EST
+    - cron: '*/5 13-20 * * 1-5'
+  workflow_dispatch: # Allows you to run it manually to test
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance requests pandas
+
+      - name: Run Scanner
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python scanner.py
