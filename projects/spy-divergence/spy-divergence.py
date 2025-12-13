@@ -1,7 +1,9 @@
 import yfinance as yf
 import requests
 import time
+from datetime import datetime
 from dotenv import load_dotenv
+import pytz
 
 # --- CONFIGURATION ---
 # List of stocks to watch (instituition critera RoE 15%, Net Profit 25%, Nasdaq and SP500, 10bil market cap)
@@ -32,7 +34,7 @@ def scan_market():
     print("Fetching data...")
     # Download data for all tickers + SPY for the current day
     tickers = WATCHLIST + [BENCHMARK]
-    data = yf.download(tickers, period="1d", interval="5m", progress=False)['Close']
+    data = yf.download(tickers, period="1d", interval="5m", progress=False, auto_adjust=True)['Close']
     
     if data.empty:
         print("No data found. Market might be closed.")
@@ -67,7 +69,9 @@ def scan_market():
             alerts.append(f"💪 *RS ALERT: {ticker}*\nMassive Relative Strength! {ticker} is leading SPY by {relative_strength:.2f}%.")
 
     if alerts:
-        final_msg = "\n\n".join(alerts)
+        ny_tz = pytz.timezone('America/New_York')
+        timestamp = datetime.now(ny_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
+        final_msg = f"⏰ *Market Scan: {timestamp}*\n\n" + "\n\n".join(alerts)
         send_telegram_message(final_msg)
         print("Alerts sent!")
     else:
