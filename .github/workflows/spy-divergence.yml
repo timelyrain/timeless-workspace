@@ -51,7 +51,7 @@ on:
 env:
   PYTHON_VERSION: '3.11'
   TZ: 'America/New_York'
-  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
+  TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
   CHAT_ID: ${{ secrets.CHAT_ID }}
   
 jobs:
