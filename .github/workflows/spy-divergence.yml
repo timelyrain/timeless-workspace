@@ -130,7 +130,7 @@ jobs:
       if: steps.market_check.outputs.is_open == 'true' || steps.manual_override.outputs.is_open == 'true'
       run: |
         echo "Starting scanner at $(date)"
-        python spy-divergence.py
+        python projects/spy-divergence.py
         echo "Scanner completed at $(date)"
       continue-on-error: false
     
