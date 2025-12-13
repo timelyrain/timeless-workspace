@@ -13,7 +13,7 @@ BENCHMARK = 'SPY'
 # Telegram Credentials (loaded from environment or .env file)
 import os
 load_dotenv()  # pulls TELEGRAM_TOKEN and CHAT_ID from a local .env if present
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_DIVERGENCE")
 CHAT_ID = os.environ.get("CHAT_ID")
 
 def send_telegram_message(message):
