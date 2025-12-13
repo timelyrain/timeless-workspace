@@ -1,0 +1,39 @@
+name: Unusual Options Scanner
+
+on:
+  schedule:
+    # Run 3x during market hours (Eastern Time)
+    # 10:00 AM, 12:00 PM, 2:00 PM ET
+    - cron: '0 14 * * 1-5'   # 10:00 AM EDT
+    - cron: '0 16 * * 1-5'   # 12:00 PM EDT
+    - cron: '0 18 * * 1-5'   # 2:00 PM EDT
+    - cron: '0 15 * * 1-5'   # 10:00 AM EST
+    - cron: '0 17 * * 1-5'   # 12:00 PM EST
+    - cron: '0 19 * * 1-5'   # 2:00 PM EST
+  workflow_dispatch: {}  # Manual trigger
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  run-options-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run unusual options scanner
+        env:
+          TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python projects/unusual-options-scanner.py

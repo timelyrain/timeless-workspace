@@ -1,4 +1,4 @@
-name: Daily Market Analysis
+name: Market Daily Outlook
 
 on:
   schedule:

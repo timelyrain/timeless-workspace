@@ -1,4 +1,4 @@
-name: NYSE Market Scheduler (Mon-Fri)
+name: Market Divergence Relative Strength
 
 on:
   schedule:
