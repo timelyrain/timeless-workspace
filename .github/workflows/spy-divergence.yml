@@ -1,33 +1,186 @@
-name: SPY Divergence Alert
+name: NYSE Market Scheduler (Mon-Fri)
 
 on:
-  workflow_dispatch: {}
-  # Uncomment to schedule (UTC):
-  # schedule:
-  #   - cron: "0 14 * * 1-5"  # 10:00 AM US/Eastern on weekdays
+  schedule:
+    # NYSE market hours: 9:30 AM - 4:00 PM ET
+    # UTC conversion varies by daylight saving time:
+    # - Standard Time (Nov-Mar): ET = UTC-5, so 9:30 AM ET = 2:30 PM UTC
+    # - Daylight Time (Mar-Nov): ET = UTC-4, so 9:30 AM ET = 1:30 PM UTC
+    
+    # During EDT (Daylight Saving Time) - 2nd Sunday in March to 1st Sunday in November
+    # Runs at 1:30 PM, 2:30 PM, 3:30 PM, 4:30 PM, 5:30 PM, 6:30 PM, 7:30 PM, 8:00 PM UTC
+    # Which equals 9:30 AM, 10:30 AM, 11:30 AM, 12:30 PM, 1:30 PM, 2:30 PM, 3:30 PM, 4:00 PM ET
+    - cron: '30 13 * 3-10 1-5'  # 9:30 AM ET
+    - cron: '30 14 * 3-10 1-5'  # 10:30 AM ET
+    - cron: '30 15 * 3-10 1-5'  # 11:30 AM ET
+    - cron: '30 16 * 3-10 1-5'  # 12:30 PM ET
+    - cron: '30 17 * 3-10 1-5'  # 1:30 PM ET
+    - cron: '30 18 * 3-10 1-5'  # 2:30 PM ET
+    - cron: '30 19 * 3-10 1-5'  # 3:30 PM ET
+    - cron: '0 20 * 3-10 1-5'   # 4:00 PM ET (market close)
+    
+    # During EST (Standard Time) - November to early March
+    # Runs at 2:30 PM, 3:30 PM, 4:30 PM, 5:30 PM, 6:30 PM, 7:30 PM, 8:30 PM, 9:00 PM UTC
+    # Which equals 9:30 AM, 10:30 AM, 11:30 AM, 12:30 PM, 1:30 PM, 2:30 PM, 3:30 PM, 4:00 PM ET
+    - cron: '30 14 * 11-12 1-5' # 9:30 AM ET (Nov-Dec)
+    - cron: '30 15 * 11-12 1-5' # 10:30 AM ET
+    - cron: '30 16 * 11-12 1-5' # 11:30 AM ET
+    - cron: '30 17 * 11-12 1-5' # 12:30 PM ET
+    - cron: '30 18 * 11-12 1-5' # 1:30 PM ET
+    - cron: '30 19 * 11-12 1-5' # 2:30 PM ET
+    - cron: '30 20 * 11-12 1-5' # 3:30 PM ET
+    - cron: '0 21 * 11-12 1-5'  # 4:00 PM ET (market close)
+    
+    - cron: '30 14 * 1-2 1-5'   # 9:30 AM ET (Jan-Feb)
+    - cron: '30 15 * 1-2 1-5'   # 10:30 AM ET
+    - cron: '30 16 * 1-2 1-5'   # 11:30 AM ET
+    - cron: '30 17 * 1-2 1-5'   # 12:30 PM ET
+    - cron: '30 18 * 1-2 1-5'   # 1:30 PM ET
+    - cron: '30 19 * 1-2 1-5'   # 2:30 PM ET
+    - cron: '30 20 * 1-2 1-5'   # 3:30 PM ET
+    - cron: '0 21 * 1-2 1-5'    # 4:00 PM ET (market close)
+  
+  workflow_dispatch: # Allows manual triggering
+    inputs:
+      skip_market_check:
+        description: 'Skip market open check (for testing)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   PYTHON_VERSION: '3.11'
-
+  TZ: 'America/New_York'
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_MKT_DIVERGENCE }}
+  CHAT_ID: ${{ secrets.CHAT_ID }}
+  
 jobs:
-  run-spy-divergence:
+  run-scanner:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # Prevent hanging jobs
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'  # Built-in pip caching
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas-market-calendars
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    
+    - name: Check if NYSE is open today
+      id: market_check
+      if: github.event.inputs.skip_market_check != 'true'
+      run: |
+        python -c "
+        import pandas_market_calendars as mcal
+        from datetime import datetime
+        import pytz
+        
+        nyse = mcal.get_calendar('NYSE')
+        et_tz = pytz.timezone('America/New_York')
+        today = datetime.now(et_tz).date()
+        
+        schedule = nyse.schedule(start_date=today, end_date=today)
+        
+        if schedule.empty:
+            print('NYSE is closed today (holiday or weekend)')
+            print('market_open=false')
+            exit(0)
+        else:
+            print('NYSE is open today')
+            print('market_open=true')
+        " > market_status.txt
+        
+        cat market_status.txt
+        grep -q "market_open=true" market_status.txt && echo "is_open=true" >> $GITHUB_OUTPUT || echo "is_open=false" >> $GITHUB_OUTPUT
+    
+    - name: Set market status for manual runs
+      if: github.event.inputs.skip_market_check == 'true'
+      run: echo "is_open=true" >> $GITHUB_OUTPUT
+      id: manual_override
+    
+    - name: Holiday message
+      if: steps.market_check.outputs.is_open == 'false'
+      run: |
+        MESSAGES=(
+          "🏖️ Market's closed today... go touch some grass!"
+          "📴 NYSE is taking a day off. Maybe you should too?"
+          "🎉 It's a holiday! The only green you should worry about is your lawn."
+          "☕ Market's closed. Time to pretend you have a work-life balance!"
+          "🌴 Wall Street called in sick. Go enjoy actual daylight for once."
+          "🎮 No trading today... finally time to beat that video game!"
+          "🧘 Market's closed. Your portfolio can't hurt you today. Relax!"
+          "🍕 NYSE is off duty. Go do something that doesn't involve staring at charts."
+          "🎪 It's a holiday! Even Wall Street needs a break from making you anxious."
+          "🏃 Market's closed... get a life! (Just kidding, but seriously, go outside)"
+        )
+        RANDOM_MSG=${MESSAGES[$RANDOM % ${#MESSAGES[@]}]}
+        echo "$RANDOM_MSG"
+        echo "::notice::$RANDOM_MSG"
+    
+    - name: Run scanner script
+      if: steps.market_check.outputs.is_open == 'true' || steps.manual_override.outputs.is_open == 'true'
+      run: |
+        echo "Starting scanner at $(date)"
+        python market-divergence-scan.py
+        echo "Scanner completed at $(date)"
+      continue-on-error: false
+    
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scanner-logs-${{ github.run_id }}-${{ github.run_attempt }}
+        path: |
+          *.log
+          logs/
+        retention-days: 7
+        if-no-files-found: ignore
+    
+    - name: Upload scan results (if any)
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scan-results-${{ github.run_id }}
+        path: |
+          results/
+          output/
+          *.csv
+          *.json
+        retention-days: 30
+        if-no-files-found: ignore
+    
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "::error::Scanner failed at $(date)"
+        echo "Check the logs for details"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install yfinance python-dotenv requests pytz
-
-      - name: Run SPY divergence scanner
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/spy-divergence.py
+  # Optional: Summary job to track success rate
+  summary:
+    runs-on: ubuntu-latest
+    needs: run-scanner
+    if: always()
+    steps:
+    - name: Job summary
+      run: |
+        echo "## NYSE Scanner Run Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Time:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ${{ needs.run-scanner.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.run-scanner.result }}" == "success" ]; then
+          echo "✅ Scanner completed successfully" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ needs.run-scanner.result }}" == "skipped" ]; then
+          echo "⏭️ Scanner skipped (market closed)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Scanner failed - check logs" >> $GITHUB_STEP_SUMMARY
+        fi
