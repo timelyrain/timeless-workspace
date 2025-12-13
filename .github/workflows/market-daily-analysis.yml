@@ -2,9 +2,9 @@ name: Daily Market Analysis
 
 on:
   schedule:
-    # Runs every 2 hours between 06:30 and 22:30 Malaysia Time (UTC+8).
-    # Converted to UTC: 22:30,00:30,02:30,04:30,06:30,08:30,10:30,12:30,14:30
-    - cron: '30 22,0,2,4,6,8,10,12,14 * * *'
+    # Malaysia Time (UTC+8): 9:00 AM, 3:00 PM, 9:00 PM
+    # Converted to UTC: 01:00, 07:00, 13:00
+    - cron: '0 1,7,13 * * *'
   workflow_dispatch:      # Allows manual run button
 
 jobs:
