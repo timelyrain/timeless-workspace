@@ -1,34 +1,31 @@
-name: Market Daily Analysis
+name: Hourly Market Analysis
 
 on:
-  workflow_dispatch: {}
-  # Uncomment to schedule (UTC):
-  # schedule:
-  #   - cron: "0 12 * * 1-5"  # 8:00 AM US/Eastern on weekdays
-
-env:
-  PYTHON_VERSION: '3.11'
+  schedule:
+    # Runs every 2 hours between 06:30 and 22:30 Malaysia Time (UTC+8).
+    # Converted to UTC: 22:30,00:30,02:30,04:30,06:30,08:30,10:30,12:30,14:30
+    - cron: '30 22,0,2,4,6,8,10,12,14 * * *'
+  workflow_dispatch:      # Allows manual run button
 
 jobs:
-  run-market-daily-analysis:
+  analyze_market:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: '3.9'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install feedparser google-generativeai requests python-dotenv
+      - name: Install libraries
+        run: pip install -r requirements.txt
 
-      - name: Run market daily analysis
+      - name: Run AI Bot
         env:
-          TELEGRAM_TOKEN_MKT_ANALYSIS: ${{ secrets.TELEGRAM_TOKEN_MKT_ANALYSIS }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python projects/market-daily-analysis.py
+        run: python market_bot.py
