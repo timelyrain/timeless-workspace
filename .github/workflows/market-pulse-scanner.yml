@@ -1,4 +1,4 @@
-name: Market Daily Outlook
+name: Market Pulse Scanner
 
 on:
   schedule:
@@ -23,9 +23,9 @@ jobs:
       - name: Install libraries
         run: pip install -r requirements.txt
 
-      - name: Run AI Bot
+      - name: Run Market Pulse Scanner
         env:
           TELEGRAM_TOKEN_MKT_ANALYSIS: ${{ secrets.TELEGRAM_TOKEN_MKT_ANALYSIS }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python projects/market-daily-analysis.py
+        run: python projects/market-pulse-scanner.py
