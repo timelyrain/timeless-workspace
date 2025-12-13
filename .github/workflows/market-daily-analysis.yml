@@ -1,4 +1,4 @@
-name: Hourly Market Analysis
+name: Daily Market Analysis
 
 on:
   schedule:
