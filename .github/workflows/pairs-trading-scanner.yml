@@ -1,0 +1,35 @@
+name: Pairs Trading Scanner
+
+on:
+  schedule:
+    # Runs daily at 3 PM ET (end of day positioning)
+    # EDT (UTC-4): 19:00 UTC
+    - cron: '0 19 * * 1-5'
+    # EST (UTC-5): 20:00 UTC
+    - cron: '0 20 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run Pairs Trading Scanner
+        env:
+          TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: |
+          python projects/pairs-trading-scanner.py

@@ -4,3 +4,7 @@ requests==2.32.3
 pytz==2024.1
 feedparser==6.0.10
 google-generativeai==0.4.1
+pandas
+numpy
+scipy
+statsmodels
