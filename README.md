@@ -1,4 +1,4 @@
-# Complete Trading Scanner Arsenal - 21 Scanners
+# 21 Complete Trading Signals
 
 ## **1. Market Pulse Scanner** 🎙️
 - **Purpose**: AI-powered daily market sentiment analysis using Gemini 2.0
