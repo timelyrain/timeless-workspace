@@ -1,10 +1,10 @@
-name: Buyback Scanner
+name: PEAD Scanner
 
 on:
   schedule:
-    # Weekly Monday 7 AM ET
-    - cron: '0 11 * * 1'  # EDT
-    - cron: '0 12 * * 1'  # EST
+    # Daily 8 AM ET
+    - cron: '0 12 * * 1-5'  # EDT
+    - cron: '0 13 * * 1-5'  # EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/buyback-scanner.py
+        run: python projects/pead-signals.py

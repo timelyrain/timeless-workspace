@@ -1,19 +1,22 @@
-name: Support Resistance Scanner
+name: Unusual Options Scanner
 
 on:
   schedule:
-    # Run twice daily: 10:00 AM and 2:00 PM ET
+    # Run 3x during market hours (Eastern Time)
+    # 10:00 AM, 12:00 PM, 2:00 PM ET
     - cron: '0 14 * * 1-5'   # 10:00 AM EDT
+    - cron: '0 16 * * 1-5'   # 12:00 PM EDT
     - cron: '0 18 * * 1-5'   # 2:00 PM EDT
     - cron: '0 15 * * 1-5'   # 10:00 AM EST
+    - cron: '0 17 * * 1-5'   # 12:00 PM EST
     - cron: '0 19 * * 1-5'   # 2:00 PM EST
-  workflow_dispatch: {}
+  workflow_dispatch: {}  # Manual trigger
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  run-sr-scanner:
+  run-options-scanner:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,8 +32,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run support/resistance scanner
+      - name: Run unusual options scanner
         env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/support-resistance-scanner.py
+        run: python projects/unusual-options-signals.py

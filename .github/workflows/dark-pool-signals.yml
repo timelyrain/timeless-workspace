@@ -1,10 +1,12 @@
-name: Liquidity Scanner
+name: Dark Pool Scanner
 
 on:
   schedule:
-    # Weekly Friday 3 PM ET (weekend review)
-    - cron: '0 19 * * 5'  # EDT
-    - cron: '0 20 * * 5'  # EST
+    # 2x daily: 11 AM, 3 PM ET
+    - cron: '0 15 * * 1-5'   # 11 AM EDT
+    - cron: '0 19 * * 1-5'   # 3 PM EDT
+    - cron: '0 16 * * 1-5'   # 11 AM EST
+    - cron: '0 20 * * 1-5'   # 3 PM EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +26,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/liquidity-scanner.py
+        run: python projects/dark-pool-signals.py

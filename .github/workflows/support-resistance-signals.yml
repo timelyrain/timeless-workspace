@@ -1,17 +1,19 @@
-name: Smart Money Flow Scanner
+name: Support Resistance Scanner
 
 on:
   schedule:
-    # Run weekly on Mondays at 7:00 AM ET (after weekend 13F analysis)
-    - cron: '0 11 * * 1'  # EDT
-    - cron: '0 12 * * 1'  # EST
+    # Run twice daily: 10:00 AM and 2:00 PM ET
+    - cron: '0 14 * * 1-5'   # 10:00 AM EDT
+    - cron: '0 18 * * 1-5'   # 2:00 PM EDT
+    - cron: '0 15 * * 1-5'   # 10:00 AM EST
+    - cron: '0 19 * * 1-5'   # 2:00 PM EST
   workflow_dispatch: {}
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  run-smart-money:
+  run-sr-scanner:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,8 +29,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run smart money flow scanner
+      - name: Run support/resistance scanner
         env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/smart-money-flow-scanner.py
+        run: python projects/support-resistance-signals.py

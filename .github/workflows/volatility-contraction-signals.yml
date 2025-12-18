@@ -1,10 +1,10 @@
-name: PEAD Scanner
+name: Volatility Contraction Scanner
 
 on:
   schedule:
-    # Daily 8 AM ET
-    - cron: '0 12 * * 1-5'  # EDT
-    - cron: '0 13 * * 1-5'  # EST
+    # Daily 4:30 PM ET (after market close)
+    - cron: '30 20 * * 1-5'  # EDT
+    - cron: '30 21 * * 1-5'  # EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/pead-scanner.py
+        run: python projects/volatility-contraction-signals.py

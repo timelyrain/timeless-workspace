@@ -1,14 +1,12 @@
-name: Mean Reversion Scanner
+name: Short Squeeze Scanner
 
 on:
   schedule:
-    # 3x daily: 10 AM, 1 PM, 3:45 PM ET
-    - cron: '0 14 * * 1-5'   # 10 AM EDT
-    - cron: '0 17 * * 1-5'   # 1 PM EDT
-    - cron: '45 19 * * 1-5'  # 3:45 PM EDT
-    - cron: '0 15 * * 1-5'   # 10 AM EST
-    - cron: '0 18 * * 1-5'   # 1 PM EST
-    - cron: '45 20 * * 1-5'  # 3:45 PM EST
+    # 2x daily: 9:45 AM, 2 PM ET
+    - cron: '45 13 * * 1-5'  # 9:45 AM EDT
+    - cron: '0 18 * * 1-5'   # 2 PM EDT
+    - cron: '45 14 * * 1-5'  # 9:45 AM EST
+    - cron: '0 19 * * 1-5'   # 2 PM EST
   workflow_dispatch: {}
 
 env:
@@ -28,4 +26,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/mean-reversion-scanner.py
+        run: python projects/short-squeeze-signals.py

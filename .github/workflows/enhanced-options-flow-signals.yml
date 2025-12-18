@@ -1,10 +1,14 @@
-name: Dollar Correlation Scanner
+name: Enhanced Options Flow Scanner
 
 on:
   schedule:
-    # Weekly Monday 8 AM ET
-    - cron: '0 12 * * 1'  # EDT
-    - cron: '0 13 * * 1'  # EST
+    # 3x daily: 10:30 AM, 12:30 PM, 2:30 PM ET
+    - cron: '30 14 * * 1-5'  # 10:30 AM EDT
+    - cron: '30 16 * * 1-5'  # 12:30 PM EDT
+    - cron: '30 18 * * 1-5'  # 2:30 PM EDT
+    - cron: '30 15 * * 1-5'  # 10:30 AM EST
+    - cron: '30 17 * * 1-5'  # 12:30 PM EST
+    - cron: '30 19 * * 1-5'  # 2:30 PM EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +28,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/dollar-correlation-scanner.py
+        run: python projects/enhanced-options-flow-signals.py

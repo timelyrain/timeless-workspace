@@ -24,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/sector-rs-momentum-scanner.py
+        run: python projects/sector-rs-momentum-signals.py

@@ -1,21 +1,17 @@
-name: Breakout Scanner
+name: Smart Money Flow Scanner
 
 on:
   schedule:
-    # Run twice daily during market hours (Eastern Time)
-    # 10:00 AM ET = 14:00 UTC (DST) / 15:00 UTC (Standard)
-    # 3:30 PM ET = 19:30 UTC (DST) / 20:30 UTC (Standard)
-    - cron: '0 14 * * 1-5'   # Morning scan (EDT)
-    - cron: '30 19 * * 1-5'  # End of day scan (EDT)
-    - cron: '0 15 * * 1-5'   # Morning scan (EST)
-    - cron: '30 20 * * 1-5'  # End of day scan (EST)
-  workflow_dispatch: {}  # Manual trigger
+    # Run weekly on Mondays at 7:00 AM ET (after weekend 13F analysis)
+    - cron: '0 11 * * 1'  # EDT
+    - cron: '0 12 * * 1'  # EST
+  workflow_dispatch: {}
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  run-breakout-scanner:
+  run-smart-money:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -31,8 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run breakout scanner
+      - name: Run smart money flow scanner
         env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/breakout-scanner.py
+        run: python projects/smart-money-flow-signals.py

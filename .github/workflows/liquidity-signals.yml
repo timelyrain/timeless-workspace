@@ -1,10 +1,10 @@
-name: Analyst Rating Scanner
+name: Liquidity Scanner
 
 on:
   schedule:
-    # Daily 8 AM ET (before market open)
-    - cron: '0 12 * * 1-5'  # EDT
-    - cron: '0 13 * * 1-5'  # EST
+    # Weekly Friday 3 PM ET (weekend review)
+    - cron: '0 19 * * 5'  # EDT
+    - cron: '0 20 * * 5'  # EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/analyst-rating-scanner.py
+        run: python projects/liquidity-signals.py

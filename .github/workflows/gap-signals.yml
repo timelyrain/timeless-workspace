@@ -1,22 +1,17 @@
-name: Unusual Options Scanner
+name: Gap Scanner
 
 on:
   schedule:
-    # Run 3x during market hours (Eastern Time)
-    # 10:00 AM, 12:00 PM, 2:00 PM ET
-    - cron: '0 14 * * 1-5'   # 10:00 AM EDT
-    - cron: '0 16 * * 1-5'   # 12:00 PM EDT
-    - cron: '0 18 * * 1-5'   # 2:00 PM EDT
-    - cron: '0 15 * * 1-5'   # 10:00 AM EST
-    - cron: '0 17 * * 1-5'   # 12:00 PM EST
-    - cron: '0 19 * * 1-5'   # 2:00 PM EST
-  workflow_dispatch: {}  # Manual trigger
+    # Run at 8:00 AM ET (pre-market)
+    - cron: '0 12 * * 1-5'  # EDT
+    - cron: '0 13 * * 1-5'  # EST
+  workflow_dispatch: {}
 
 env:
   PYTHON_VERSION: '3.11'
 
 jobs:
-  run-options-scanner:
+  run-gap-scanner:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,8 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Run unusual options scanner
+      - name: Run gap scanner
         env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/unusual-options-scanner.py
+        run: python projects/gap-signals.py

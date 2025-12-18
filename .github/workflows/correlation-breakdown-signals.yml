@@ -1,12 +1,10 @@
-name: Short Squeeze Scanner
+name: Correlation Breakdown Scanner
 
 on:
   schedule:
-    # 2x daily: 9:45 AM, 2 PM ET
-    - cron: '45 13 * * 1-5'  # 9:45 AM EDT
-    - cron: '0 18 * * 1-5'   # 2 PM EDT
-    - cron: '45 14 * * 1-5'  # 9:45 AM EST
-    - cron: '0 19 * * 1-5'   # 2 PM EST
+    # Daily 3 PM ET
+    - cron: '0 19 * * 1-5'  # EDT
+    - cron: '0 20 * * 1-5'  # EST
   workflow_dispatch: {}
 
 env:
@@ -26,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/short-squeeze-scanner.py
+        run: python projects/correlation-breakdown-signals.py

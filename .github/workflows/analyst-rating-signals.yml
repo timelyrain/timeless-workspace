@@ -1,10 +1,10 @@
-name: Volatility Contraction Scanner
+name: Analyst Rating Scanner
 
 on:
   schedule:
-    # Daily 4:30 PM ET (after market close)
-    - cron: '30 20 * * 1-5'  # EDT
-    - cron: '30 21 * * 1-5'  # EST
+    # Daily 8 AM ET (before market open)
+    - cron: '0 12 * * 1-5'  # EDT
+    - cron: '0 13 * * 1-5'  # EST
   workflow_dispatch: {}
 
 env:
@@ -24,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/volatility-contraction-scanner.py
+        run: python projects/analyst-rating-signals.py

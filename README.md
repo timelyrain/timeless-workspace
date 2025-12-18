@@ -1,6 +1,6 @@
 # 21 Complete Trading Signals
 
-## **1. Market Pulse Scanner** 🎙️
+## **1. Market Pulse Signal** 🎙️
 - **Purpose**: AI-powered daily market sentiment analysis using Gemini 2.0
 - **Data Sources**: 8 RSS feeds (MarketWatch, Yahoo Finance, Seeking Alpha, Google News)
 - **Parameters**: Real-time news aggregation, sentiment scoring, witty analysis
@@ -9,7 +9,7 @@
 
 ---
 
-## **2. Market Divergence Scanner** 📉
+## **2. Market Divergence Signal** 📉
 - **Purpose**: Detect relative strength when SPY is weak (divergence = reversal signal)
 - **Parameters**: 
   - SPY intraday drawdown ≤ -1.5%
@@ -20,7 +20,7 @@
 
 ---
 
-## **3. Breakout Scanner** 🚀
+## **3. Breakout Signal** 🚀
 - **Purpose**: Identify 52-week high breakouts with volume confirmation
 - **Parameters**:
   - Distance from 52W high ≤ 2%
@@ -32,7 +32,7 @@
 
 ---
 
-## **4. Unusual Options Activity Scanner** 📊
+## **4. Unusual Options Activity Signal** 📊
 - **Purpose**: Track institutional options flow and premium accumulation
 - **Parameters**:
   - Volume ratio ≥ 3x average
@@ -44,7 +44,7 @@
 
 ---
 
-## **5. Earnings Calendar + IV Crush Scanner** 📅
+## **5. Earnings Calendar + IV Crush Signal** 📅
 - **Purpose**: Track earnings dates and identify IV rank extremes for option strategies
 - **Parameters**:
   - IV rank ≥ 70 (high implied volatility)
@@ -69,7 +69,7 @@
 
 ---
 
-## **7. Gap Scanner** 🌅
+## **7. Gap Signal** 🌅
 - **Purpose**: Detect pre-market/after-hours gaps for day trading setups
 - **Parameters**:
   - Minimum gap: 3%
@@ -84,7 +84,7 @@
 
 ---
 
-## **8. Support/Resistance Bounce Scanner** 📈
+## **8. Support/Resistance Bounce Signal** 📈
 - **Purpose**: Identify stocks testing key S/R levels with RSI confirmation
 - **Parameters**:
   - 52W high/low levels
@@ -111,7 +111,7 @@
 
 ---
 
-## **10. Smart Money Flow Scanner** 🏦
+## **10. Smart Money Flow Signal** 🏦
 - **Purpose**: Track institutional ownership and 13F superinvestor activity
 - **Parameters**:
   - Minimum institutional ownership: 50%
@@ -123,7 +123,7 @@
 
 ---
 
-## **11. Mean Reversion Scanner** 📊
+## **11. Mean Reversion Signal** 📊
 - **Purpose**: Detect oversold bounces using statistical measures
 - **Parameters**:
   - Z-score ≤ -2.0 SD (2.5% probability)
@@ -137,7 +137,7 @@
 
 ---
 
-## **12. Volatility Contraction Scanner** 🎯
+## **12. Volatility Contraction Signal** 🎯
 - **Purpose**: Find coiled springs (low volatility → high volatility)
 - **Parameters**:
   - ATR compression ≤ 50% of 60-day max
@@ -150,7 +150,7 @@
 
 ---
 
-## **13. Dark Pool Scanner** 🌑
+## **13. Dark Pool Signal** 🌑
 - **Purpose**: Track large block trades indicating institutional accumulation
 - **Parameters**:
   - Minimum block value: $500k
@@ -163,7 +163,7 @@
 
 ---
 
-## **14. Short Squeeze Scanner** 🔥
+## **14. Short Squeeze Signal** 🔥
 - **Purpose**: Detect high short interest stocks near squeeze
 - **Parameters**:
   - Short interest ≥ 15% of float (30%+ extreme)
@@ -176,7 +176,7 @@
 
 ---
 
-## **15. Buyback Scanner** 💰
+## **15. Buyback Signal** 💰
 - **Purpose**: Monitor share buyback programs (management confidence signal)
 - **Parameters**:
   - Buyback ratio ≥ 2% of shares outstanding (5%+ strong)
@@ -187,7 +187,7 @@
 
 ---
 
-## **16. Analyst Rating Scanner** 📈
+## **16. Analyst Rating Signal** 📈
 - **Purpose**: Track analyst upgrades/downgrades (institutional flow preview)
 - **Parameters**:
   - Focus on Tier 1 firms: Goldman Sachs, Morgan Stanley, JPMorgan, BofA, Citi
@@ -198,7 +198,7 @@
 
 ---
 
-## **17. Dollar Correlation Scanner** 💵
+## **17. Dollar Correlation Signal** 💵
 - **Purpose**: Find stocks inversely correlated to DXY for macro plays
 - **Parameters**:
   - Minimum correlation: -0.5 (inverse) or +0.5 (positive)
@@ -209,7 +209,7 @@
 
 ---
 
-## **18. Sector RS Momentum Scanner** 🚀
+## **18. Sector RS Momentum Signal** 🚀
 - **Purpose**: IBD-style relative strength rating (institutional playbook)
 - **Parameters**:
   - RS rating ≥ 90 (top 10% performers)
@@ -221,7 +221,7 @@
 
 ---
 
-## **19. Enhanced Options Flow Scanner** 🎰
+## **19. Enhanced Options Flow Signal** 🎰
 - **Purpose**: Track $1M+ options sweeps (whale activity)
 - **Parameters**:
   - Minimum sweep: $1M per trade
@@ -233,7 +233,7 @@
 
 ---
 
-## **20. Liquidity Scanner** 💧
+## **20. Liquidity Signal** 💧
 - **Purpose**: Risk management tool - identify illiquid stocks (exit risk)
 - **Parameters**:
   - Flag if avg volume < 500k shares/day (critical < 200k)
@@ -244,7 +244,7 @@
 
 ---
 
-## **21. Correlation Breakdown Scanner** ⚠️
+## **21. Correlation Breakdown Signal** ⚠️
 - **Purpose**: Detect anomalies in correlated pairs (NVDA/AMD, JPM/GS, etc.)
 - **Parameters**:
   - Historical correlation ≥ 0.6 required
@@ -259,7 +259,7 @@
 
 ---
 
-## **22. PEAD Scanner** 📊
+## **22. PEAD Signal** 📊
 - **Purpose**: Post-Earnings Announcement Drift (academic research proven)
 - **Parameters**:
   - Earnings beat ≥ 10%
@@ -271,33 +271,33 @@
 
 ---
 
-## **RISK MANAGEMENT MASTER RULES (Apply to ALL 21 Scanners):**
+## **RISK MANAGEMENT MASTER RULES (Apply to ALL 21 Signals):**
 
 1. **Position Sizing**: Never risk more than 2% of portfolio on single trade (1% for volatile setups)
 2. **Correlation**: Max 3 positions in same sector simultaneously
 3. **Stop Losses**: Always use stops - no exceptions. Trail stops once +10% profitable
-4. **Confluence**: Best setups have 2-3 scanners triggering same stock (e.g., Breakout + Options Flow + Sector Rotation)
+4. **Confluence**: Best setups have 2-3 Signals triggering same stock (e.g., Breakout + Options Flow + Sector Rotation)
 5. **Quality Tiers**: 
    - HIGH quality = full position size
    - MEDIUM = 50-75% position
    - LOW = 25% or skip
 6. **Market Environment**: 
-   - Uptrend: Use breakout, momentum, sector RS scanners (75% of capital)
+   - Uptrend: Use breakout, momentum, sector RS Signals (75% of capital)
    - Choppy: Use mean reversion, S/R bounce, PEAD (50% capital, smaller size)
    - Downtrend: Cash is a position (max 20% deployed, short squeezes only)
 7. **Diversification**: Max 8-10 positions at once across different strategies
-8. **Journal Every Trade**: Track which scanner, why entered, result (learn patterns)
+8. **Journal Every Trade**: Track which Signal, why entered, result (learn patterns)
 
-**Portfolio Allocation by Scanner Type:**
+**Portfolio Allocation by Signal Type:**
 - **Core (60%)**: Breakout, Sector RS Momentum, Volatility Contraction (lower frequency, higher conviction)
 - **Tactical (30%)**: Mean Reversion, PEAD, Options Flow, S/R Bounce (higher frequency, smaller size)
 - **Speculative (10%)**: Short Squeeze, Dark Pool, Correlation Breakdown (highest risk/reward)
 
 ---
 
-## New Tier 1 Institutional Scanners (Added Dec 2024)
+## New Tier 1 Institutional Signals (Added Dec 2024)
 
-### 23. Accumulation/Distribution Scanner (Wyckoff Method) 📦
+### 23. Accumulation/Distribution Signal (Wyckoff Method) 📦
 **Summary**: Detects institutional accumulation/distribution phases using volume-price analysis based on Richard Wyckoff's methodology. Tracks On-Balance Volume (OBV) and Accumulation/Distribution Line to identify smart money footprints.
 
 **Purpose**: Identify when institutions are secretly accumulating shares before markup phases or distributing before markdowns. The Wyckoff method has been used by professional traders for 100+ years to follow institutional money flow.
@@ -327,7 +327,7 @@
 
 ---
 
-### 24. Opening Range Breakout (ORB) Scanner 🌅
+### 24. Opening Range Breakout (ORB) Signal 🌅
 **Summary**: Detects breakouts from the first 15-30 minutes of trading, a strategy favored by prop traders and day trading firms like SMB Capital. Captures momentum from opening imbalances.
 
 **Purpose**: Capitalize on early market volatility where 70%+ of intraday range is established. Institutions often place orders at market open, creating directional momentum that persists throughout the session.
@@ -358,7 +358,7 @@
 
 ---
 
-### 25. Golden/Death Cross Scanner ✝️
+### 25. Golden/Death Cross Signal ✝️
 **Summary**: Detects 50 SMA crossing above/below 200 SMA, a major algorithmic trigger used by $100B+ AUM institutions. One of the most widely followed technical signals in institutional trading.
 
 **Purpose**: Capture major trend changes when algos trigger simultaneous buy/sell programs. Golden Cross has historically preceded 20-30% rallies, while Death Cross signals extended downtrends.
@@ -389,7 +389,7 @@
 
 ---
 
-### 26. Cup & Handle Scanner ☕
+### 26. Cup & Handle Signal ☕
 **Summary**: Detects William O'Neil's signature IBD pattern with 85%+ win rate in bull markets. Identifies 7-65 week U-shaped consolidations followed by 1-4 week handle pullbacks, indicating institutional accumulation.
 
 **Purpose**: Capture massive moves (100-500%+) by identifying patterns where institutions accumulate shares over weeks/months before major breakouts. This is the #1 pattern in the CANSLIM methodology.
@@ -422,7 +422,7 @@
 
 ---
 
-### 27. Pairs Trading Scanner (Statistical Arbitrage) 🔄
+### 27. Pairs Trading Signal (Statistical Arbitrage) 🔄
 **Summary**: Identifies cointegrated stock pairs for market-neutral statistical arbitrage. Uses Engle-Granger cointegration test and Z-score analysis to find mean-reversion opportunities with 70%+ Sharpe ratios.
 
 **Purpose**: Generate market-neutral returns by exploiting temporary divergences between historically correlated stocks. This is a hedge fund staple strategy that profits regardless of market direction.

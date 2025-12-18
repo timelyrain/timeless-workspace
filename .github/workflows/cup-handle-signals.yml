@@ -1,12 +1,12 @@
-name: Accumulation Distribution Scanner
+name: Cup and Handle Scanner
 
 on:
   schedule:
-    # Runs daily at 4:30 PM ET (after market close)
-    # EDT (UTC-4): 20:30 UTC
-    - cron: '30 20 * * 1-5'
-    # EST (UTC-5): 21:30 UTC
-    - cron: '30 21 * * 1-5'
+    # Runs weekly Friday at 5 PM ET (pattern forms over weeks)
+    # EDT (UTC-4): 21:00 UTC on Friday
+    - cron: '0 21 * * 5'
+    # EST (UTC-5): 22:00 UTC on Friday
+    - cron: '0 22 * * 5'
   workflow_dispatch:
 
 jobs:
@@ -27,9 +27,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Run Accumulation Distribution Scanner
+      - name: Run Cup & Handle Scanner
         env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: |
-          python projects/accumulation-distribution-scanner.py
+          python projects/cup-handle-signals.py

@@ -1,12 +1,10 @@
-name: Dark Pool Scanner
+name: Dollar Correlation Scanner
 
 on:
   schedule:
-    # 2x daily: 11 AM, 3 PM ET
-    - cron: '0 15 * * 1-5'   # 11 AM EDT
-    - cron: '0 19 * * 1-5'   # 3 PM EDT
-    - cron: '0 16 * * 1-5'   # 11 AM EST
-    - cron: '0 20 * * 1-5'   # 3 PM EST
+    # Weekly Monday 8 AM ET
+    - cron: '0 12 * * 1'  # EDT
+    - cron: '0 13 * * 1'  # EST
   workflow_dispatch: {}
 
 env:
@@ -26,4 +24,4 @@ jobs:
       - env:
           TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python projects/dark-pool-scanner.py
+        run: python projects/dollar-correlation-signals.py
