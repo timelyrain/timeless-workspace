@@ -47,12 +47,7 @@ def load_watchlist(include_etfs=True, watchlist_path=None):
         print("Using fallback watchlist...")
         # Fallback watchlist
         return [
-            'ABT', 'ADBE', 'AMT', 'ANET', 'APP', 'ASML', 'AVGO', 'COIN', 'COST', 'CRM',
-            'CRWD', 'DDOG', 'DIS', 'GOOGL', 'GS', 'HUBS', 'ISRG', 'JNJ', 'JPM', 'LLY',
-            'MA', 'MCD', 'META', 'MELI', 'MSFT', 'NET', 'NFLX', 'NOW', 'NVDA', 'ORCL',
-            'PANW', 'PFE', 'PG', 'PLTR', 'PYPL', 'S', 'SHOP', 'SNOW', 'SOFI', 'TEAM',
-            'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'ZS',
-            'SPY', 'QQQ', 'IWM', 'DIA', 'TLT'
+            'SPY', 'QQQ'
         ]
     
     except json.JSONDecodeError as e:

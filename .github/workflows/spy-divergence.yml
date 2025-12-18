@@ -1,4 +1,4 @@
-name: Market Divergence Relative Strength
+name: SPY Divergence Relative Strength
 
 on:
   schedule:

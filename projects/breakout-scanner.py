@@ -98,7 +98,7 @@ WATCHLIST = load_watchlist()
 BENCHMARK = 'SPY'
 
 # Telegram Credentials
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_DIVERGENCE")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 
 # ==========================================
