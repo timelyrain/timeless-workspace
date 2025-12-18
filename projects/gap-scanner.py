@@ -102,17 +102,14 @@ from dotenv import load_dotenv
 from pathlib import Path
 import pytz
 import os
+from watchlist_loader import load_watchlist
 
 # Load environment variables
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
 # Watchlist
-WATCHLIST = ['ABT', 'ADBE', 'AMT', 'ANET', 'APP', 'ASML', 'AVGO', 'COIN', 'CPRT', 'DOV',
-             'ESS', 'FDS', 'FSLR', 'FTNT', 'GILD', 'GOOG', 'GOOGL', 'HOOD', 'ISRG', 'JNJ',
-             'KLAC', 'KO', 'LLY', 'LRCX', 'MA', 'MCO', 'META', 'MPWR', 'MRK', 'MRVL',
-             'MSFT', 'MSTR', 'NEM', 'NVDA', 'PAYX', 'PLTR', 'PSA', 'PTC', 'REGN', 'RMD',
-             'SCHW', 'SPG', 'TPL', 'TROW', 'TXN', 'UBER', 'UNP', 'V', 'VRSK', 'VRTX', 'ZTS']
+WATCHLIST = load_watchlist()
 
 # Telegram Credentials
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_DIVERGENCE")

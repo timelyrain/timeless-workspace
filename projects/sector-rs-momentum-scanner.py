@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 import pytz
+from watchlist_loader import load_watchlist
 
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
@@ -23,11 +24,7 @@ load_dotenv(dotenv_path=env_path)
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN_DIVERGENCE')
 CHAT_ID = os.getenv('CHAT_ID')
 
-WATCHLIST = [
-    'ABT', 'ADBE', 'AMT', 'ANET', 'APP', 'ASML', 'AVGO', 'COIN', 'COST', 'CRM',
-    'CRWD', 'DDOG', 'DIS', 'GOOGL', 'GS', 'HUBS', 'ISRG', 'JNJ', 'JPM', 'LLY',
-    'MA', 'MCD', 'META', 'MELI', 'MSFT', 'NET', 'NFLX', 'NOW', 'NVDA', 'ORCL',
-    'PANW', 'PFE', 'PG', 'PLTR', 'PYPL', 'S', 'SHOP', 'SNOW', 'SOFI', 'TEAM',
+WATCHLIST = load_watchlist()
     'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'ZS',
     'SPY', 'QQQ', 'IWM', 'DIA', 'TLT'
 ]

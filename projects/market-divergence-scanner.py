@@ -4,10 +4,11 @@ import time
 from datetime import datetime
 from dotenv import load_dotenv
 import pytz
+from watchlist_loader import load_watchlist
 
 # --- CONFIGURATION ---
 # List of stocks to watch (instituition critera RoE 15%, Net Profit 25%, Nasdaq and SP500, 10bil market cap)
-WATCHLIST = ['ABT', 'ADBE', 'AMT', 'ANET', 'APP', 'ASML', 'AVGO', 'COIN', 'CPRT', 'DOV','ESS', 'FDS', 'FSLR', 'FTNT', 'GILD', 'GOOG', 'GOOGL', 'HOOD', 'ISRG', 'JNJ','KLAC', 'KO', 'LLY', 'LRCX', 'MA', 'MCO', 'META', 'MPWR', 'MRK', 'MRVL','MSFT', 'MSTR', 'NEM', 'NVDA', 'PAYX', 'PLTR', 'PSA', 'PTC', 'REGN', 'RMD','SCHW', 'SPG', 'TPL', 'TROW', 'TXN', 'UBER', 'UNP', 'V', 'VRSK', 'VRTX', 'ZTS']
+WATCHLIST = load_watchlist()
 BENCHMARK = 'SPY'
 
 # Telegram Credentials (loaded from environment or .env file)
