@@ -25,9 +25,6 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN_DIVERGENCE')
 CHAT_ID = os.getenv('CHAT_ID')
 
 WATCHLIST = load_watchlist()
-    'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'ZS',
-    'SPY', 'QQQ', 'IWM', 'DIA', 'TLT'
-]
 
 # Tier 1 firms (weight higher)
 TOP_TIER_FIRMS = ['Goldman Sachs', 'Morgan Stanley', 'JPMorgan', 'Bank of America', 'Citi']

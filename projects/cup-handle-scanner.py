@@ -37,11 +37,6 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN_DIVERGENCE')
 CHAT_ID = os.getenv('CHAT_ID')
 
 WATCHLIST = load_watchlist()
-    'MA', 'MCD', 'META', 'MELI', 'MSFT', 'NET', 'NFLX', 'NOW', 'NVDA', 'ORCL',
-    'PANW', 'PFE', 'PG', 'PLTR', 'PYPL', 'S', 'SHOP', 'SNOW', 'SOFI', 'TEAM',
-    'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'ZS',
-    'SPY', 'QQQ', 'IWM', 'DIA', 'TLT'
-]
 
 # === SETTINGS ===
 MIN_CUP_WEEKS = 7

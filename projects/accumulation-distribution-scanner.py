@@ -38,12 +38,6 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN_DIVERGENCE')
 CHAT_ID = os.getenv('CHAT_ID')
 
 WATCHLIST = load_watchlist()
-    'CRWD', 'DDOG', 'DIS', 'GOOGL', 'GS', 'HUBS', 'ISRG', 'JNJ', 'JPM', 'LLY',
-    'MA', 'MCD', 'META', 'MELI', 'MSFT', 'NET', 'NFLX', 'NOW', 'NVDA', 'ORCL',
-    'PANW', 'PFE', 'PG', 'PLTR', 'PYPL', 'S', 'SHOP', 'SNOW', 'SOFI', 'TEAM',
-    'TSLA', 'TSM', 'UNH', 'V', 'WMT', 'ZS',
-    'SPY', 'QQQ', 'IWM', 'DIA', 'TLT'
-]
 
 # === SETTINGS ===
 ACCUMULATION_PERIOD = 40  # 40 days (~8 weeks) for accumulation detection
