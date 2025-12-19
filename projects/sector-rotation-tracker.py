@@ -139,7 +139,7 @@ TOP_N_SECTORS = 3
 
 def send_telegram_message(message):
     """Sends alert to Telegram"""
-    if not TELEGRAM_TOKEN or not CHAT_ID:
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("Telegram credentials not found. Printing to console instead.")
         print(message)
         return
