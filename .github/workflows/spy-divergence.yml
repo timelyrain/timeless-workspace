@@ -51,8 +51,8 @@ on:
 env:
   PYTHON_VERSION: '3.11'
   TZ: 'America/New_York'
-  TELEGRAM_TOKEN_DIVERGENCE: ${{ secrets.TELEGRAM_TOKEN_DIVERGENCE }}
-  CHAT_ID: ${{ secrets.CHAT_ID }}
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
   
 jobs:
   run-scanner:

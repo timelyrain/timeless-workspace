@@ -110,7 +110,7 @@ def scan_analyst_ratings():
 
 def format_alert_message(signals):
     if not signals:
-        return "📈 Analyst Rating Scanner\n\nNo significant rating changes this week."
+        return None
     
     signals = sorted(signals, key=lambda x: x['net_rating'], reverse=True)
     ny_tz = pytz.timezone('America/New_York')
@@ -151,8 +151,13 @@ def main():
     signals = scan_analyst_ratings()
     print(f"Found {len(signals)} rating change(s)")
     message = format_alert_message(signals)
-    print(f"\n{message}")
-    send_telegram_message(message)
+    
+    if message:
+        print(f"\n{message}")
+        send_telegram_message(message)
+    else:
+        print("\nNo significant rating changes found. Skipping Telegram alert.")
+        
     print("Analyst Rating Scanner completed")
 
 if __name__ == "__main__":

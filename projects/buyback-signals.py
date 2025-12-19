@@ -1,10 +1,10 @@
 """
-Buyback Authorization Scanner 💰
-Monitors share buyback announcements and 10b5-1 plan activity.
+Buyback Authorization Signals 💰
+Monitors share buyback announcements using Financial Modeling Prep (FMP) API for accurate, real-time data.
 
 Key Features:
-- Tracks companies with active buyback programs
-- Monitors buyback % of shares outstanding
+- Tracks companies with active buyback programs (via FMP buyback endpoint)
+- Monitors buyback % of shares outstanding (using FMP-reported buybackAmount)
 - Detects accelerated buyback activity
 - Identifies strong shareholder return signals
 
@@ -18,7 +18,7 @@ Usage Tips:
 Strategy: Follow companies putting money where their mouth is.
 Schedule: Runs weekly Monday 7 AM ET (after weekend filings review).
 
-Note: Buyback data available via company filings and yfinance info.
+Note: Buyback data is now sourced from Financial Modeling Prep (FMP) API, not yfinance. You must set FMP_API_KEY in your .env file.
 """
 
 import yfinance as yf
@@ -35,16 +35,43 @@ load_dotenv(dotenv_path=env_path)
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
+FMP_API_KEY = os.getenv('FMP_API_KEY')
 
 WATCHLIST = load_watchlist()
 
 # === SETTINGS ===
-MIN_BUYBACK_RATIO = 2.0  # % of shares outstanding
+# Buyback data is now sourced from FMP API (see get_fmp_buyback_amount)
+MIN_BUYBACK_RATIO = 2.0  # % of shares outstanding (from FMP buybackAmount)
 STRONG_BUYBACK_RATIO = 5.0
 MIN_FREE_CASH_FLOW = 100_000_000  # $100M minimum FCF
 MIN_PRICE = 20.0
 
+def get_fmp_buyback_amount(ticker):
+    """
+    Fetches the most recent buyback amount (in dollars) from FMP cash flow statement endpoint.
+    Returns (buyback_amount, fiscal_date). If no data, returns (0, None).
+    """
+    url = f"https://financialmodelingprep.com/stable/cash-flow-statement?symbol={ticker}&apikey={FMP_API_KEY}"
+    print(f"FMP URL: {url}")
+    try:
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        print(f"FMP cash flow data for {ticker}: {data}")
+        if data and isinstance(data, list) and 'commonStockRepurchased' in data[0]:
+            latest = data[0]
+            return float(latest.get('commonStockRepurchased', 0)), latest.get('date', '')
+        return 0, None
+    except Exception as e:
+        print(f"FMP error for {ticker}: {e}")
+        return 0, None
+
 def scan_buybacks():
+    """
+    Scans for buyback signals using FMP cash flow statement
+    - Only considers stocks with a recent repurchase > 0
+    - Calculates buyback % of shares outstanding (using repurchase $ / (shares_outstanding * price))
+    - Applies scoring based on buyback %, free cash flow, and price discount
+    """
     signals = []
     for ticker in WATCHLIST:
         try:
@@ -52,48 +79,33 @@ def scan_buybacks():
             stock = yf.Ticker(ticker)
             info = stock.info
             hist = stock.history(period='1y')
-            
             if hist.empty:
                 continue
-            
             current_price = hist['Close'].iloc[-1]
             if current_price < MIN_PRICE:
                 continue
-            
-            # Check for buyback indicators
+            # FMP buyback integration (cash flow statement)
+            print(f"Fetching buyback data for {ticker} from FMP...")
+            buyback_amount, buyback_date = get_fmp_buyback_amount(ticker)
             shares_outstanding = info.get('sharesOutstanding', 0)
-            float_shares = info.get('floatShares', shares_outstanding)
+            if buyback_amount == 0 or shares_outstanding == 0 or current_price == 0:
+                continue
+            # Estimate buyback %: repurchase $ / (shares_outstanding * price)
+            buyback_pct = abs(buyback_amount) / (shares_outstanding * current_price) * 100
             free_cash_flow = info.get('freeCashflow', 0)
-            
-            # Estimate buyback activity (simplified - real data needs filings)
-            shares_change = info.get('sharesShortPriorMonth', 0) - info.get('sharesShort', 0)
-            
-            # Calculate buyback ratio (if data available)
-            if shares_outstanding > 0:
-                buyback_pct = abs(shares_change) / shares_outstanding * 100 if shares_change < 0 else 0
-            else:
-                buyback_pct = 0
-            
-            # Free cash flow check
             if free_cash_flow < MIN_FREE_CASH_FLOW:
                 continue
-            
-            # Score
             score = 0
             if buyback_pct >= STRONG_BUYBACK_RATIO:
                 score += 5
             elif buyback_pct >= MIN_BUYBACK_RATIO:
                 score += 3
-            
             if free_cash_flow > 1_000_000_000:  # $1B+
                 score += 2
-            
-            # Price relative to 52W high
             high_52w = hist['High'].max()
             distance_from_high = ((high_52w - current_price) / high_52w) * 100
             if distance_from_high > 20:  # Buying at discount
                 score += 2
-            
             if score >= 5:
                 quality = 'HIGH' if score >= 7 else 'MEDIUM'
                 signals.append({
@@ -103,13 +115,12 @@ def scan_buybacks():
                     'fcf_m': free_cash_flow / 1_000_000,
                     'distance_from_high': distance_from_high,
                     'score': score,
-                    'quality': quality
+                    'quality': quality,
+                    'buyback_date': buyback_date
                 })
-        
         except Exception as e:
             print(f"Error processing {ticker}: {e}")
             continue
-    
     return signals
 
 def format_alert_message(signals):

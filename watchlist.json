@@ -1,13 +1,9 @@
 {
   "stocks": [
-    "ABT", "ADBE", "AMT", "ANET", "APP", "ASML", "AVGO", "COIN", "COST", "CRM",
-    "CRWD", "DDOG", "DIS", "GOOGL", "GS", "HUBS", "ISRG", "JNJ", "JPM", "LLY",
-    "MA", "MCD", "META", "MELI", "MSFT", "NET", "NFLX", "NOW", "NVDA", "ORCL",
-    "PANW", "PFE", "PG", "PLTR", "PYPL", "S", "SHOP", "SNOW", "SOFI", "TEAM",
-    "TSLA", "TSM", "UNH", "V", "WMT", "ZS"
+    "GEV", "AAPL"
   ],
   "etfs": [
-    "SPY", "QQQ", "IWM", "DIA", "TLT", "VT"
+    "SPY"
   ],
   "description": "Master watchlist for all trading scanners. Edit this file to update all scanners at once."
 }

@@ -61,8 +61,8 @@ def scan_market():
         stock_change = pct_changes[ticker]
         relative_strength = stock_change - spy_change
         
-        # Condition 1: "The Divergence" (SPY dropped >1.5% intraday, stock green)
-        if spy_intraday_drawdown_pct <= -1.5 and stock_change > 0:
+        # Condition 1: "The Divergence" (SPY dropped >1.0% intraday, stock green)
+        if spy_intraday_drawdown_pct <= -1.0 and stock_change > 0:
             alerts.append(f"🚀 *DIVERGENCE ALERT: {ticker}*\nSPY fell {spy_intraday_drawdown_pct:.2f}% intraday, but {ticker} is Green ({stock_change:.2f}%).")
             
         # Condition 2: "The Rocket" (Stock is beating SPY by 2%+)
