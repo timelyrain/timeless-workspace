@@ -20,7 +20,7 @@ load_dotenv()
 # Configuration
 FMP_API_KEY = os.getenv('FMP_API_KEY')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+CHAT_ID = os.getenv('CHAT_ID')
 
 # Signal thresholds
 MIN_FIRST_DAY_GAIN = 10  # Minimum first-day pop %
@@ -33,13 +33,13 @@ MIN_SCORE_HIGH = 10
 
 def send_telegram_message(message):
     """Send message via Telegram bot"""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    if not TELEGRAM_TOKEN or not CHAT_ID:
         print("Telegram credentials not configured")
         return False
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
+        'chat_id': CHAT_ID,
         'text': message,
         'parse_mode': 'HTML'
     }

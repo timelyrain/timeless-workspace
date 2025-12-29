@@ -12,7 +12,7 @@ load_dotenv(dotenv_path=env_path)
 
 # --- CONFIGURATION ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+CHAT_ID = os.environ.get("CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # Comprehensive free RSS feeds - institutional grade sources
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         print("❌ Error: GEMINI_API_KEY environment variable is missing.")
         exit(1)
     
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    if not TELEGRAM_TOKEN or not CHAT_ID:
         print("⚠️  Warning: Telegram credentials missing. Analysis will print to console only.")
 
     try:
@@ -151,7 +151,7 @@ if __name__ == "__main__":
         if not headlines_text:
             error_msg = "⚠️ No market news found from any source."
             print(error_msg)
-            if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+            if TELEGRAM_TOKEN and CHAT_ID:
                 send_telegram_message(error_msg)
             exit()
 
@@ -173,7 +173,7 @@ if __name__ == "__main__":
         full_message = header + analysis + footer
         
         # 4. Send or print
-        if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        if TELEGRAM_TOKEN and CHAT_ID:
             send_telegram_message(full_message)
         else:
             print("\n" + "=" * 60)
@@ -186,5 +186,5 @@ if __name__ == "__main__":
     except Exception as e:
         error_msg = f"❌ Critical Error: {str(e)}"
         print(error_msg)
-        if TELEGRAM_TOKEN and TELEGRAM_CHAT_ID:
+        if TELEGRAM_TOKEN and CHAT_ID:
             send_telegram_message(f"⚠️ Bot Error: {str(e)}")

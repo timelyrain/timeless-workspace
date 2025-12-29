@@ -123,7 +123,7 @@ WATCHLIST = load_watchlist()
 
 # Telegram Credentials
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+CHAT_ID = os.environ.get("CHAT_ID")
 
 # ==========================================
 # 🎯 SUPPORT/RESISTANCE SETTINGS - CUSTOMIZE HERE!
@@ -148,7 +148,7 @@ LOOKBACK_DAYS = 252  # 52 weeks
 
 def send_telegram_message(message):
     """Sends alert to Telegram"""
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+    if not TELEGRAM_TOKEN or not CHAT_ID:
         print("Telegram credentials not found. Printing to console instead.")
         print(message)
         return
