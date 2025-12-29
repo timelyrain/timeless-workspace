@@ -82,7 +82,7 @@ WATCHLIST = load_watchlist()
 
 # Telegram Credentials
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 # ==========================================
 # 🎯 OPTIONS SCANNER SETTINGS - CUSTOMIZE HERE!

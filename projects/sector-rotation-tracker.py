@@ -100,7 +100,7 @@ load_dotenv(dotenv_path=env_path)
 
 # Telegram Credentials
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 # ==========================================
 # 🎯 SECTOR ROTATION SETTINGS - CUSTOMIZE HERE!
