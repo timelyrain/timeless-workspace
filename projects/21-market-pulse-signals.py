@@ -19,10 +19,13 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 # Comprehensive free RSS feeds - institutional grade sources
 RSS_FEEDS = {
     # Major Financial News Outlets
+    "Reuters Business": "https://feeds.reuters.com/reuters/businessNews",
+    "WSJ Markets": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
     "Investing.com": "https://www.investing.com/rss/news.rss",
     "Yahoo Finance": "https://finance.yahoo.com/news/rssindex",
     "Seeking Alpha": "https://seekingalpha.com/feed.xml",
+    "ZeroHedge": "https://feeds.feedburner.com/zerohedge/feed",
     
     # Google News - Targeted Searches (24h filter)
     "Google: Market News": "https://news.google.com/rss/search?q=stock+market+when:24h&hl=en-US&gl=US&ceid=US:en",
@@ -43,7 +46,7 @@ def get_market_headlines():
         try:
             print(f"  ✓ Fetching from {source}...")
             feed = feedparser.parse(url)
-            
+
             if not feed.entries:
                 print(f"    ⚠ No entries found")
                 continue
@@ -270,7 +273,7 @@ if __name__ == "__main__":
         footer = (
             f"\n\n━━━━━━━━━━━━━━━━━\n"
             f"📰 _Brewed from {headline_count} fresh headlines_\n"
-            f"🔍 _Sources: MarketWatch, Investing.com, Yahoo Finance, Seeking Alpha & Google News_\n"
+            f"🔍 _Sources: Reuters, WSJ, MarketWatch, Investing.com, Yahoo Finance, Seeking Alpha, ZeroHedge & Google News_\n"
             f"🤖 _Analyzed by your friendly neighborhood KHK AI_"
         )
         
