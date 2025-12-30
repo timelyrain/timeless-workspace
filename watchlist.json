@@ -1,9 +1,53 @@
 {
   "stocks": [
-    "GS", "JPM"
+    "AAPL",
+    "ABBV",
+    "AMD",
+    "AMGN",
+    "AMZN",
+    "AVGO",
+    "AXP",
+    "BAC",
+    "BMY",
+    "C",
+    "CAT",
+    "COST",
+    "EL",
+    "GE",
+    "GOOGL",
+    "GS",
+    "HD",
+    "INTC",
+    "JNJ",
+    "JPM",
+    "KLAC",
+    "LLY",
+    "LRCX",
+    "MA",
+    "MDB",
+    "META",
+    "MRK",
+    "MS",
+    "MSFT",
+    "NEE",
+    "NVDA",
+    "PLD",
+    "REGN",
+    "RTX",
+    "TJX",
+    "TMO",
+    "TSLA",
+    "UNH",
+    "USB",
+    "V"
   ],
   "etfs": [
-    "SPY"
+    "SPY",
+    "QQQ",
+    "DIA",
+    "IWM"
   ],
-  "description": "Master watchlist for all trading scanners. Edit this file to update all scanners at once."
+  "description": "Auto-updated watchlist. Last refresh: 2025-12-30 17:28",
+  "total_stocks": 40,
+  "update_frequency": "Weekly"
 }

@@ -1,0 +1,20 @@
+# Watchlist Auto-Update Cron Job
+# Add this to your crontab: crontab -e
+#
+# Runs every Sunday at 8:00 PM ET (adjust for your timezone)
+# For ET (Eastern Time), if you're in EST/EDT:
+
+# Sunday 8 PM ET
+0 20 * * 0 /Users/hongkiatkoh/Desktop/timeless-workspace/scripts/update-watchlist.sh
+
+# Alternative schedules:
+# Every Monday 6 AM: 0 6 * * 1 /path/to/update-watchlist.sh
+# Twice a week (Sun, Wed 8 PM): 0 20 * * 0,3 /path/to/update-watchlist.sh
+# First day of month: 0 8 1 * * /path/to/update-watchlist.sh
+
+# To install:
+# 1. Open terminal
+# 2. Run: crontab -e
+# 3. Paste the line above (adjust path if needed)
+# 4. Save and exit (ESC then :wq in vim)
+# 5. Verify: crontab -l

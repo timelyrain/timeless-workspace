@@ -1,0 +1,22 @@
+# Launchd Management Commands for Watchlist Updater
+
+# View status
+launchctl list | grep timeless
+
+# Unload (stop) the job
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+
+# Reload (restart) the job
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+launchctl load ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+
+# Test run immediately (for debugging)
+launchctl start com.timeless.watchlist-updater
+
+# View logs
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+
+# Remove completely
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+rm ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist

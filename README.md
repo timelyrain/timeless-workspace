@@ -616,3 +616,451 @@ SPY fell -1.2% intraday, AAPL +0.8%
 **Good luck on your trading journey! 🚀**
 
 *Last Updated: December 30, 2025*
+
+---
+
+## 🛠️ SETUP & CONFIGURATION GUIDE
+
+### **Overview**
+This workspace contains automated trading signal systems that run on schedule and require minimal manual intervention. Below is the complete setup documentation for all systems.
+
+---
+
+### **1. Environment Setup**
+
+#### **Prerequisites**
+- macOS with Python 3.9+
+- Virtual environment configured
+- API keys for Gemini AI and Telegram
+
+#### **Environment Variables (.env file)**
+```bash
+# Create .env in workspace root or projects/ directory
+TELEGRAM_TOKEN=your_bot_token_here
+CHAT_ID=your_chat_id_here
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+#### **Installation**
+```bash
+# Navigate to workspace
+cd ~/Desktop/timeless-workspace
+
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+# (Includes: yfinance, feedparser, google-generativeai, requests, python-dotenv, pytz)
+```
+
+---
+
+### **2. Watchlist System (Autonomous Updates)**
+
+#### **What It Does**
+- Automatically scans S&P 500 top performers every Sunday 8 PM
+- Finds breakout stocks near 52-week highs
+- Updates `watchlist.json` with strongest 40-60 stocks
+- Balances sector exposure to avoid concentration
+- Maintains core mega-cap holdings
+
+#### **Files Involved**
+- **`watchlist.json`** - Master watchlist (edited by updater)
+- **`projects/watchlist-auto-updater.py`** - Scans and updates watchlist
+- **`projects/watchlist_loader.py`** - Loader utility for other scripts
+- **`scripts/update-watchlist.sh`** - Bash wrapper with sleep prevention
+
+#### **Schedule: Sunday 8:00 PM (Automated via Launchd)**
+
+**Status Check:**
+```bash
+# View if job is loaded
+launchctl list | grep timeless
+
+# View logs
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+```
+
+**Manual Run:**
+```bash
+cd ~/Desktop/timeless-workspace
+source .venv/bin/activate
+python projects/watchlist-auto-updater.py
+```
+
+**Management Commands:**
+```bash
+# Unload (stop) the job
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+
+# Reload (restart) the job
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+launchctl load ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+
+# Test run immediately
+launchctl start com.timeless.watchlist-updater
+
+# Remove completely
+launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+rm ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
+```
+
+**What Gets Updated:**
+- Min Market Cap: $10B
+- Min Avg Volume: 1M shares/day
+- Min Price: $20
+- Max Stocks: 60
+- Core Holdings: Always kept (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, V, MA, UNH, LLY, HD, COST)
+- Sector Balance: Max 35% per sector
+
+**Technical Details:**
+- Uses `caffeinate` to prevent Mac sleep during execution
+- Logs to separate stdout/stderr files
+- Automatically activates virtual environment
+- Sleep prevention: 1-hour timeout buffer
+- Runs via macOS Launchd (not cron) for better reliability
+
+---
+
+### **3. Sector RS Momentum Signal**
+
+#### **Purpose**
+IBD-style relative strength scanner identifying the strongest stocks in the strongest sectors.
+
+**File:** `projects/01-sector-rs-momentum-signals.py`  
+**Schedule:** Daily 4 PM ET  
+**Watchlist:** Uses `watchlist.json`
+
+#### **Setup**
+```bash
+# Run manually
+python projects/01-sector-rs-momentum-signals.py
+
+# Output: Telegram alert + console display
+```
+
+**What It Scans:**
+- RS Rating: Compares each stock vs SPY over 252 trading days
+- Top 3 Sectors: Measures 3-month performance of 11 sector ETFs
+- Filters: RS ≥90 (top 10%), must be in top 3 sector
+- Quality Score: Based on RS ≥95, top sector status, outperformance >50%
+
+**Output Format:**
+```
+🚀 Sector RS Momentum Scanner
+⏰ 2025-12-30 04:00 PM ET
+
+🔥 Top 3 Sectors:
+  1. Technology: +15.2%
+  2. Communication: +12.8%
+  3. Consumer Disc: +9.4%
+
+📊 Found 3 high RS stock(s)
+
+🟢 NVDA - $875.50 [TOP SECTOR]
+  📈 RS Rating: 98/99 (Top 2%)
+  💪 Outperformance: +85.3% vs SPY
+  🏢 Sector: Technology
+  ⭐ Score: 10/10 (HIGH)
+```
+
+---
+
+### **4. Market Pulse Signal (Daily News Bot)**
+
+#### **Purpose**
+Analyzes daily financial news from 11 sources using Gemini AI to provide:
+- Narrative market briefing (witty, conversational)
+- Structured sentiment/impact analysis (JSON)
+- Top tickers and macro drivers
+
+**File:** `projects/21-market-pulse-signals.py`  
+**Schedule:** Daily (configurable time, currently no schedule)  
+**RSS Feeds:** 11 sources (Reuters, WSJ, MarketWatch, Yahoo Finance, Seeking Alpha, ZeroHedge, + 5 Google News targets)
+
+#### **Setup**
+```bash
+# Requires: GEMINI_API_KEY, TELEGRAM_TOKEN, CHAT_ID in .env
+
+# Run manually
+python projects/21-market-pulse-signals.py
+```
+
+**RSS Feed Sources:**
+1. Reuters Business - Institutional breaking news
+2. WSJ Markets - Wall Street Journal (paywalled)
+3. MarketWatch - Dow Jones financial news
+4. Investing.com - Broker/analyst perspective
+5. Yahoo Finance - Market data + news
+6. Seeking Alpha - Retail + professional commentary
+7. ZeroHedge - Contrarian/bearish viewpoint
+8-11. Google News - Targeted searches (Market, S&P 500, Fed, Earnings)
+
+#### **Features**
+- **Deduplication:** Removes duplicate headlines (case-insensitive)
+- **Headline Cap:** Limits to 25 headlines to avoid overwhelming Gemini
+- **Structured Output:**
+  - Overall sentiment (bullish/bearish/neutral)
+  - Macro driver (main story of the day)
+  - High-impact items (5 max) with direction (up/down/mixed)
+  - Top tickers (6 max) with sentiment
+- **JSON Cleaning:** Strips markdown fences and backticks from Gemini responses
+- **Error Handling:** Gracefully handles missing feeds and JSON parse errors
+
+#### **Output Example**
+```
+🚀 Your Daily Market Tea ☕
+_December 30, 2025 at 04:00 PM_
+
+📈 Structured read: BULLISH
+🌐 Macro: Fed rate cuts expected in 2026; tech earnings in focus
+
+🔥 High-impact moves:
+- 🟢⬆️ (high) Fed Policy Shift - Expects rate cuts next year
+- 🟢⬆️ (high) AI Sector Momentum - NVDA rallies on data center demand
+- 🟡↔️ (medium) Earnings Season - Mixed results from Q4 reports
+
+🎯 Top tickers:
+- 🟢 NVDA: Strong AI fundamentals, data center boom
+- 🟢 TSLA: EV demand recovery, margin expansion
+- 🟡 MSFT: Copilot adoption slower than expected
+
+[Narrative analysis from Gemini follows...]
+```
+
+#### **Configuration Options**
+```python
+# In projects/21-market-pulse-signals.py:
+RSS_FEEDS = {
+    # Add/remove feeds as needed
+    "Your Source": "https://feed.url.here"
+}
+MIN_HEADLINES = 5  # Minimum before Gemini analysis
+MAX_HEADLINES = 25  # Cap to avoid token limits
+```
+
+---
+
+### **5. Logging & Monitoring**
+
+#### **Log Locations**
+```bash
+# Watchlist updater logs
+~/Desktop/timeless-workspace/logs/watchlist-updates.log
+~/Desktop/timeless-workspace/logs/watchlist-errors.log
+
+# Market Pulse Signal (if enabled with launchd)
+~/Desktop/timeless-workspace/logs/market-pulse.log
+```
+
+#### **View Real-time Logs**
+```bash
+# Watchlist updates
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+
+# Errors
+tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+
+# Count recent updates
+grep "✅" ~/Desktop/timeless-workspace/logs/watchlist-updates.log | wc -l
+```
+
+#### **Troubleshooting**
+| Issue | Solution |
+|-------|----------|
+| Launchd job not running | Check `launchctl list \| grep timeless` |
+| Mac sleeping at 8 PM | Job is queued; will run when Mac wakes. Disable sleep in System Prefs for reliability |
+| "No headlines found" | Check RSS feed URLs; firewall may block feedparser requests |
+| Gemini API errors | Verify API key in `.env`; check token balance |
+| Telegram not receiving | Verify TELEGRAM_TOKEN and CHAT_ID in `.env` |
+| JSON parse errors | Gemini response format changed; check `_clean_structured_json()` function |
+
+---
+
+### **6. Watchlist Maintenance Guide**
+
+#### **Current Watchlist (40 stocks)**
+**Updated:** December 30, 2025 via auto-updater
+
+**Composition:**
+- 9 Technology stocks (AAPL, MSFT, GOOGL, NVDA, META, ADBE, CRM, AVGO, KLAC)
+- 9 Healthcare stocks (UNH, LLY, ABBV, TMO, ISRG, VRTX, JNJ, ABT, MRK)
+- 9 Financial Services (JPM, BAC, GS, V, MA, BLK, COIN, C, MS)
+- 4 Consumer stocks (HD, COST, NKE, SYK)
+- 3 Industrials (CAT, BA, GE)
+- 2 Communication (DIS, NFLX)
+- 1 Utility (NEE)
+- 1 Real Estate (PLD)
+- 4 ETFs for benchmarking (SPY, QQQ, DIA, IWM)
+
+#### **Manual Updates**
+Edit `watchlist.json` directly:
+```json
+{
+  "stocks": ["AAPL", "MSFT", "GOOGL", ...],
+  "etfs": ["SPY", "QQQ", ...],
+  "description": "Your custom description"
+}
+```
+
+#### **Quality Filters**
+Updater automatically filters:
+- Market Cap ≥ $10B
+- Avg Volume ≥ 1M shares/day
+- Price ≥ $20
+- Sector balance (max 35% per sector)
+
+#### **Add Sector-Specific Watches**
+Example: Add emerging AI stocks monthly
+```python
+# In watchlist-auto-updater.py, add to growth_candidates:
+growth_candidates = [
+    # ... existing ...
+    'UPST',  # AI lending
+    'MNDY',  # AI project management
+    'RBLX',  # Metaverse/AI
+]
+```
+
+---
+
+### **7. Running Signals on Schedule**
+
+#### **Current Scheduled Tasks**
+| Signal | Schedule | Execution | Status |
+|--------|----------|-----------|--------|
+| Watchlist Auto-Updater | Sun 8 PM | Launchd | ✅ Active |
+| Sector RS Scanner | Daily 4 PM | Manual | ⏳ Needs launchd setup |
+| Market Pulse News Bot | Daily (var) | Manual | ⏳ Needs launchd setup |
+
+#### **Setting Up Launchd for Sector RS Signals**
+```bash
+# Create plist file
+cat > ~/Library/LaunchAgents/com.timeless.sector-rs-scanner.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.timeless.sector-rs-scanner</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/hongkiatkoh/Desktop/timeless-workspace/projects/01-sector-rs-momentum-signals.py</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>16</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/hongkiatkoh/Desktop/timeless-workspace/logs/sector-rs.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/hongkiatkoh/Desktop/timeless-workspace/logs/sector-rs-errors.log</string>
+</dict>
+</plist>
+EOF
+
+# Load it
+launchctl load ~/Library/LaunchAgents/com.timeless.sector-rs-scanner.plist
+
+# Verify
+launchctl list | grep sector
+```
+
+---
+
+### **8. Quick Reference**
+
+#### **Essential Commands**
+```bash
+# Test all systems
+python projects/01-sector-rs-momentum-signals.py
+python projects/21-market-pulse-signals.py
+python projects/watchlist-auto-updater.py
+
+# Check scheduled jobs
+launchctl list | grep timeless
+
+# View recent watchlist updates
+tail -20 ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+
+# Manually trigger watchlist update
+launchctl start com.timeless.watchlist-updater
+
+# Edit .env
+nano ~/Desktop/timeless-workspace/projects/.env
+
+# Check Python environment
+source .venv/bin/activate
+python --version
+pip list | grep -E "(yfinance|feedparser|google|requests)"
+```
+
+#### **Directory Structure**
+```
+timeless-workspace/
+├── README.md                          # This file
+├── watchlist.json                     # Master watchlist (auto-updated)
+├── requirements.txt                   # Python dependencies
+├── .env                               # API keys (not in git)
+├── .venv/                             # Python virtual environment
+│
+├── projects/                          # All trading signal scripts
+│   ├── 01-sector-rs-momentum-signals.py
+│   ├── 21-market-pulse-signals.py
+│   ├── watchlist-auto-updater.py
+│   ├── watchlist_loader.py
+│   └── .env                           # Copy of main .env
+│
+├── scripts/                           # Bash wrappers & config
+│   ├── update-watchlist.sh            # Called by launchd
+│   ├── launchd-commands.txt           # Management reference
+│   └── crontab-example.txt            # Legacy (use launchd instead)
+│
+└── logs/                              # Execution logs
+    ├── watchlist-updates.log
+    ├── watchlist-errors.log
+    ├── sector-rs.log
+    └── sector-rs-errors.log
+```
+
+---
+
+### **9. Troubleshooting Checklist**
+
+- [ ] Virtual environment activated? `source .venv/bin/activate`
+- [ ] `.env` file exists with API keys?
+- [ ] Watchlist.json is valid JSON? Test: `python -m json.tool watchlist.json`
+- [ ] Launchd job loaded? `launchctl list | grep timeless`
+- [ ] Check logs for errors? `tail -50 logs/watchlist-updates.log`
+- [ ] Test script manually first before scheduling
+- [ ] Network firewall blocking feedparser? Test with `curl`
+- [ ] Telegram token valid? Test with `curl` to Telegram API
+- [ ] Gemini API quota exceeded? Check gemini.google.com console
+
+---
+
+### **10. Future Enhancements**
+
+- [ ] Add email notifications as backup to Telegram
+- [ ] Integrate with live brokerage API for actual trading
+- [ ] Add historical backtesting for RS signals
+- [ ] Create dashboard for signal performance tracking
+- [ ] Add SMS alerts for high-impact signals
+- [ ] Implement position sizing based on Kelly Criterion
+- [ ] Add portfolio rebalancing alerts
+- [ ] Create weekly summary report
+
+---
+
+**Last Updated:** December 30, 2025  
+**Maintained By:** Your Name  
+**Questions?** See troubleshooting section or check logs
