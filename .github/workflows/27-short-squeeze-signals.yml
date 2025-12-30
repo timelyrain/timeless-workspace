@@ -1,0 +1,29 @@
+name: Short Squeeze Scanner
+
+on:
+  schedule:
+    # 2x daily: 9:45 AM, 2 PM ET
+    - cron: '45 13 * * 1-5'  # 9:45 AM EDT
+    - cron: '0 18 * * 1-5'   # 2 PM EDT
+    - cron: '45 14 * * 1-5'  # 9:45 AM EST
+    - cron: '0 19 * * 1-5'   # 2 PM EST
+  workflow_dispatch: {}
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python projects/27-short-squeeze-signals.py

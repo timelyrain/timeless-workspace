@@ -1,0 +1,31 @@
+name: Market Pulse Scanner
+
+on:
+  schedule:
+    # Malaysia Time (UTC+8): 9:00 AM, 3:00 PM, 9:00 PM
+    # Converted to UTC: 01:00, 07:00, 13:00
+    - cron: '0 1,7,13 * * *'
+  workflow_dispatch:      # Allows manual run button
+
+jobs:
+  analyze_market:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install libraries
+        run: pip install -r requirements.txt
+
+      - name: Run Market Pulse Scanner
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python projects/21-market-pulse-signals.py

@@ -1,0 +1,31 @@
+name: Enhanced Options Flow Scanner
+
+on:
+  schedule:
+    # 3x daily: 10:30 AM, 12:30 PM, 2:30 PM ET
+    - cron: '30 14 * * 1-5'  # 10:30 AM EDT
+    - cron: '30 16 * * 1-5'  # 12:30 PM EDT
+    - cron: '30 18 * * 1-5'  # 2:30 PM EDT
+    - cron: '30 15 * * 1-5'  # 10:30 AM EST
+    - cron: '30 17 * * 1-5'  # 12:30 PM EST
+    - cron: '30 19 * * 1-5'  # 2:30 PM EST
+  workflow_dispatch: {}
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python projects/14-enhanced-options-flow-signals.py

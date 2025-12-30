@@ -1,0 +1,31 @@
+name: Mean Reversion Scanner
+
+on:
+  schedule:
+    # 3x daily: 10 AM, 1 PM, 3:45 PM ET
+    - cron: '0 14 * * 1-5'   # 10 AM EDT
+    - cron: '0 17 * * 1-5'   # 1 PM EDT
+    - cron: '45 19 * * 1-5'  # 3:45 PM EDT
+    - cron: '0 15 * * 1-5'   # 10 AM EST
+    - cron: '0 18 * * 1-5'   # 1 PM EST
+    - cron: '45 20 * * 1-5'  # 3:45 PM EST
+  workflow_dispatch: {}
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python projects/05-mean-reversion-signals.py

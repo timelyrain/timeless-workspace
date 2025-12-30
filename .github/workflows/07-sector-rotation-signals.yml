@@ -1,0 +1,32 @@
+name: Sector Rotation Signals
+
+on:
+  schedule:
+    # Schedule: Daily at 4:30 PM New York Time (Monday-Friday, after market close)
+    # Note: Dual cron entries handle the shift between EDT (UTC-4) and EST (UTC-5)
+    - cron: '30 20 * * 1-5'  # 20:30 UTC = 4:30 PM EDT
+    - cron: '30 21 * * 1-5'  # 21:30 UTC = 4:30 PM EST
+  workflow_dispatch: {}
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  run-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Run Sector Rotation Scanner
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+        run: |
+          python projects/07-sector-rotation-signals.py
