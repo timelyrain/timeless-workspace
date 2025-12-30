@@ -1,4 +1,4 @@
-# 🎯 Trading Signals Priority Guide
+# 🎯 Trading Signals Guide
 
 Last verified vs code: December 30, 2025
 

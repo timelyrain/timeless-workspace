@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import feedparser
 import google.generativeai as genai
@@ -71,8 +72,19 @@ def get_market_headlines():
     if not all_headlines:
         return ""
     
-    # Return top 25 headlines to avoid overwhelming Gemini
-    return "\n".join(all_headlines[:25])
+    # Deduplicate case-insensitively and cap to top 25 to avoid overwhelming Gemini
+    deduped = []
+    seen = set()
+    for h in all_headlines:
+        key = h.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(h)
+        if len(deduped) >= 25:
+            break
+
+    return "\n".join(deduped)
 
 def analyze_with_gemini(headlines):
     """Sends headlines to Gemini 2.0 for analysis"""
@@ -99,6 +111,33 @@ def analyze_with_gemini(headlines):
         f"- Under 500 words\n"
         f"- Use markdown for structure\n\n"
         f"Think: 'Professional trader at happy hour explaining the day' energy 🍻"
+    )
+
+    response = model.generate_content(prompt)
+    return response.text
+
+
+def analyze_structured_with_gemini(headlines):
+    """Ask Gemini for structured sentiment, impact, and directional cues."""
+    print("🤖 Getting structured summary from Gemini...\n")
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+
+    prompt = (
+        "Summarize these headlines for trading decisions. Return ONLY JSON with this schema:\n"
+        "{\n"
+        "  \"overall_sentiment\": \"bullish|bearish|neutral\",\n"
+        "  \"macro_driver\": \"string\",\n"
+        "  \"high_impact_items\": [\n"
+        "    {\"title\": \"string\", \"direction\": \"up|down|mixed\", \"impact\": \"high|medium|low\", \"why\": \"string\"}\n"
+        "  ],\n"
+        "  \"top_tickers\": [\n"
+        "    {\"ticker\": \"string\", \"sentiment\": \"bullish|bearish|neutral\", \"why\": \"string\"}\n"
+        "  ]\n"
+        "}\n"
+        "Rules: be concise; limit high_impact_items to 5; limit top_tickers to 6; omit markdown; no extra text.\n"
+        f"Headlines:\n{headlines}"
     )
 
     response = model.generate_content(prompt)
@@ -132,6 +171,48 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"✗ Telegram error: {e}\n")
 
+
+def build_structured_section(structured_json: str) -> str:
+    """Format structured JSON (string) into a compact text block."""
+    if not structured_json:
+        return ""
+    try:
+        data = json.loads(structured_json)
+    except Exception as e:
+        print(f"✗ Failed to parse structured summary: {e}")
+        return ""
+
+    overall = data.get("overall_sentiment", "neutral").upper()
+    macro = data.get("macro_driver", "")
+    items = data.get("high_impact_items", []) or []
+    tickers = data.get("top_tickers", []) or []
+
+    lines = []
+    lines.append(f"📈 Structured read: {overall}")
+    if macro:
+        lines.append(f"🌐 Macro: {macro}")
+
+    if items:
+        lines.append("🔥 High-impact moves:")
+        for itm in items[:5]:
+            title = itm.get("title", "")
+            direction = itm.get("direction", "")
+            impact = itm.get("impact", "")
+            why = itm.get("why", "")
+            arrow = "⬆️" if direction == "up" else "⬇️" if direction == "down" else "↔️"
+            lines.append(f"- {arrow} ({impact}) {title} — {why}")
+
+    if tickers:
+        lines.append("🎯 Top tickers:")
+        for t in tickers[:6]:
+            tk = t.get("ticker", "").upper()
+            sent = t.get("sentiment", "")
+            why = t.get("why", "")
+            emoji = "🟢" if sent == "bullish" else "🔴" if sent == "bearish" else "⚪"
+            lines.append(f"- {emoji} {tk}: {why}")
+
+    return "\n".join(lines)
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🤖 MARKET SENTIMENT BOT")
@@ -155,8 +236,10 @@ if __name__ == "__main__":
                 send_telegram_message(error_msg)
             exit()
 
-        # 2. Analyze with Gemini
+        # 2. Analyze with Gemini (narrative + structured)
         analysis = analyze_with_gemini(headlines_text)
+        structured_json = analyze_structured_with_gemini(headlines_text)
+        structured_block = build_structured_section(structured_json)
         
         # 3. Format message
         timestamp = datetime.now().strftime('%B %d, %Y at %I:%M %p')
@@ -170,7 +253,10 @@ if __name__ == "__main__":
             f"🤖 _Analyzed by your friendly neighborhood KHK AI_"
         )
         
-        full_message = header + analysis + footer
+        full_message = header
+        if structured_block:
+            full_message += structured_block + "\n\n"
+        full_message += analysis + footer
         
         # 4. Send or print
         if TELEGRAM_TOKEN and CHAT_ID:
