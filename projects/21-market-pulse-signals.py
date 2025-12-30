@@ -141,7 +141,25 @@ def analyze_structured_with_gemini(headlines):
     )
 
     response = model.generate_content(prompt)
-    return response.text
+    return response.text or ""
+
+
+def _clean_structured_json(raw: str) -> str:
+    """Strip fences/markdown and extract the first JSON object if present."""
+    if not raw:
+        return ""
+    s = raw.strip()
+    # Remove Markdown fences/backticks if present
+    if s.startswith("```json"):
+        s = s[len("```json"):]
+    s = s.strip('`').strip()
+    # Extract JSON object between first { and last }
+    if '{' in s and '}' in s:
+        start = s.find('{')
+        end = s.rfind('}')
+        if end > start:
+            s = s[start:end+1]
+    return s
 
 def send_telegram_message(message):
     """Sends the analysis to Telegram"""
@@ -177,7 +195,10 @@ def build_structured_section(structured_json: str) -> str:
     if not structured_json:
         return ""
     try:
-        data = json.loads(structured_json)
+        cleaned = _clean_structured_json(structured_json)
+        if not cleaned:
+            return ""
+        data = json.loads(cleaned)
     except Exception as e:
         print(f"✗ Failed to parse structured summary: {e}")
         return ""
@@ -199,7 +220,7 @@ def build_structured_section(structured_json: str) -> str:
             direction = itm.get("direction", "")
             impact = itm.get("impact", "")
             why = itm.get("why", "")
-            arrow = "⬆️" if direction == "up" else "⬇️" if direction == "down" else "↔️"
+            arrow = "🟢" if direction == "up" else "🔴" if direction == "down" else "↔️"
             lines.append(f"- {arrow} ({impact}) {title} — {why}")
 
     if tickers:
