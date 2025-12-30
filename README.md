@@ -609,9 +609,8 @@ SPY fell -1.2% intraday, AAPL +0.8%
 
 **Remember:** 
 - The best trader isn't the one who knows the most signals
-- It's the one who masters 5-10 signals perfectly
+- It's the one who masters 3-5 signals perfectly
 - Start with Tier 1, build competence, then expand
-- Paper trade until profitable, then scale slowly
 - Discipline beats intelligence in trading
 
 **Good luck on your trading journey! 🚀**
