@@ -1,0 +1,48 @@
+🎯 INSTITUTIONAL RISK DASHBOARD v1.5
+📅 2026-01-04 17:00:05
+
+📊 TOTAL RISK SCORE: 80.5/100
+🎚️ RISK LEVEL: ★★★★☆ NORMAL
+💼 POSITIONING: STAY COURSE
+
+📈 TIER BREAKDOWN:
+├─ Tier 1 (Credit/Liquidity): 48.0/50 (96%)
+├─ Tier 2 (Breadth): 24.0/30 (80%)
+├─ Tier 3 (Risk Appetite): 7.0/15 (47%)
+└─ Tier 4 (Sentiment): 1.5/5 (30%)
+
+📋 INDICATOR DETAILS:
+
+💰 TIER 1: CREDIT & LIQUIDITY
+  • HY Spread: 2.81% (Range: 3-6%)
+  • Fed BS YoY: -3.1% (Range: -10% to +10%)
+  • TED Spread: 0.09 (Range: 0.1-0.5)
+  • DXY Trend: -0.0% (Range: -3% to +3%)
+
+📊 TIER 2: MARKET BREADTH
+  • % Above 50-MA: 66% (Healthy: >65%)
+  • % Below 200-MA: 33% (Healthy: <25%)
+  • AD Line: Flat
+  • New H-L: 12 (Range: -10 to +10)
+
+🎯 TIER 3: RISK APPETITE
+  • XLU/XLK Rotation: 1.5% (Risk-on: <-2%)
+  • GLD/SPY Ratio: 0.1% (Risk-on: <-1%)
+  • VIX Structure: Backwardation
+
+🧠 TIER 4: SENTIMENT
+  • Yield Curve: 0.72% (Healthy: >0.2%)
+  • VIX Level: 14.5 (Calm: <16)
+  • Fear/Greed: 86/100 (Neutral: 35-65)
+
+📝 MARKET SUMMARY:
+
+✅ The Good:
+  • Credit markets healthy (HY spread tight)
+  • Banking system stable (TED spread low)
+  • Fed liquidity manageable
+  • Strong market breadth (>65% above 50-MA)
+  • No recession signal (yield curve positive)
+
+⚠️ The Concerns:
+  • VIX backwardation while VIX low = hidden tension
