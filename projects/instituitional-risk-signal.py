@@ -50,6 +50,12 @@ CONFIG = {
     'RUN_TIME': '09:15',
 }
 
+# Validate FRED API key
+if CONFIG['FRED_API_KEY'] == 'YOUR_FRED_API_KEY_HERE':
+    print("⚠️  WARNING: FRED_API_KEY not set. Economic indicators (HY Spread, Fed BS, TED, Yield Curve) will fail.")
+    print("   Get your free key at: https://fred.stlouisfed.org/docs/api/api_key.html")
+    print("   Add to GitHub Secrets: FRED_API_KEY")
+
 fred = Fred(api_key=CONFIG['FRED_API_KEY'])
 
 # =============================================================================
@@ -661,26 +667,26 @@ class RiskDashboard:
             "📋 INDICATOR DETAILS:",
             "",
             "💰 TIER 1: CREDIT & LIQUIDITY",
-            f"  • HY Spread: {d.get('hy_spread', 'N/A'):.2f}% (Range: 3-6%)",
-            f"  • Fed BS YoY: {d.get('fed_bs_yoy', 'N/A'):.1f}% (Range: -10% to +10%)",
-            f"  • TED Spread: {d.get('ted_spread', 'N/A'):.2f} (Range: 0.1-0.5)",
-            f"  • DXY Trend: {d.get('dxy_trend', 'N/A'):.1f}% (Range: -3% to +3%)",
+            f"  • HY Spread: {d.get('hy_spread'):.2f if d.get('hy_spread') is not None else 'N/A'}{'%' if d.get('hy_spread') is not None else ''} (Range: 3-6%)",
+            f"  • Fed BS YoY: {d.get('fed_bs_yoy'):.1f if d.get('fed_bs_yoy') is not None else 'N/A'}{'%' if d.get('fed_bs_yoy') is not None else ''} (Range: -10% to +10%)",
+            f"  • TED Spread: {d.get('ted_spread'):.2f if d.get('ted_spread') is not None else 'N/A'} (Range: 0.1-0.5)",
+            f"  • DXY Trend: {d.get('dxy_trend'):.1f if d.get('dxy_trend') is not None else 'N/A'}{'%' if d.get('dxy_trend') is not None else ''} (Range: -3% to +3%)",
             "",
             "📊 TIER 2: MARKET BREADTH",
-            f"  • % Above 50-MA: {d.get('pct_above_50ma', 'N/A'):.0f}% (Healthy: >65%)",
-            f"  • % Below 200-MA: {d.get('pct_below_200ma', 'N/A'):.0f}% (Healthy: <25%)",
+            f"  • % Above 50-MA: {d.get('pct_above_50ma'):.0f if d.get('pct_above_50ma') is not None else 'N/A'}{'%' if d.get('pct_above_50ma') is not None else ''} (Healthy: >65%)",
+            f"  • % Below 200-MA: {d.get('pct_below_200ma'):.0f if d.get('pct_below_200ma') is not None else 'N/A'}{'%' if d.get('pct_below_200ma') is not None else ''} (Healthy: <25%)",
             f"  • AD Line: {d.get('ad_line', 'N/A')}",
             f"  • New H-L: {d.get('new_hl', 'N/A')} (Range: -10 to +10)",
             "",
             "🎯 TIER 3: RISK APPETITE",
-            f"  • XLU/XLK Rotation: {d.get('sector_rot', 'N/A'):.1f}% (Risk-on: <-2%)",
-            f"  • GLD/SPY Ratio: {d.get('gold_spy', 'N/A'):.1f}% (Risk-on: <-1%)",
+            f"  • XLU/XLK Rotation: {d.get('sector_rot'):.1f if d.get('sector_rot') is not None else 'N/A'}{'%' if d.get('sector_rot') is not None else ''} (Risk-on: <-2%)",
+            f"  • GLD/SPY Ratio: {d.get('gold_spy'):.1f if d.get('gold_spy') is not None else 'N/A'}{'%' if d.get('gold_spy') is not None else ''} (Risk-on: <-1%)",
             f"  • VIX Structure: {d.get('vix_struct', 'N/A')}",
             "",
             "🧠 TIER 4: SENTIMENT",
-            f"  • Yield Curve: {d.get('yield_curve', 'N/A'):.2f}% (Healthy: >0.2%)",
-            f"  • VIX Level: {d.get('vix', 'N/A'):.1f} (Calm: <16)",
-            f"  • Fear/Greed: {d.get('fear_greed', 'N/A'):.0f}/100 (Neutral: 35-65)",
+            f"  • Yield Curve: {d.get('yield_curve'):.2f if d.get('yield_curve') is not None else 'N/A'}{'%' if d.get('yield_curve') is not None else ''} (Healthy: >0.2%)",
+            f"  • VIX Level: {d.get('vix'):.1f if d.get('vix') is not None else 'N/A'} (Calm: <16)",
+            f"  • Fear/Greed: {d.get('fear_greed'):.0f if d.get('fear_greed') is not None else 'N/A'}{'/100' if d.get('fear_greed') is not None else ''} (Neutral: 35-65)",
             "",
         ]
         
