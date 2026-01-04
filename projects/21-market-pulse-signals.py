@@ -171,7 +171,7 @@ def send_telegram_message(message):
     
     # Telegram has a 4096 character limit - truncate BEFORE any processing
     if len(message) > 4096:
-        print(f"⚠️  Message too long ({len(message)} chars), truncating to 4096...")
+        print(f"⚠️  Message too long ({len(message)} chars), truncating to 4090...")
         message = message[:4090] + "\n\n[...]"
     
     # Convert Markdown to plain text to avoid formatting issues
