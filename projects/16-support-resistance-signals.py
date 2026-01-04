@@ -154,10 +154,12 @@ def send_telegram_message(message):
         return
     
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    plain_message = message.replace('**', '').replace('_', '')
     
-    if len(plain_message) > 4096:
-        plain_message = plain_message[:4090] + "\n\n[...]"
+    # Telegram has a 4096 character limit - truncate BEFORE any processing
+    if len(message) > 4096:
+        message = message[:4090] + "\n\n[...]"
+    
+    plain_message = message.replace('**', '').replace('_', '')
     
     payload = {"chat_id": CHAT_ID, "text": plain_message}
     
