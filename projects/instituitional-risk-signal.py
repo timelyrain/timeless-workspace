@@ -918,6 +918,9 @@ class RiskDashboard:
             lines.append(f"💰 ALLOCATION: {int(final_alloc[0]*100)}/{int(final_alloc[1]*100)}/{int(final_alloc[2]*100)}/{int(final_alloc[3]*100)} (Tier1/Tier2/Tier3/Cash)")
             lines.append("")
         
+        # Add detailed dollar allocation breakdown
+        lines.extend(self._generate_allocation_breakdown(final_alloc))
+        
         lines.extend([
             "📈 TIER BREAKDOWN:",
             f"├─ Tier 1 (Credit/Liquidity): {self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
@@ -967,6 +970,45 @@ class RiskDashboard:
                 ])
         
         return "\n".join(lines)
+    
+    def _generate_allocation_breakdown(self, allocation):
+        """Generate detailed allocation breakdown with dollar amounts
+        
+        Args:
+            allocation: tuple (tier1%, tier2%, tier3%, cash%)
+        
+        Returns:
+            list of strings for report lines
+        """
+        tier1_pct, tier2_pct, tier3_pct, cash_pct = allocation
+        
+        # Use standard $1M capital for calculations
+        capital = 1_000_000
+        
+        tier1_dollars = capital * tier1_pct
+        tier2_dollars = capital * tier2_pct
+        tier3_dollars = capital * tier3_pct
+        cash_dollars = capital * cash_pct
+        
+        total_invested = tier1_dollars + tier2_dollars + tier3_dollars
+        
+        lines = [
+            "💵 ALLOCATION BREAKDOWN (Based on $1M Capital):",
+            "",
+            f"  Tier 1 (Core Positions):      ${tier1_dollars:>9,.0f} ({tier1_pct*100:>5.1f}%)",
+            f"  Tier 2 (Tactical):             ${tier2_dollars:>9,.0f} ({tier2_pct*100:>5.1f}%)",
+            f"  Tier 3 (Aggressive):           ${tier3_dollars:>9,.0f} ({tier3_pct*100:>5.1f}%)",
+            f"  Total Deployed:                ${total_invested:>9,.0f} ({(1-cash_pct)*100:>5.1f}%)",
+            f"  Cash Reserve:                  ${cash_dollars:>9,.0f} ({cash_pct*100:>5.1f}%)",
+            "",
+            "📋 TIER DEFINITIONS:",
+            "  • Tier 1: Blue-chip equities, 15-20% stops, months-to-years hold",
+            "  • Tier 2: Swing trades, sector rotation, 8-12% stops, weeks-to-months",
+            "  • Tier 3: Momentum plays, options, 3-5% stops, days-to-weeks",
+            ""
+        ]
+        
+        return lines
     
     def _generate_summary(self):
         """Generate narrative summary of market conditions

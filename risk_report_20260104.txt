@@ -1,15 +1,31 @@
-🎯 INSTITUTIONAL RISK DASHBOARD v1.5
-📅 2026-01-04 23:24:49
+🎯 INSTITUTIONAL RISK DASHBOARD v1.6
+📅 2026-01-04 23:45:54
 
-📊 TOTAL RISK SCORE: 80.5/100
+📊 TOTAL RISK SCORE: 83.8/100
 🎚️ RISK LEVEL: ★★★★☆ NORMAL
-💼 POSITIONING: STAY COURSE
+💼 BASE POSITIONING: STAY COURSE
+
+💰 ALLOCATION: 60/30/5/5 (Tier1/Tier2/Tier3/Cash)
+
+💵 ALLOCATION BREAKDOWN (Based on $1M Capital):
+
+  Tier 1 (Core Positions):      $  600,000 ( 60.0%)
+  Tier 2 (Tactical):             $  300,000 ( 30.0%)
+  Tier 3 (Aggressive):           $   50,000 (  5.0%)
+  ───────────────────────────────────────────────
+  Total Deployed:                $  950,000 ( 95.0%)
+  Cash Reserve:                  $   50,000 (  5.0%)
+
+📋 TIER DEFINITIONS:
+  • Tier 1: Blue-chip equities, 15-20% stops, months-to-years hold
+  • Tier 2: Swing trades, sector rotation, 8-12% stops, weeks-to-months
+  • Tier 3: Momentum plays, options, 3-5% stops, days-to-weeks
 
 📈 TIER BREAKDOWN:
 ├─ Tier 1 (Credit/Liquidity): 48.0/50 (96%)
-├─ Tier 2 (Breadth): 24.0/30 (80%)
+├─ Tier 2 (Breadth): 27.0/30 (90%)
 ├─ Tier 3 (Risk Appetite): 7.0/15 (47%)
-└─ Tier 4 (Sentiment): 1.5/5 (30%)
+└─ Tier 4 (Sentiment): 1.8/5 (36%)
 
 📋 INDICATOR DETAILS:
 
@@ -20,10 +36,10 @@
   • DXY Trend: -0.0% (Range: -3% to +3%)
 
 📊 TIER 2: MARKET BREADTH
-  • % Above 50-MA: 66% (Healthy: >65%)
-  • % Below 200-MA: 33% (Healthy: <25%)
+  • % Above 50-MA: 58% (Healthy: >65%)
+  • % Below 200-MA: 42% (Healthy: <25%)
   • AD Line: Flat
-  • New H-L: 12 (Range: -10 to +10)
+  • New H-L: 6 (Range: -10 to +10)
 
 🎯 TIER 3: RISK APPETITE
   • XLU/XLK Rotation: 1.5% (Risk-on: <-2%)
@@ -33,7 +49,7 @@
 🧠 TIER 4: SENTIMENT
   • Yield Curve: 0.72% (Healthy: >0.2%)
   • VIX Level: 14.5 (Calm: <16)
-  • Fear/Greed: 86/100 (Neutral: 35-65)
+  • Fear/Greed: 89/100 (Neutral: 35-65)
 
 📝 MARKET SUMMARY:
 
@@ -41,7 +57,6 @@
   • Credit markets healthy (HY spread tight)
   • Banking system stable (TED spread low)
   • Fed liquidity manageable
-  • Strong market breadth (>65% above 50-MA)
   • No recession signal (yield curve positive)
 
 ⚠️ The Concerns:

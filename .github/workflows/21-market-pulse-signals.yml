@@ -2,9 +2,9 @@ name: Market Pulse Scanner
 
 on:
   schedule:
-    # Malaysia Time (UTC+8): 9:00 AM, 3:00 PM, 9:00 PM
-    # Converted to UTC: 01:00, 07:00, 13:00
-    - cron: '0 1,7,13 * * *'
+    # Malaysia Time (UTC+8): 11:00 AM, 9:00 PM
+    # Converted to UTC: 03:00, 13:00
+    - cron: '0 3,13 * * *'
   workflow_dispatch:      # Allows manual run button
 
 jobs:
