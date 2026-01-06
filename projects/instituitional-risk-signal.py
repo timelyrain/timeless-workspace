@@ -36,14 +36,16 @@ pip install yfinance pandas fredapi requests python-dotenv lxml html5lib beautif
 SETUP:
 1. Get FRED API key: https://fred.stlouisfed.org/docs/api/api_key.html
 2. Get Anthropic API key: https://console.anthropic.com/settings/keys
-3. Add to .env file:
+3. Get Gemini API key: https://aistudio.google.com/app/apikey
+4. Add to .env file:
    FRED_API_KEY=your_fred_key_here
    ANTHROPIC_API_KEY=your_anthropic_key_here  # For CIO interpretation
+   GEMINI_API_KEY=your_gemini_key_here  # For Gemini CIO interpretation
    TELEGRAM_TOKEN_RISK=your_telegram_token
    CHAT_ID=your_chat_id
 
 DAILY OUTPUT:
-You'll receive TWO Telegram messages each day:
+You'll receive THREE Telegram messages each day:
 
 MESSAGE 1: MAIN REPORT (Objective Data)
 - All 14 signal readings with actual values
@@ -60,9 +62,16 @@ MESSAGE 2: CIO INTERPRETATION (Dynamic Analysis by Claude)
 - Dynamic trigger points for what would change the call
 - Written fresh each day by Claude Sonnet 4.5
 
-The CIO interpretation is NOT static if/else logic. It's Claude analyzing
-your specific data each morning and giving you real insights like a human
-CIO would. Different market conditions = different analysis.
+MESSAGE 3: CIO INTERPRETATION (Dynamic Analysis by Gemini)
+- Alternative AI perspective on same data
+- Same structured analysis format as Claude
+- Different AI reasoning approach (Google Gemini 2.0)
+- Provides second opinion for validation
+
+The CIO interpretations are NOT static if/else logic. Both Claude and Gemini
+analyze your specific data each morning giving you real insights like a human
+CIO would. Different market conditions = different analysis. Having two AI
+models provides diverse perspectives on the same data.
 
 ═══════════════════════════════════════════════════════════════════════
 
@@ -340,8 +349,8 @@ class HistoricalDataManager:
                 with open(self.history_file, 'r') as f:
                     return json.load(f)
             except:
-                return {'scores': [], 'overrides': []}
-        return {'scores': [], 'overrides': []}
+                return {'scores': [], 'overrides': [], 'backwardation': []}
+        return {'scores': [], 'overrides': [], 'backwardation': []}
     
     def save_history(self):
         """Save historical data to file"""
@@ -351,14 +360,79 @@ class HistoricalDataManager:
         except Exception as e:
             print(f"⚠️  Could not save history: {e}")
     
-    def add_score(self, date, score, spy_price, vix):
+    def add_score(self, date, score, spy_price, vix, vix_structure=None, vixy_vxx_ratio=None):
         """Add today's score to history"""
-        self.history['scores'].append({
+        entry = {
             'date': date,
             'score': score,
             'spy': spy_price,
             'vix': vix
+        }
+        
+        # Add VIX structure data if available
+        if vix_structure:
+            entry['vix_structure'] = vix_structure
+        if vixy_vxx_ratio:
+            entry['vixy_vxx_ratio'] = vixy_vxx_ratio
+        
+        self.history['scores'].append(entry)
+        
+        # Keep only last 90 days
+        cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        self.history['scores'] = [
+            s for s in self.history['scores'] 
+            if s['date'] >= cutoff_date
+        ]
+    
+    def add_backwardation_event(self, date, vixy_vxx_ratio, magnitude_pct):
+        """Record backwardation occurrence"""
+        if 'backwardation' not in self.history:
+            self.history['backwardation'] = []
+        
+        self.history['backwardation'].append({
+            'date': date,
+            'ratio': vixy_vxx_ratio,
+            'magnitude': magnitude_pct
         })
+        
+        # Keep only last 90 days
+        cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        self.history['backwardation'] = [
+            b for b in self.history['backwardation'] 
+            if b['date'] >= cutoff_date
+        ]
+    
+    def get_backwardation_streak(self):
+        """Count consecutive days of backwardation
+        Returns: (days, avg_magnitude)
+        """
+        if 'backwardation' not in self.history or not self.history['backwardation']:
+            return 0, 0.0
+        
+        # Sort by date
+        events = sorted(self.history['backwardation'], key=lambda x: x['date'], reverse=True)
+        
+        # Count consecutive days from today backwards
+        today = datetime.now().strftime('%Y-%m-%d')
+        streak = 0
+        magnitudes = []
+        
+        # Check if today has backwardation
+        if events and events[0]['date'] == today:
+            streak = 1
+            magnitudes.append(events[0]['magnitude'])
+            
+            # Count backwards
+            for i in range(1, len(events)):
+                prev_date = (datetime.strptime(events[i-1]['date'], '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+                if events[i]['date'] == prev_date:
+                    streak += 1
+                    magnitudes.append(events[i]['magnitude'])
+                else:
+                    break
+        
+        avg_magnitude = sum(magnitudes) / len(magnitudes) if magnitudes else 0.0
+        return streak, avg_magnitude
         
         # Keep only last 90 days
         cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
@@ -645,12 +719,17 @@ class RiskDashboard:
             # Tier 3
             'sector_rot': self._sector_rotation(),
             'gold_spy': self._gold_spy_ratio(),
-            'vix_struct': self._vix_structure(),
             
             # Tier 4
             'yield_curve': self._fred_get('T10Y2Y', 'Yield Curve'),
             'vix': self._yf_get('^VIX', 'VIX'),
         }
+        
+        # Get VIX structure (returns tuple)
+        vix_struct, vixy_vxx_ratio, vix_magnitude = self._vix_structure()
+        self.data['vix_struct'] = vix_struct
+        self.data['vixy_vxx_ratio'] = vixy_vxx_ratio
+        self.data['vix_magnitude'] = vix_magnitude
         
         # Calculate Fear/Greed after VIX is available
         self.data['fear_greed'] = self._fear_greed()
@@ -881,18 +960,43 @@ class RiskDashboard:
     
     def _vix_structure(self):
         """Determine VIX term structure using VIXY/VXX ratio
-        Returns: str ('Contango', 'Flat', 'Backwardation') or None
+        Returns: tuple (structure, ratio, magnitude_pct) or (None, None, None)
         """
         try:
             vxx = yf.Ticker('VXX').history(period='5d')['Close'].iloc[-1]
             vixy = yf.Ticker('VIXY').history(period='5d')['Close'].iloc[-1]
             ratio = vixy / vxx
-            struct = 'Contango' if ratio > 1.03 else 'Backwardation' if ratio < 0.97 else 'Flat'
-            print(f"   ✓ VIX Struct: {struct} (VIXY/VXX={ratio:.3f})")
-            return struct
+            
+            # Determine structure
+            if ratio > 1.03:
+                struct = 'Contango'
+                magnitude_pct = (ratio - 1.0) * 100  # How much contango
+            elif ratio < 0.97:
+                struct = 'Backwardation'
+                magnitude_pct = (1.0 - ratio) * 100  # How much backwardation (positive number)
+            else:
+                struct = 'Flat'
+                magnitude_pct = 0.0
+            
+            # Get backwardation streak if applicable
+            streak_info = ""
+            if struct == 'Backwardation':
+                streak, avg_mag = self.history_manager.get_backwardation_streak()
+                if streak > 0:
+                    streak_info = f" Day {streak}"
+                    # Record today's backwardation
+                    self.history_manager.add_backwardation_event(
+                        date=datetime.now().strftime('%Y-%m-%d'),
+                        vixy_vxx_ratio=ratio,
+                        magnitude_pct=magnitude_pct
+                    )
+            
+            print(f"   ✓ VIX Struct: {struct}{streak_info} (ratio={ratio:.3f}, mag={magnitude_pct:.1f}%)")
+            return struct, ratio, magnitude_pct
+            
         except Exception as e:
             print(f"   ✗ VIX Struct: Error - {str(e)[:50]}")
-            return None
+            return None, None, None
     
     def _fear_greed(self):
         """Calculate VIX-based Fear & Greed proxy (0-100 scale)
@@ -1219,7 +1323,39 @@ class RiskDashboard:
                 'action': 'INSTITUTIONS ROTATING DEFENSIVE'
             })
         
-        # Alert 6: V-Recovery Active (NEW IN v1.6)
+        # Alert 6: Backwardation Persistence (NEW - ESCALATES)
+        if d.get('vix_struct') == 'Backwardation':
+            streak, avg_mag = self.history_manager.get_backwardation_streak()
+            
+            if streak >= 5:
+                # Day 5+ = CRITICAL
+                self.alerts.append({
+                    'type': 'BACKWARDATION PERSISTING',
+                    'severity': 'CRITICAL',
+                    'icon': '🚨🚨🚨',
+                    'msg': f'VIX BACKWARDATION DAY {streak} - INSTITUTIONS STILL HEDGING',
+                    'action': 'TIGHTEN STOPS 12-15%, REDUCE TIER 3'
+                })
+            elif streak >= 3:
+                # Day 3-4 = HIGH CONCERN
+                self.alerts.append({
+                    'type': 'BACKWARDATION PERSISTING',
+                    'severity': 'HIGH',
+                    'icon': '🚨🚨',
+                    'msg': f'VIX BACKWARDATION DAY {streak} - PATTERN FORMING',
+                    'action': 'WATCH CREDIT & BREADTH CLOSELY'
+                })
+            elif streak >= 1 and d.get('vix') and d['vix'] < 16:
+                # Day 1-2 + Low VIX = HIDDEN DANGER
+                self.alerts.append({
+                    'type': 'HIDDEN TENSION',
+                    'severity': 'MEDIUM',
+                    'icon': '⚠️',
+                    'msg': f'VIX CALM ({d["vix"]:.1f}) BUT BACKWARDATION DETECTED',
+                    'action': 'INSTITUTIONS BUYING PROTECTION - STAY ALERT'
+                })
+        
+        # Alert 7: V-Recovery Active
         if self.v_recovery_active:
             self.alerts.append({
                 'type': 'V-RECOVERY OVERRIDE ACTIVE',
@@ -1229,7 +1365,7 @@ class RiskDashboard:
                 'action': 'CASH ALLOCATION CUT BY 50% - AGGRESSIVE RE-ENTRY'
             })
         
-        # Alert 7: All Clear
+        # Alert 8: All Clear
         if not self.alerts and self.scores['total'] >= 85:
             self.alerts.append({
                 'type': 'ALL CLEAR',
@@ -1268,60 +1404,61 @@ class RiskDashboard:
         else: risk, pos = "★☆☆☆☆ EXTREME", "MAX DEFENSE"
         
         lines = [
-            "🎯 INSTITUTIONAL RISK DASHBOARD v1.6",
-            f"📅 {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
+            "🎯 RISK DASHBOARD v1.6",
+            f"📅 {self.timestamp.strftime('%b %d, %Y @ %H:%M')}",
             "",
-            f"📊 TOTAL RISK SCORE: {score:.1f}/100",
-            f"🎚️ RISK LEVEL: {risk}",
-            f"💼 BASE POSITIONING: {pos}",
+            f"📊 SCORE: {score:.1f}/100",
+            f"🎚️ {risk}",
+            f"💼 {pos}",
             "",
         ]
         
         # Show allocation (with override if active)
         if self.v_recovery_active:
             lines.extend([
-                "🚀 V-RECOVERY OVERRIDE ACTIVE",
-                f"   Base Allocation: {int(base_alloc[0]*100)}/{int(base_alloc[1]*100)}/{int(base_alloc[2]*100)}/{int(base_alloc[3]*100)}",
-                f"   Override Allocation: {int(final_alloc[0]*100)}/{int(final_alloc[1]*100)}/{int(final_alloc[2]*100)}/{int(final_alloc[3]*100)} (Tier1/Tier2/Tier3/Cash)",
+                "🚀 V-RECOVERY ACTIVE",
+                f"Base: {int(base_alloc[0]*100)}/{int(base_alloc[1]*100)}/{int(base_alloc[2]*100)}/{int(base_alloc[3]*100)}",
+                f"Override: {int(final_alloc[0]*100)}/{int(final_alloc[1]*100)}/{int(final_alloc[2]*100)}/{int(final_alloc[3]*100)}",
+                "(T1/T2/T3/Cash)",
                 ""
             ])
         else:
-            lines.append(f"💰 ALLOCATION: {int(final_alloc[0]*100)}/{int(final_alloc[1]*100)}/{int(final_alloc[2]*100)}/{int(final_alloc[3]*100)} (Tier1/Tier2/Tier3/Cash)")
-            lines.append("")
+            lines.extend([
+                "💰 ALLOCATION",
+                f"{int(final_alloc[0]*100)}/{int(final_alloc[1]*100)}/{int(final_alloc[2]*100)}/{int(final_alloc[3]*100)}",
+                "(T1/T2/T3/Cash)",
+                ""
+            ])
         
         # Add detailed dollar allocation breakdown
         lines.extend(self._generate_allocation_breakdown(final_alloc))
         
+        # Enhanced tier scores with individual signals
+        sc = self.scores['components']
         lines.extend([
-            "📈 TIER BREAKDOWN:",
-            f"├─ Tier 1 (Credit/Liquidity): {self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
-            f"├─ Tier 2 (Breadth): {self.scores['tier2']:.1f}/30 ({self.scores['tier2']/30*100:.0f}%)",
-            f"├─ Tier 3 (Risk Appetite): {self.scores['tier3']:.1f}/15 ({self.scores['tier3']/15*100:.0f}%)",
-            f"└─ Tier 4 (Sentiment): {self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
+            "📈 TIER SCORES",
             "",
-            "📋 INDICATOR DETAILS:",
+            f"T1 (Credit & Liquidity): {self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
+            f"  • HY Spread: {sc['hy_spread']:.1f}/20 [{format(d.get('hy_spread'), '.2f') + '%' if d.get('hy_spread') is not None else 'N/A'}]",
+            f"  • Fed BS YoY: {sc['fed_bs']:.1f}/15 [{format(d.get('fed_bs_yoy'), '.1f') + '%' if d.get('fed_bs_yoy') is not None else 'N/A'}]",
+            f"  • TED Spread: {sc['ted']:.1f}/10 [{format(d.get('ted_spread'), '.2f') if d.get('ted_spread') is not None else 'N/A'}]",
+            f"  • DXY Trend: {sc['dxy']:.1f}/5 [{format(d.get('dxy_trend'), '.1f') + '%' if d.get('dxy_trend') is not None else 'N/A'}]",
             "",
-            "💰 TIER 1: CREDIT & LIQUIDITY",
-            f"  • HY Spread: {format(d.get('hy_spread'), '.2f') + '%' if d.get('hy_spread') is not None else 'N/A'} (Range: 3-6%)",
-            f"  • Fed BS YoY: {format(d.get('fed_bs_yoy'), '.1f') + '%' if d.get('fed_bs_yoy') is not None else 'N/A'} (Range: -10% to +10%)",
-            f"  • TED Spread: {format(d.get('ted_spread'), '.2f') if d.get('ted_spread') is not None else 'N/A'} (Range: 0.1-0.5)",
-            f"  • DXY Trend: {format(d.get('dxy_trend'), '.1f') + '%' if d.get('dxy_trend') is not None else 'N/A'} (Range: -3% to +3%)",
+            f"T2 (Market Breadth): {self.scores['tier2']:.1f}/30 ({self.scores['tier2']/30*100:.0f}%)",
+            f"  • % >50-MA: {sc['pct_50ma']:.1f}/12 [{format(d.get('pct_above_50ma'), '.0f') + '%' if d.get('pct_above_50ma') is not None else 'N/A'}]",
+            f"  • % <200-MA: {sc['pct_200ma']:.1f}/10 [{format(d.get('pct_below_200ma'), '.0f') + '%' if d.get('pct_below_200ma') is not None else 'N/A'}]",
+            f"  • A-D Line: {sc['ad_line']:.1f}/5 [{d.get('ad_line', 'N/A')}]",
+            f"  • New H-L: {sc['new_hl']:.1f}/3 [{d.get('new_hl', 'N/A')}]",
             "",
-            "📊 TIER 2: MARKET BREADTH",
-            f"  • % Above 50-MA: {format(d.get('pct_above_50ma'), '.0f') + '%' if d.get('pct_above_50ma') is not None else 'N/A'} (Healthy: >65%)",
-            f"  • % Below 200-MA: {format(d.get('pct_below_200ma'), '.0f') + '%' if d.get('pct_below_200ma') is not None else 'N/A'} (Healthy: <25%)",
-            f"  • AD Line: {d.get('ad_line', 'N/A')}",
-            f"  • New H-L: {d.get('new_hl', 'N/A')} (Range: -10 to +10)",
+            f"T3 (Risk Appetite): {self.scores['tier3']:.1f}/15 ({self.scores['tier3']/15*100:.0f}%)",
+            f"  • XLU/XLK: {sc['sector_rot']:.1f}/6 [{format(d.get('sector_rot'), '.1f') + '%' if d.get('sector_rot') is not None else 'N/A'}]",
+            f"  • GLD/SPY: {sc['gold_spy']:.1f}/5 [{format(d.get('gold_spy'), '.1f') + '%' if d.get('gold_spy') is not None else 'N/A'}]",
+            f"  • VIX Struct: {sc['vix_struct']:.1f}/4 [{d.get('vix_struct', 'N/A')}]",
             "",
-            "🎯 TIER 3: RISK APPETITE",
-            f"  • XLU/XLK Rotation: {format(d.get('sector_rot'), '.1f') + '%' if d.get('sector_rot') is not None else 'N/A'} (Risk-on: <-2%)",
-            f"  • GLD/SPY Ratio: {format(d.get('gold_spy'), '.1f') + '%' if d.get('gold_spy') is not None else 'N/A'} (Risk-on: <-1%)",
-            f"  • VIX Structure: {d.get('vix_struct', 'N/A')}",
-            "",
-            "🧠 TIER 4: SENTIMENT",
-            f"  • Yield Curve: {format(d.get('yield_curve'), '.2f') + '%' if d.get('yield_curve') is not None else 'N/A'} (Healthy: >0.2%)",
-            f"  • VIX Level: {format(d.get('vix'), '.1f') if d.get('vix') is not None else 'N/A'} (Calm: <16)",
-            f"  • Fear/Greed: {format(d.get('fear_greed'), '.0f') + '/100' if d.get('fear_greed') is not None else 'N/A'} (Neutral: 35-65)",
+            f"T4 (Sentiment): {self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
+            f"  • Yield Curve: {sc['yield_curve']:.1f}/3 [{format(d.get('yield_curve'), '.2f') + '%' if d.get('yield_curve') is not None else 'N/A'}]",
+            f"  • VIX Level: {sc['vix']:.1f}/1.5 [{format(d.get('vix'), '.1f') if d.get('vix') is not None else 'N/A'}]",
+            f"  • Fear/Greed: {sc['fear_greed']:.1f}/0.5 [{format(d.get('fear_greed'), '.0f') if d.get('fear_greed') is not None else 'N/A'}]",
             "",
         ])
         
@@ -1331,19 +1468,19 @@ class RiskDashboard:
         # Add divergence alerts
         if self.alerts:
             lines.append("")
-            lines.append("🚨 ALERTS:")
+            lines.append("🚨 ALERTS")
             for alert in self.alerts:
                 lines.extend([
                     "",
-                    f"{alert['icon']} {alert['type']} ({alert['severity']})",
-                    f"   {alert['msg']}",
-                    f"   💡 Action: {alert['action']}"
+                    f"{alert['icon']} {alert['type']}",
+                    f"{alert['msg']}",
+                    f"→ {alert['action']}"
                 ])
         
         return "\n".join(lines)
     
     def _generate_allocation_breakdown(self, allocation):
-        """Generate detailed allocation breakdown with dollar amounts
+        """Generate detailed allocation breakdown with percentages only
         
         Args:
             allocation: tuple (tier1%, tier2%, tier3%, cash%)
@@ -1353,29 +1490,17 @@ class RiskDashboard:
         """
         tier1_pct, tier2_pct, tier3_pct, cash_pct = allocation
         
-        # Use standard $1M capital for calculations
-        capital = 1_000_000
-        
-        tier1_dollars = capital * tier1_pct
-        tier2_dollars = capital * tier2_pct
-        tier3_dollars = capital * tier3_pct
-        cash_dollars = capital * cash_pct
-        
-        total_invested = tier1_dollars + tier2_dollars + tier3_dollars
+        total_invested_pct = tier1_pct + tier2_pct + tier3_pct
         
         lines = [
-            "💵 ALLOCATION BREAKDOWN (Based on $1M Capital):",
+            "💵 BREAKDOWN",
+            f"T1 Core: {tier1_pct*100:.0f}%",
+            f"T2 Tactical: {tier2_pct*100:.0f}%",
+            f"T3 Aggr: {tier3_pct*100:.0f}%",
+            f"Cash: {cash_pct*100:.0f}%",
             "",
-            f"  Tier 1 (Core Positions):      ${tier1_dollars:>9,.0f} ({tier1_pct*100:>5.1f}%)",
-            f"  Tier 2 (Tactical):             ${tier2_dollars:>9,.0f} ({tier2_pct*100:>5.1f}%)",
-            f"  Tier 3 (Aggressive):           ${tier3_dollars:>9,.0f} ({tier3_pct*100:>5.1f}%)",
-            f"  Total Deployed:                ${total_invested:>9,.0f} ({(1-cash_pct)*100:>5.1f}%)",
-            f"  Cash Reserve:                  ${cash_dollars:>9,.0f} ({cash_pct*100:>5.1f}%)",
-            "",
-            "📋 TIER DEFINITIONS:",
-            "  • Tier 1: Blue-chip equities, 15-20% stops, months-to-years hold",
-            "  • Tier 2: Swing trades, sector rotation, 8-12% stops, weeks-to-months",
-            "  • Tier 3: Momentum plays, options, 3-5% stops, days-to-weeks",
+            f"Deployed: {total_invested_pct*100:.0f}%",
+            f"Risk: {(1-cash_pct)*100:.0f}%",
             ""
         ]
         
@@ -1440,22 +1565,62 @@ class RiskDashboard:
                 good.append("Complacency low (VIX calm)")
         
         # Build summary section
-        lines = ["📝 MARKET SUMMARY:", ""]
+        lines = [
+            "📝 SUMMARY"
+        ]
         
         if good:
-            lines.append("✅ The Good:")
-            for item in good:
-                lines.append(f"  • {item}")
-            lines.append("")
+            lines.append("✅ Good:")
+            for item in good[:3]:  # Top 3 only
+                lines.append(f"• {item}")
         
         if concerns:
-            lines.append("⚠️ The Concerns:")
-            for item in concerns:
-                lines.append(f"  • {item}")
-        else:
-            lines.append("✅ No major concerns detected")
+            lines.append("")
+            lines.append("⚠️ Watch:")
+            for item in concerns[:3]:  # Top 3 only
+                lines.append(f"• {item}")
+        
+        if not good and not concerns:
+            lines.append("• No major issues")
+        
+        lines.append("")
         
         return lines
+    
+    def _get_backwardation_context(self):
+        """Generate backwardation context for CIO interpretation
+        Returns: dict with backwardation details
+        """
+        d = self.data
+        
+        if d.get('vix_struct') != 'Backwardation':
+            return {
+                'active': False,
+                'message': 'No backwardation detected'
+            }
+        
+        streak, avg_mag = self.history_manager.get_backwardation_streak()
+        
+        # Determine severity
+        if streak >= 5:
+            severity = "CRITICAL - Pattern firmly established"
+        elif streak >= 3:
+            severity = "HIGH - Pattern forming, needs attention"
+        elif streak >= 1:
+            severity = "MEDIUM - New signal, watch closely"
+        else:
+            severity = "INFO - Single occurrence"
+        
+        return {
+            'active': True,
+            'streak_days': streak,
+            'magnitude_pct': d.get('vix_magnitude', 0),
+            'avg_magnitude': avg_mag,
+            'vix_level': d.get('vix'),
+            'vixy_vxx_ratio': d.get('vixy_vxx_ratio'),
+            'severity': severity,
+            'message': f"Backwardation Day {streak}: {severity}. VIX calm at {d.get('vix', 'N/A'):.1f} but institutions buying {d.get('vix_magnitude', 0):.1f}% premium on near-term protection."
+        }
     
     def generate_cio_interpretation(self):
         """Generate CIO's honest interpretation using Claude API for dynamic analysis
@@ -1517,6 +1682,7 @@ class RiskDashboard:
                     'fear_greed': f"{d.get('fear_greed', 'N/A')}/100" if d.get('fear_greed') else "N/A",
                 }
             },
+            'backwardation_context': self._get_backwardation_context(),
             'allocation': {
                 'base': f"{int(self.get_base_allocation()[0]*100)}/{int(self.get_base_allocation()[1]*100)}/{int(self.get_base_allocation()[2]*100)}/{int(self.get_base_allocation()[3]*100)}",
                 'description': 'Tier1/Tier2/Tier3/Cash percentages'
@@ -1544,92 +1710,59 @@ KEY SIGNAL INTERPRETATIONS:
 - % Below 200-MA: <25% = healthy, 25-35% = caution, >50% = bear market
 - New H-L: >+10 = euphoria (contrarian sell), <-10 = capitulation (contrarian buy)
 - VIX Backwardation = institutions hedging (danger signal even if VIX calm)
+  * Day 1-2: Watch mode
+  * Day 3-4: Pattern forming, heightened alert
+  * Day 5+: CRITICAL - institutions committed to hedging
 - Fear/Greed: >75 = extreme greed, <25 = extreme fear
 
 YOUR TASK:
-Write a direct, insightful CIO interpretation covering these sections:
+Write a brief CIO interpretation for iPhone Telegram.
 
-═══════════════════════════════════════════════════════════════════════
+FORMAT:
+- Short, punchy lines
+- No decorative dividers
+- Mobile-friendly
+- Direct language
 
-## THE HEADLINE
-One punchy line about what you really see (not just the score). Be direct.
+STRUCTURE:
 
-## WHAT THE SCORE SAYS VS WHAT I SEE
+💭 HEADLINE
+[One punchy line about what you see]
 
-**WHAT THE SCORE SAYS:**
-Quick tier assessment:
-• Tier 1 (Credit/Liquidity): X.X/50 (XX%) - STRONG/WEAK/MIXED
-• Tier 2 (Breadth): X.X/30 (XX%) - STRONG/DECENT/WEAK
-• Tier 3 (Risk Appetite): X.X/15 (XX%) - STRONG/MIXED/WEAK
-• Tier 4 (Sentiment): X.X/5 (XX%) - HEALTHY/EXTREME
+📊 SCORE QUALITY
+T1: XX/50 (XX%) [STRONG/WEAK]
+T2: XX/30 (XX%) [STRONG/WEAK]
+T3: XX/15 (XX%) [STRONG/WEAK]
+T4: X/5 (XX%) [STRONG/WEAK]
 
-**WHAT I SEE:**
-Bullet points of observations and concerns:
-  ✅ [Positive signals with specific numbers]
-  ⚠️  [Concerns with specific numbers]
+👁️ WHAT I SEE
+✅ [2-3 positives with numbers]
+⚠️ [2-3 concerns with numbers]
 
-Look for:
-- Divergences (credit calm but risk appetite weak)
-- Extreme readings (euphoria, capitulation, hidden tensions)
-- Be SPECIFIC with actual numbers from today
+🎯 MARKET REGIME
+[2-3 sentences on market type, score quality, what institutions doing]
 
-## MY HONEST INTERPRETATION
+💡 MY CALL
+System: XX/XX/XX/XX
+[If adjustments:]
+Suggest: XX/XX/XX/XX
+Stops: X-X%
+Why: [brief reason]
+[If clean:]
+Run the playbook.
 
-Market regime and quality assessment:
-- What market regime is this? (healthy bull, late-stage caution, credit stress, etc.)
-- What's the quality of the score? (clean signal or hidden tensions?)
-- What are institutions really doing?
-- Synthesize the divergences you spotted
+🔄 FLIP TRIGGERS
+→ [Specific trigger with numbers]
+→ [Specific trigger with numbers]
 
-## MY HONEST CALL
+⚡ BOTTOM LINE
+[One clear sentence - deployed/cautious/defensive and why]
 
-Tactical guidance:
-- System allocation: XX/XX/XX/XX
-- Your adjustments (if any): 
-  • Tier 1: Keep X% but [specific guidance like "tighten stops to 12-15%"]
-  • Tier 2: [specific guidance]
-  • Tier 3: [specific guidance like "cut from 5% to 0-2%"]
-  • Cash: [specific guidance like "bump to 10%"]
-- Explain WHY: "Credit is calm (stay deployed) BUT [tension] = [action]"
+KEEP UNDER 1200 CHARS.
+USE ACTUAL NUMBERS FROM TODAY.
+BE SPECIFIC AND DIRECT.
 
-## THE CRITICAL QUESTION
-
-Pose the key question today's data raises. Examples:
-- "Why is VIX in backwardation with VIX at 15?"
-- "Why is credit so calm while breadth is breaking?"
-- "Why are institutions rotating defensive despite strong breadth?"
-
-Then answer it with 2-3 possible explanations:
-1. [First possibility - e.g., "Smart money hedging"]
-2. [Second possibility - e.g., "Technical quirk"]
-3. [Third possibility - e.g., "Early warning"]
-
-End with: "I don't know which it is. But I respect the signal."
-
-## WHAT WOULD CHANGE MY MIND
-
-Dynamic triggers based on TODAY's specific data:
-→ If [specific condition with actual numbers from today]
-→ If [another specific condition]
-→ If [third condition]
-
-## BOTTOM LINE
-
-One clear sentence: stay deployed/cautious/defensive and why.
-Include: what the system says vs what you think, and your final call.
-
-═══════════════════════════════════════════════════════════════════════
-
-STYLE REQUIREMENTS:
-- Direct and blunt (CEO-CIO relationship, not client-facing)
-- Use conversational phrases like "Here's what I really see", "Let me be honest"
-- Flag contradictions (e.g., "VIX says calm but backwardation says institutions hedging")
-- Be SPECIFIC with numbers from today's data
-- Give actionable guidance, not generic warnings
-- Use proper formatting with headers, bullet points, clear sections
-- Keep total response under 2000 characters for Telegram compatibility
-
-Write the complete interpretation now, following the exact structure above:"""
+Write now:"""
 
         try:
             import requests
@@ -1658,17 +1791,12 @@ Write the complete interpretation now, following the exact structure above:"""
                 result = response.json()
                 cio_text = result['content'][0]['text']
                 
-                # Format with header and footer
+                # Format with simple header
                 formatted_output = [
-                    "═══════════════════════════════════════════════════════════════════════",
-                    "🧠 CIO'S INTERPRETATION - Dynamic Analysis by Claude",
-                    "═══════════════════════════════════════════════════════════════════════",
+                    "🧠 CIO INTERPRETATION",
+                    f"📅 {self.timestamp.strftime('%b %d, %Y')}",
                     "",
                     cio_text,
-                    "",
-                    "═══════════════════════════════════════════════════════════════════════",
-                    f"Generated by Claude Sonnet 4.5 | {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
-                    "═══════════════════════════════════════════════════════════════════════",
                 ]
                 
                 print("✅ CIO interpretation generated successfully")
@@ -1681,6 +1809,181 @@ Write the complete interpretation now, following the exact structure above:"""
                 
         except Exception as e:
             print(f"⚠️  Error generating CIO interpretation: {e}")
+            return None
+    
+    def generate_gemini_interpretation(self):
+        """Generate CIO's honest interpretation using Gemini API for dynamic analysis
+        Returns: str - Multi-line CIO analysis report"""
+        
+        print("🔍 Checking for GEMINI_API_KEY...")
+        
+        # Check if Gemini API key is available
+        gemini_api_key = os.getenv('GEMINI_API_KEY')
+        
+        if not gemini_api_key:
+            print("❌ GEMINI_API_KEY not found in environment")
+            print("   Checked: os.getenv('GEMINI_API_KEY')")
+            print("   Make sure .env file is in the same directory as the script")
+            print("   And contains: GEMINI_API_KEY=...")
+            return None
+        
+        if gemini_api_key == 'YOUR_GEMINI_API_KEY_HERE':
+            print("❌ GEMINI_API_KEY is placeholder value")
+            print("   Replace with actual key from Google AI Studio")
+            return None
+        
+        print(f"✅ API key found (starts with: {gemini_api_key[:15]}...)")
+        
+        score = self.scores['total']
+        d = self.data
+        
+        # Build comprehensive data package for Gemini (same as Claude)
+        data_package = {
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'total_score': f"{score:.1f}/100",
+            'tier_scores': {
+                'tier1_credit_liquidity': f"{self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
+                'tier2_breadth': f"{self.scores['tier2']:.1f}/30 ({self.scores['tier2']/30*100:.0f}%)",
+                'tier3_risk_appetite': f"{self.scores['tier3']:.1f}/15 ({self.scores['tier3']/15*100:.0f}%)",
+                'tier4_sentiment': f"{self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
+            },
+            'raw_indicators': {
+                'tier1': {
+                    'hy_spread': f"{d.get('hy_spread', 'N/A')}%" if d.get('hy_spread') else "N/A",
+                    'fed_bs_yoy': f"{d.get('fed_bs_yoy', 'N/A')}%" if d.get('fed_bs_yoy') else "N/A",
+                    'ted_spread': f"{d.get('ted_spread', 'N/A')}" if d.get('ted_spread') else "N/A",
+                    'dxy_trend': f"{d.get('dxy_trend', 'N/A')}%" if d.get('dxy_trend') else "N/A",
+                },
+                'tier2': {
+                    'pct_above_50ma': f"{d.get('pct_above_50ma', 'N/A')}%" if d.get('pct_above_50ma') else "N/A",
+                    'pct_below_200ma': f"{d.get('pct_below_200ma', 'N/A')}%" if d.get('pct_below_200ma') else "N/A",
+                    'ad_line': d.get('ad_line', 'N/A'),
+                    'new_hl': f"{d.get('new_hl', 'N/A')}" if d.get('new_hl') is not None else "N/A",
+                },
+                'tier3': {
+                    'sector_rot': f"{d.get('sector_rot', 'N/A')}%" if d.get('sector_rot') else "N/A",
+                    'gold_spy': f"{d.get('gold_spy', 'N/A')}%" if d.get('gold_spy') else "N/A",
+                    'vix_struct': d.get('vix_struct', 'N/A'),
+                },
+                'tier4': {
+                    'yield_curve': f"{d.get('yield_curve', 'N/A')}%" if d.get('yield_curve') else "N/A",
+                    'vix': f"{d.get('vix', 'N/A')}" if d.get('vix') else "N/A",
+                    'fear_greed': f"{d.get('fear_greed', 'N/A')}/100" if d.get('fear_greed') else "N/A",
+                }
+            },
+            'backwardation_context': self._get_backwardation_context(),
+            'allocation': {
+                'base': f"{int(self.get_base_allocation()[0]*100)}/{int(self.get_base_allocation()[1]*100)}/{int(self.get_base_allocation()[2]*100)}/{int(self.get_base_allocation()[3]*100)}",
+                'description': 'Tier1/Tier2/Tier3/Cash percentages'
+            },
+            'alerts': [alert for alert in self.alerts],
+            'v_recovery_active': self.v_recovery_active
+        }
+        
+        # Craft the prompt for Gemini (identical to Claude)
+        prompt = f"""You are the CIO (Chief Investment Officer) analyzing today's institutional risk dashboard for your CEO. The CEO is a sophisticated trader with $2M portfolio ($1M active trading, $1M in bonds). They value direct, blunt, witty analysis over diplomatic corporate speak.
+
+TODAY'S DATA:
+{json.dumps(data_package, indent=2)}
+
+CONTEXT YOU NEED TO KNOW:
+- Tier 1 (Credit/Liquidity) = 50% weight = Most important, "smart money" signals
+- Tier 2 (Breadth) = 30% weight = Confirms or warns about market structure
+- Tier 3 (Risk Appetite) = 15% weight = Shows institutional positioning
+- Tier 4 (Sentiment) = 5% weight = Noise, but extremes matter
+
+KEY SIGNAL INTERPRETATIONS:
+- HY Spread: <3.5% = very tight/healthy, 3-4% = normal, 4.5-5% = caution, >5.5% = stress
+- TED Spread: <0.3 = healthy banking, 0.5-0.8 = elevated, >1.0 = crisis
+- % Above 50-MA: >65% = healthy breadth, 50-65% = mixed, <50% = weak
+- % Below 200-MA: <25% = healthy, 25-35% = caution, >50% = bear market
+- New H-L: >+10 = euphoria (contrarian sell), <-10 = capitulation (contrarian buy)
+- VIX Backwardation = institutions hedging (danger signal even if VIX calm)
+  * Day 1-2: Watch mode
+  * Day 3-4: Pattern forming, heightened alert
+  * Day 5+: CRITICAL - institutions committed to hedging
+- Fear/Greed: >75 = extreme greed, <25 = extreme fear
+
+YOUR TASK:
+Write a brief CIO interpretation for iPhone Telegram.
+
+FORMAT:
+- Short, punchy lines
+- No decorative dividers
+- Mobile-friendly
+- Direct language
+
+STRUCTURE:
+
+💭 HEADLINE
+[One punchy line about what you see]
+
+📊 SCORE QUALITY
+T1: XX/50 (XX%) [STRONG/WEAK]
+T2: XX/30 (XX%) [STRONG/WEAK]
+T3: XX/15 (XX%) [STRONG/WEAK]
+T4: X/5 (XX%) [STRONG/WEAK]
+
+👁️ WHAT I SEE
+✅ [2-3 positives with numbers]
+⚠️ [2-3 concerns with numbers]
+
+🎯 MARKET REGIME
+[2-3 sentences on market type, score quality, what institutions doing]
+
+💡 MY CALL
+System: XX/XX/XX/XX
+[If adjustments:]
+Suggest: XX/XX/XX/XX
+Stops: X-X%
+Why: [brief reason]
+[If clean:]
+Run the playbook.
+
+🔄 FLIP TRIGGERS
+→ [Specific trigger with numbers]
+→ [Specific trigger with numbers]
+
+⚡ BOTTOM LINE
+[One clear sentence - deployed/cautious/defensive and why]
+
+KEEP UNDER 1200 CHARS.
+USE ACTUAL NUMBERS FROM TODAY.
+BE SPECIFIC AND DIRECT.
+
+Write now:"""
+
+        try:
+            import google.generativeai as genai
+            
+            print("\n🧠 Generating CIO interpretation using Gemini API...")
+            
+            # Configure and call Gemini API
+            genai.configure(api_key=gemini_api_key)
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            response = model.generate_content(prompt)
+            
+            if response.text:
+                cio_text = response.text
+                
+                # Format with simple header
+                formatted_output = [
+                    "🧠 CIO INTERPRETATION (Gemini)",
+                    f"📅 {self.timestamp.strftime('%b %d, %Y')}",
+                    "",
+                    cio_text,
+                ]
+                
+                print("✅ Gemini CIO interpretation generated successfully")
+                return "\n".join(formatted_output)
+            
+            else:
+                print(f"⚠️  Gemini API returned no text")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️  Error generating Gemini CIO interpretation: {e}")
             return None
     
     # =========================================================================
@@ -1717,7 +2020,9 @@ Write the complete interpretation now, following the exact structure above:"""
             date=self.timestamp.strftime('%Y-%m-%d'),
             score=self.scores['total'],
             spy_price=spy_price,
-            vix=self.data.get('vix')
+            vix=self.data.get('vix'),
+            vix_structure=self.data.get('vix_struct'),
+            vixy_vxx_ratio=self.data.get('vixy_vxx_ratio')
         )
         
         # Check V-Recovery and detect divergences
@@ -1775,6 +2080,36 @@ Write the complete interpretation now, following the exact structure above:"""
                 print("   Expected: ANTHROPIC_API_KEY=sk-ant-api03-...\n")
         except Exception as e:
             print(f"❌ ERROR in CIO interpretation section: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        print("\n" + "="*80)
+        print("GENERATING GEMINI CIO INTERPRETATION")
+        print("="*80)
+        
+        # Generate and send Gemini CIO interpretation (third message)
+        # This uses Gemini API for alternative AI perspective
+        try:
+            gemini_analysis = self.generate_gemini_interpretation()
+            
+            if gemini_analysis:
+                print("\n" + gemini_analysis + "\n")
+                
+                # Save Gemini analysis to separate file
+                gemini_filename = f"gemini_analysis_{self.timestamp.strftime('%Y%m%d')}.txt"
+                with open(gemini_filename, 'w') as f:
+                    f.write(gemini_analysis)
+                print(f"💾 Gemini analysis saved to {gemini_filename}\n")
+                
+                # Send Gemini interpretation as third Telegram message
+                send_to_telegram(gemini_analysis)
+                print("✅ Gemini interpretation sent to Telegram\n")
+            else:
+                print("⚠️  Gemini interpretation returned None")
+                print("   Check API key configuration in .env file")
+                print("   Expected: GEMINI_API_KEY=...\n")
+        except Exception as e:
+            print(f"❌ ERROR in Gemini interpretation section: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
         

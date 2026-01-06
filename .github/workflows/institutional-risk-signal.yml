@@ -2,6 +2,8 @@
 # 
 # Required GitHub Secrets (Settings → Secrets and variables → Actions):
 #   - FRED_API_KEY: Get from https://fred.stlouisfed.org/docs/api/api_key.html
+#   - ANTHROPIC_API_KEY: Get from https://console.anthropic.com/settings/keys
+#   - GEMINI_API_KEY: Get from https://aistudio.google.com/app/apikey
 #   - TELEGRAM_TOKEN_RISK: Your Telegram bot token from @BotFather
 #   - CHAT_ID: Your Telegram channel/chat ID
 #
@@ -33,12 +35,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yfinance pandas fredapi requests python-dotenv lxml html5lib beautifulsoup4 schedule
+          pip install yfinance pandas fredapi requests python-dotenv lxml html5lib beautifulsoup4 schedule google-generativeai
       
       - name: Create .env file
         run: |
           cd projects
           echo "FRED_API_KEY=${{ secrets.FRED_API_KEY }}" >> .env
+          echo "ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}" >> .env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           echo "TELEGRAM_TOKEN_RISK=${{ secrets.TELEGRAM_TOKEN_RISK }}" >> .env
           echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> .env
           echo "✅ Created .env file in projects directory"
