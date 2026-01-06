@@ -1793,7 +1793,7 @@ Write now:"""
                 
                 # Format with simple header
                 formatted_output = [
-                    "🧠 CIO INTERPRETATION",
+                    "🧠 CIO INTERPRETATION (Claude)",
                     f"📅 {self.timestamp.strftime('%b %d, %Y')}",
                     "",
                     cio_text,
