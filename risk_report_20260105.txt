@@ -1,0 +1,62 @@
+🎯 INSTITUTIONAL RISK DASHBOARD v1.6
+📅 2026-01-05 23:50:13
+
+📊 TOTAL RISK SCORE: 81.8/100
+🎚️ RISK LEVEL: ★★★★☆ NORMAL
+💼 BASE POSITIONING: STAY COURSE
+
+💰 ALLOCATION: 60/30/5/5 (Tier1/Tier2/Tier3/Cash)
+
+💵 ALLOCATION BREAKDOWN (Based on $1M Capital):
+
+  Tier 1 (Core Positions):      $  600,000 ( 60.0%)
+  Tier 2 (Tactical):             $  300,000 ( 30.0%)
+  Tier 3 (Aggressive):           $   50,000 (  5.0%)
+  Total Deployed:                $  950,000 ( 95.0%)
+  Cash Reserve:                  $   50,000 (  5.0%)
+
+📋 TIER DEFINITIONS:
+  • Tier 1: Blue-chip equities, 15-20% stops, months-to-years hold
+  • Tier 2: Swing trades, sector rotation, 8-12% stops, weeks-to-months
+  • Tier 3: Momentum plays, options, 3-5% stops, days-to-weeks
+
+📈 TIER BREAKDOWN:
+├─ Tier 1 (Credit/Liquidity): 48.0/50 (96%)
+├─ Tier 2 (Breadth): 27.0/30 (90%)
+├─ Tier 3 (Risk Appetite): 5.0/15 (33%)
+└─ Tier 4 (Sentiment): 1.8/5 (36%)
+
+📋 INDICATOR DETAILS:
+
+💰 TIER 1: CREDIT & LIQUIDITY
+  • HY Spread: 2.83% (Range: 3-6%)
+  • Fed BS YoY: -3.1% (Range: -10% to +10%)
+  • TED Spread: 0.09 (Range: 0.1-0.5)
+  • DXY Trend: 0.1% (Range: -3% to +3%)
+
+📊 TIER 2: MARKET BREADTH
+  • % Above 50-MA: 62% (Healthy: >65%)
+  • % Below 200-MA: 40% (Healthy: <25%)
+  • AD Line: Confirming
+  • New H-L: 14 (Range: -10 to +10)
+
+🎯 TIER 3: RISK APPETITE
+  • XLU/XLK Rotation: -1.7% (Risk-on: <-2%)
+  • GLD/SPY Ratio: 1.7% (Risk-on: <-1%)
+  • VIX Structure: Backwardation
+
+🧠 TIER 4: SENTIMENT
+  • Yield Curve: 0.72% (Healthy: >0.2%)
+  • VIX Level: 14.8 (Calm: <16)
+  • Fear/Greed: 88/100 (Neutral: 35-65)
+
+📝 MARKET SUMMARY:
+
+✅ The Good:
+  • Credit markets healthy (HY spread tight)
+  • Banking system stable (TED spread low)
+  • Fed liquidity manageable
+  • No recession signal (yield curve positive)
+
+⚠️ The Concerns:
+  • VIX backwardation while VIX low = hidden tension

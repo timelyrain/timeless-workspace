@@ -9,6 +9,7 @@ WHAT'S NEW IN v1.6:
 ✅ Historical tracking of override events for performance analysis
 ✅ Configurable sensitivity with conservative defaults
 ✅ All v1.5 features preserved (14 indicators, Telegram alerts)
+🧠 CLAUDE-POWERED CIO INTERPRETATION - Dynamic daily analysis (NEW!)
 
 PHILOSOPHY:
 "Defensive on the way down, Aggressive on the way up"
@@ -27,15 +28,199 @@ EXAMPLE: COVID 2020
 - Mar 12: Override triggers, cut to 40% cash ✓ Caught recovery
 - Estimated improvement: +15% additional return
 
-14 SIGNALS + V-RECOVERY OVERRIDE | INSTITUTIONAL-GRADE
+14 SIGNALS + V-RECOVERY OVERRIDE + AI CIO | INSTITUTIONAL-GRADE
 
 DEPENDENCIES:
 pip install yfinance pandas fredapi requests python-dotenv lxml html5lib beautifulsoup4
 
 SETUP:
 1. Get FRED API key: https://fred.stlouisfed.org/docs/api/api_key.html
-2. Add to .env file: FRED_API_KEY=your_key_here
-3. Add Telegram credentials: TELEGRAM_TOKEN_RISK and CHAT_ID
+2. Get Anthropic API key: https://console.anthropic.com/settings/keys
+3. Add to .env file:
+   FRED_API_KEY=your_fred_key_here
+   ANTHROPIC_API_KEY=your_anthropic_key_here  # For CIO interpretation
+   TELEGRAM_TOKEN_RISK=your_telegram_token
+   CHAT_ID=your_chat_id
+
+DAILY OUTPUT:
+You'll receive TWO Telegram messages each day:
+
+MESSAGE 1: MAIN REPORT (Objective Data)
+- All 14 signal readings with actual values
+- Risk score and tier breakdown
+- Allocation recommendation (60/30/5/5 format)
+- Automated alerts for divergences
+- Market summary (The Good / The Concerns)
+
+MESSAGE 2: CIO INTERPRETATION (Dynamic Analysis by Claude)
+- "What the score says vs what I see" analysis
+- Hidden tensions and divergences explained
+- Quality of score assessment (clean or tension?)
+- Honest tactical call with specific adjustments
+- Dynamic trigger points for what would change the call
+- Written fresh each day by Claude Sonnet 4.5
+
+The CIO interpretation is NOT static if/else logic. It's Claude analyzing
+your specific data each morning and giving you real insights like a human
+CIO would. Different market conditions = different analysis.
+
+═══════════════════════════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════════════════════════
+GLOSSARY - ABBREVIATIONS & TERMS
+═══════════════════════════════════════════════════════════════════════
+
+TIER 1: CREDIT & LIQUIDITY
+───────────────────────────
+HY = High Yield
+  - Also called "junk bonds" - bonds rated below investment grade (BB+ or lower)
+  - Companies with weaker credit that have to pay higher yields to borrow
+  - When these spreads widen, it means investors are pricing in default risk
+
+LIBOR = London Interbank Offered Rate
+  - The rate banks charge each other for short-term loans
+  - Being phased out (replaced by SOFR now), but TED spread still uses legacy data
+  - If banks won't lend to each other cheaply, that's a liquidity crisis signal
+
+TED = Treasury-Eurodollar
+  - "T" = Treasury bill rate (safe)
+  - "ED" = Eurodollar rate (3-month LIBOR - riskier)
+  - The spread between them = how much extra yield for bank risk
+  - Named after the T-bill and Eurodollar futures contracts traded in Chicago
+
+DXY = Dollar Index
+  - Measures US dollar strength vs a basket of 6 major currencies (EUR, JPY, GBP, CAD, SEK, CHF)
+  - When DXY goes up, dollar is strengthening
+  - Ticker symbol on trading platforms
+
+EM = Emerging Markets
+  - Countries like Brazil, India, China, Mexico, Turkey, South Africa
+  - Usually borrow in dollars, so strong dollar = their debt becomes more expensive
+  - EM stress often precedes global risk-off
+
+QE = Quantitative Easing
+  - Fed buying bonds to inject liquidity (printing money)
+  - Expands Fed's balance sheet
+  - 2020: Massive QE = stocks went crazy
+
+QT = Quantitative Tightening
+  - Fed selling bonds to drain liquidity (opposite of QE)
+  - Shrinks Fed's balance sheet
+  - 2022: Aggressive QT = bear market
+
+TIER 2: MARKET BREADTH
+──────────────────────
+MA = Moving Average
+  - Average price over X days (50-MA = 50-day moving average, 200-MA = 200-day)
+  - Stock above MA = uptrend, below MA = downtrend
+  - Most widely used technical indicator
+
+AD Line = Advance-Decline Line
+  - Originally: number of stocks advancing minus declining each day
+  - Our version: SPY's proximity to recent highs (simpler, same concept)
+  - Measures market breadth participation
+
+SPY = S&P 500 ETF
+  - Ticker for the most liquid S&P 500 index fund
+  - We use it as proxy for "the market"
+  - Trades like a stock, tracks the index
+
+TIER 3: RISK APPETITE
+─────────────────────
+XLU = Utilities Sector ETF
+  - Defensive stocks: electric, gas, water companies
+  - Stable, boring, dividend-paying
+  - People buy when scared (recession-proof)
+
+XLK = Technology Sector ETF
+  - Growth stocks: Apple, Microsoft, Nvidia, etc.
+  - High beta, high growth potential
+  - People buy when optimistic about economy
+
+GLD = Gold ETF
+  - Tracks physical gold price
+  - Safe haven asset
+  - Goes up when people are scared or when dollar weakens
+
+VIX = Volatility Index
+  - "Fear gauge" - measures S&P 500 implied volatility
+  - Calculated from options prices
+  - High VIX = expensive insurance = fear
+
+VXX = Short-term VIX futures ETF
+  - Holds 1-month VIX futures
+  - More volatile than VIX itself
+
+VIXY = Short-term VIX futures ETF (different provider)
+  - Similar to VXX but different structure
+  - We compare VIXY/VXX ratio to detect term structure
+
+Contango = Normal futures curve
+  - Far-dated contracts more expensive than near-dated
+  - Means: "Things are calm now, might get worse later"
+  - Healthy market state
+
+Backwardation = Inverted futures curve
+  - Near-dated contracts MORE expensive than far-dated
+  - Means: "Shit is hitting the fan RIGHT NOW"
+  - Danger signal
+
+TIER 4: SENTIMENT
+─────────────────
+T10Y2Y = 10-Year Treasury Yield minus 2-Year Treasury Yield
+  - FRED's ticker code for the yield curve spread
+  - Normal: 10-year pays MORE than 2-year (positive spread)
+  - Inverted: 2-year pays MORE than 10-year (negative spread = recession warning)
+
+YoY = Year-over-Year
+  - Comparing data to same period last year
+  - Fed BS YoY = how much Fed's balance sheet changed vs 12 months ago
+  - Removes seasonal effects
+
+GENERAL TRADING TERMS
+─────────────────────
+Spread (in credit context)
+  - Extra yield above risk-free rate (Treasuries)
+  - HY spread = junk bond yield minus Treasury yield
+  - Wider spread = more risk priced in
+
+ETF = Exchange-Traded Fund
+  - Trades like a stock but holds a basket of securities
+  - SPY, XLU, XLK, GLD are all ETFs
+  - Liquid, low-cost way to get sector/asset exposure
+
+Beta
+  - How much an asset moves relative to the market
+  - Beta 1.0 = moves with market
+  - Beta >1.0 = more volatile than market (Tier 3 positions)
+  - Beta <1.0 = less volatile than market (Tier 1 positions)
+
+FRED = Federal Reserve Economic Data
+  - St. Louis Fed's database of economic indicators
+  - Free API access (what we use)
+  - Gold standard for macro data
+
+FRED TICKER CODES
+─────────────────
+BAMLH0A0HYM2 = FRED code for HY spread
+  - "BAML" = Bank of America Merrill Lynch (data provider)
+  - "H0A0HYM2" = their internal code for high-yield spread
+
+WALCL = FRED code for Fed balance sheet
+  - "W" = Weekly data
+  - "ALCL" = All Federal Reserve Banks, Total Assets
+  - Tracks total Fed assets (size of balance sheet)
+
+TEDRATE = FRED code for TED spread
+  - Direct ticker, no acronym breakdown
+  - Updated daily
+
+T10Y2Y = FRED code for yield curve
+  - "T10Y" = 10-year Treasury
+  - "2Y" = 2-year Treasury
+  - The difference between them
+
+═══════════════════════════════════════════════════════════════════════
 """
 
 import yfinance as yf
@@ -211,32 +396,218 @@ class HistoricalDataManager:
 # =============================================================================
 """
 TIER 1: CREDIT & LIQUIDITY (50 points)
-├─ HY Credit Spread:        20 pts  [FRED: BAMLH0A0HYM2]
+├─ HY Credit Spread:        20 pts  [FREED: BAMLH0A0HYM2]
+│  What it is: The extra yield investors demand to hold junk bonds vs safe Treasury bonds
+│  Why it matters: When shit hits the fan, this screams FIRST. Credit markets panic before stocks do.
+│  Type: Leading indicator (predicts trouble 2-4 weeks ahead)
+│  Who uses it: Every institutional desk on Wall Street. The "smart money" indicator.
+│  Normal range: 3-4% = healthy, 4.5-5% = caution, >5.5% = red alert
+│  Released: Daily, updates after market close (FRED data)
+│  Real impact: 
+│    - Tight spreads (3%) = companies can borrow cheap, economy humming
+│    - Wide spreads (6%+) = credit freeze coming, recession risk
+│  Example: Feb 2020 COVID - HY spreads jumped to 8%+ while VIX was still calm. Credit knew first.
+│
 ├─ Fed Balance Sheet YoY:   15 pts  [FRED: WALCL]
+│  What it is: How much the Fed's balance sheet grew/shrank vs last year (in %)
+│  Why it matters: Fed expanding = printing money = liquidity flood = stocks go up. Fed shrinking = draining liquidity = danger.
+│  Type: Concurrent indicator (tells you what's happening NOW)
+│  Who uses it: Macro hedge funds, Ray Dalio types who trade on liquidity cycles
+│  Normal range: +2% to -2% = stable, >+10% = massive QE, <-10% = aggressive QT
+│  Released: Weekly (Thursdays), FRED updates it
+│  Real impact:
+│    - 2020: Fed expanded 75% YoY → stocks went ballistic
+│    - 2022: Fed contracted -8% YoY → bear market
+│  Key insight: "Don't fight the Fed" - when they're expanding, stay bullish. When contracting, be cautious.
+│
 ├─ TED Spread:              10 pts  [FRED: TEDRATE]
+│  What it is: Difference between 3-month LIBOR (bank lending rate) and 3-month Treasury
+│  Why it matters: Measures how scared banks are to lend to each other. Banking stress indicator.
+│  Type: Leading indicator (spikes DURING crises, not before)
+│  Who uses it: Risk managers, CFOs, anyone worried about liquidity freezes
+│  Normal range: 0.2-0.5 = healthy, 0.5-0.8 = elevated, >1.0 = crisis mode
+│  Released: Daily, FRED data
+│  Real impact:
+│    - 2008 Lehman: TED spiked to 4.5 → complete credit freeze
+│    - Normal times: Stays below 0.5, nobody even looks at it
+│  Key insight: When this spikes, banks don't trust each other. That's bad. Very bad.
+│
 └─ Dollar Index Trend:       5 pts  [Yahoo: DX-Y.NYB]
+   What it is: Is the US dollar strengthening or weakening vs its 20-day average?
+   Why it matters: Strong dollar = global liquidity drain, EM stress, multinational earnings hurt. Weak dollar = risk-on, everyone happy.
+   Type: Concurrent indicator
+   Who uses it: International investors, commodity traders, EM fund managers
+   Normal range: -1% to +1% = stable, >+3% = flight to safety (bad), <-3% = dollar weakness (good for risk)
+   Released: Real-time during market hours, we calculate the trend daily
+   Real impact:
+     - Strong dollar events: 2022 DXY +20% → everything collapsed (stocks, crypto, commodities)
+     - Weak dollar: 2020-2021 DXY -10% → massive risk-on rally
+   Key insight: Dollar up = liquidity down = risk assets down. Inverse correlation is real.
 
 TIER 2: MARKET BREADTH (30 points)
-├─ % Above 50-MA:           12 pts  [Calculated: S&P 100 stocks]
-├─ % Below 200-MA:          10 pts  [Calculated: S&P 100 stocks]
+├─ % Above 50-MA:           12 pts  [Calculated: 27 blue-chip stocks]
+│  What it is: What percentage of our sample stocks (100 blue chips) are trading above their 50-day moving average
+│  Why it matters: If SPY is at highs but only 40% of stocks are above their 50-MA, that's a weak rally. Breadth confirms or warns.
+│  Type: Concurrent indicator (real-time health check)
+│  Who uses it: Every technical analyst on Wall Street
+│  Normal range: >65% = healthy, 50-65% = mixed, <50% = weak breadth (danger)
+│  Released: We calculate it daily from live stock prices
+│  Real impact:
+│    - Strong breadth (>70%): Rally is real, broad participation, sustainable
+│    - Weak breadth (<40%): Only a few stocks holding up the index, fragile
+│  Example: Jan 2022 - SPY kept making highs but breadth collapsed to 35%. Market rolled over 3 weeks later.
+│  Key insight: The market can't rally on 10 stocks forever. When breadth breaks, indices follow.
+│
+├─ % Below 200-MA:          10 pts  [Calculated: 27 blue-chip stocks]
+│  What it is: Percentage of stocks trading BELOW their 200-day moving average (severe breakdown indicator)
+│  Why it matters: This is the "blood in the streets" metric. When >50% are below 200-MA, it's a bear market.
+│  Type: Lagging indicator (confirms damage, doesn't predict it)
+│  Who uses it: Value investors looking for bottoms, risk managers measuring severity
+│  Normal range: <25% = healthy, 25-35% = caution, >50% = bear market confirmed
+│  Released: We calculate daily
+│  Real impact:
+│    - March 2020: 80% below 200-MA → capitulation, then bottom
+│    - Bull markets: Stays <20%, nobody cares about it
+│  Key insight: Inverse of breadth strength. When this spikes, we're in trouble. But extreme readings (>70%) often mark bottoms.
+│
 ├─ AD Line Status:           5 pts  [SPY 20-day high proximity]
+│  What it is: Is SPY near its 20-day high? If yes, breadth is "confirming." If no, breadth is "diverging."
+│  Why it matters: Catches when price makes new highs but fewer stocks participate (bearish divergence)
+│  Type: Concurrent indicator
+│  Who uses it: Technical traders watching for divergences
+│  Three states:
+│    - "Confirming" = SPY within 1% of 20-day high (healthy)
+│    - "Flat" = SPY 1-5% off high (neutral)
+│    - "Diverging" = SPY >5% off high (warning)
+│  Released: We calculate daily
+│  Real impact:
+│    - Diverging + weak breadth = top forming (2021 November before crash)
+│    - Confirming = trend is strong, keep riding
+│  Key insight: Simple but effective divergence detector.
+│
 └─ New Highs - Lows:         3 pts  [Calculated: 3-month range]
+   What it is: How many stocks in our sample are at 52-week highs minus how many are at 52-week lows
+   Why it matters: Extreme readings signal turning points. +10 = euphoria, -10 = capitulation
+   Type: Concurrent with some leading characteristics at extremes
+   Who uses it: Contrarian investors, sentiment traders
+   Normal range: -5 to +5 = normal chop, >+10 = expansion/euphoria, <-10 = contraction/fear
+   Released: We calculate daily
+   Real impact:
+     - Extreme positive: Often marks short-term tops (too much euphoria)
+     - Extreme negative: Often marks bottoms (max fear)
+   Key insight: Mean-reverting indicator. Extremes don't last.
 
 TIER 3: RISK APPETITE (15 points)
-├─ Sector Rotation:          6 pts  [XLU/XLK ratio trend]
+├─ Sector Rotation XLU/XLK:  6 pts  [XLU/XLK ratio trend]
+│  What it is: Ratio of Utilities (XLU) to Technology (XLK). Are defensive stocks or growth stocks outperforming?
+│  Why it matters: When utilities outperform tech, institutions are rotating defensive. Risk-off mode.
+│  Type: Concurrent indicator
+│  Who uses it: Sector rotation traders, asset allocators
+│  Normal range: <-2% = tech outperforming (risk-on), +2 to +5% = utilities catching up (risk-off)
+│  Released: We calculate daily from ETF prices
+│  Real impact:
+│    - XLU outperforming (>+5%): Flight to safety, recession fears, be defensive
+│    - XLK outperforming (<-3%): Risk appetite strong, growth mode
+│  Example: 2022 bear market - XLU massively outperformed XLK. Clear risk-off signal.
+│  Key insight: Where the money flows tells you what institutions believe.
+│
 ├─ Gold/SPY Ratio:           5 pts  [GLD/SPY ratio trend]
+│  What it is: Ratio of gold (GLD) to stocks (SPY). Is safe haven in demand?
+│  Why it matters: Gold rallying vs stocks = fear. Stocks rallying vs gold = greed.
+│  Type: Concurrent indicator
+│  Who uses it: Macro traders, gold bugs, risk-parity funds
+│  Normal range: -1% to +1% = neutral, >+3% = safe haven bid (bad for stocks), <-3% = risk-on (good for stocks)
+│  Released: We calculate daily from ETF prices
+│  Real impact:
+│    - Gold outperforming: 2020 COVID, 2022 inflation → risk assets suffered
+│    - Stocks outperforming: 2023 rally → gold got destroyed
+│  Key insight: Classic risk-on/risk-off barometer. They inverse each other.
+│
 └─ VIX Term Structure:       4 pts  [VIXY/VXX ratio]
+   What it is: Are VIX futures in contango (backwardation = near-term more expensive than far-term, stress)
+   Why it matters: Contango = calm markets, backwardation = panic/fear NOW
+   Type: Concurrent indicator of market stress
+   Who uses it: VIX traders, vol arb funds, risk managers
+   Three states:
+     - "Contango" = healthy (far VIX > near VIX)
+     - "Flat" = neutral
+     - "Backwardation" = stressed (near VIX > far VIX)
+   Released: We check daily using VIXY/VXX ratio
+   Real impact:
+     - Backwardation: March 2020, Feb 2018 → crashes happening NOW
+     - Contango: Normal bull markets → all clear
+   Key insight: Backwardation = fear is HERE, not expected. That's the dangerous kind.
 
 TIER 4: SENTIMENT (5 points)
 ├─ Yield Curve:              3 pts  [FRED: T10Y2Y]
+│  What it is: 10-year Treasury yield minus 2-year Treasury yield
+│  Why it matters: Inverted curve (negative) = recession coming in 6-18 months. Most reliable recession predictor.
+│  Type: Leading indicator (predicts recessions 12-18 months ahead)
+│  Who uses it: Every economist, Fed, bond traders
+│  Normal range: >+0.5% = healthy, 0 to +0.2% = flattening, <0 = inverted (recession warning)
+│  Released: Daily, FRED data
+│  Real impact:
+│    - Every recession since 1970 was preceded by inversion
+│    - 2022: Inverted in July → recession fears dominated 2023
+│  Key insight: The bond market is smarter than the stock market. When bonds say recession, listen.
+│
 ├─ VIX Level:               1.5 pts  [Yahoo: ^VIX]
-└─ Fear & Greed:           0.5 pts  [VIX-derived calculation]
+│  What it is: The "fear gauge" - implied volatility of S&P 500 options
+│  Why it matters: Tells you if options traders are pricing in calm or chaos
+│  Type: Concurrent indicator (real-time fear/calm)
+│  Who uses it: Everyone. Most watched indicator on CNBC.
+│  Normal range: <15 = complacency, 15-20 = normal, 20-30 = elevated, >30 = fear/panic
+│  Released: Real-time during market hours
+│  Real impact:
+│    - VIX <12: Extreme complacency, often precedes corrections
+│    - VIX >40: Panic mode, often marks bottoms
+│  Key insight: We give it LOW weight (1.5 pts) because it's easily manipulated. VIX can be calm while credit markets scream.
+│
+└─ Fear & Greed Index:      0.5 pts  [VIX-derived calculation]
+   What it is: VIX-derived calculation mapping 0-100 (we replaced CNN's API with our own VIX calculation)
+   Why it matters: Sentiment barometer. Extreme fear = contrarian buy. Extreme greed = contrarian sell.
+   Type: Concurrent sentiment gauge
+   Who uses it: Retail traders love it, institutions ignore it
+   Normal range: 35-65 = neutral zone, <20 = extreme fear, >80 = extreme greed
+   Released: We calculate daily from VIX
+   Real impact:
+     - Extreme fear (<20): Often marks bottoms (March 2020, Oct 2022)
+     - Extreme greed (>80): Often marks tops (Jan 2018, Nov 2021)
+   Key insight: We give it TINY weight (0.5 pts) because sentiment is noise. But extreme readings matter.
 
 V-RECOVERY OVERRIDE: (Dynamic allocation adjustment)
 When extreme risk reverses sharply, override conservative allocation
 - Cuts cash allocation by 50% to capture V-shaped recoveries
 - Prevents missing explosive bounces after crashes
 - Requires multiple confirmation signals to avoid false triggers
+
+SUMMARY OF THE FRAMEWORK
+Why these 14?
+  - Tier 1 (50%) = Credit/liquidity matters MOST. Smart money signals.
+  - Tier 2 (30%) = Breadth confirms or warns. Can't ignore participation.
+  - Tier 3 (15%) = Risk appetite matters but less critical.
+  - Tier 4 (5%) = Sentiment is noise, but extremes matter.
+
+The hierarchy:
+  1. Credit markets (HY spread, TED) scream first → heaviest weight
+  2. Breadth confirms the move → second heaviest
+  3. Sector rotation shows flow → moderate weight
+  4. Sentiment/VIX = noise → minimal weight
+
+Time horizons:
+  - Leading (predict): HY Spread, Yield Curve
+  - Concurrent (confirm): Most breadth, Fed BS, sector rotation
+  - Lagging (validate): % Below 200-MA
+
+What we DON'T use:
+  - Put/call ratios (manipulated)
+  - RSI/MACD (noise)
+  - News headlines (laggy, emotional)
+  - Earnings (backward-looking)
+
+The edge:
+This framework prioritizes HARD-TO-MANIPULATE signals (credit markets) over 
+EASY-TO-MANIPULATE signals (VIX, sentiment). That's why it's institutional-grade.
 
 TOTAL: 100 points + Override Logic
 """
@@ -1086,6 +1457,232 @@ class RiskDashboard:
         
         return lines
     
+    def generate_cio_interpretation(self):
+        """Generate CIO's honest interpretation using Claude API for dynamic analysis
+        Returns: str - Multi-line CIO analysis report"""
+        
+        print("🔍 Checking for ANTHROPIC_API_KEY...")
+        
+        # Check if Claude API key is available
+        claude_api_key = os.getenv('ANTHROPIC_API_KEY')
+        
+        if not claude_api_key:
+            print("❌ ANTHROPIC_API_KEY not found in environment")
+            print("   Checked: os.getenv('ANTHROPIC_API_KEY')")
+            print("   Make sure .env file is in the same directory as the script")
+            print("   And contains: ANTHROPIC_API_KEY=sk-ant-api03-...")
+            return None
+        
+        if claude_api_key == 'YOUR_ANTHROPIC_API_KEY_HERE':
+            print("❌ ANTHROPIC_API_KEY is placeholder value")
+            print("   Replace with actual key from console.anthropic.com")
+            return None
+        
+        print(f"✅ API key found (starts with: {claude_api_key[:15]}...)")
+        
+        score = self.scores['total']
+        d = self.data
+        
+        # Build comprehensive data package for Claude
+        data_package = {
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'total_score': f"{score:.1f}/100",
+            'tier_scores': {
+                'tier1_credit_liquidity': f"{self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
+                'tier2_breadth': f"{self.scores['tier2']:.1f}/30 ({self.scores['tier2']/30*100:.0f}%)",
+                'tier3_risk_appetite': f"{self.scores['tier3']:.1f}/15 ({self.scores['tier3']/15*100:.0f}%)",
+                'tier4_sentiment': f"{self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
+            },
+            'raw_indicators': {
+                'tier1': {
+                    'hy_spread': f"{d.get('hy_spread', 'N/A')}%" if d.get('hy_spread') else "N/A",
+                    'fed_bs_yoy': f"{d.get('fed_bs_yoy', 'N/A')}%" if d.get('fed_bs_yoy') else "N/A",
+                    'ted_spread': f"{d.get('ted_spread', 'N/A')}" if d.get('ted_spread') else "N/A",
+                    'dxy_trend': f"{d.get('dxy_trend', 'N/A')}%" if d.get('dxy_trend') else "N/A",
+                },
+                'tier2': {
+                    'pct_above_50ma': f"{d.get('pct_above_50ma', 'N/A')}%" if d.get('pct_above_50ma') else "N/A",
+                    'pct_below_200ma': f"{d.get('pct_below_200ma', 'N/A')}%" if d.get('pct_below_200ma') else "N/A",
+                    'ad_line': d.get('ad_line', 'N/A'),
+                    'new_hl': f"{d.get('new_hl', 'N/A')}" if d.get('new_hl') is not None else "N/A",
+                },
+                'tier3': {
+                    'sector_rot': f"{d.get('sector_rot', 'N/A')}%" if d.get('sector_rot') else "N/A",
+                    'gold_spy': f"{d.get('gold_spy', 'N/A')}%" if d.get('gold_spy') else "N/A",
+                    'vix_struct': d.get('vix_struct', 'N/A'),
+                },
+                'tier4': {
+                    'yield_curve': f"{d.get('yield_curve', 'N/A')}%" if d.get('yield_curve') else "N/A",
+                    'vix': f"{d.get('vix', 'N/A')}" if d.get('vix') else "N/A",
+                    'fear_greed': f"{d.get('fear_greed', 'N/A')}/100" if d.get('fear_greed') else "N/A",
+                }
+            },
+            'allocation': {
+                'base': f"{int(self.get_base_allocation()[0]*100)}/{int(self.get_base_allocation()[1]*100)}/{int(self.get_base_allocation()[2]*100)}/{int(self.get_base_allocation()[3]*100)}",
+                'description': 'Tier1/Tier2/Tier3/Cash percentages'
+            },
+            'alerts': [alert for alert in self.alerts],
+            'v_recovery_active': self.v_recovery_active
+        }
+        
+        # Craft the prompt for Claude
+        prompt = f"""You are the CIO (Chief Investment Officer) analyzing today's institutional risk dashboard for your CEO. The CEO is a sophisticated trader with $2M portfolio ($1M active trading, $1M in bonds). They value direct, blunt, witty analysis over diplomatic corporate speak.
+
+TODAY'S DATA:
+{json.dumps(data_package, indent=2)}
+
+CONTEXT YOU NEED TO KNOW:
+- Tier 1 (Credit/Liquidity) = 50% weight = Most important, "smart money" signals
+- Tier 2 (Breadth) = 30% weight = Confirms or warns about market structure
+- Tier 3 (Risk Appetite) = 15% weight = Shows institutional positioning
+- Tier 4 (Sentiment) = 5% weight = Noise, but extremes matter
+
+KEY SIGNAL INTERPRETATIONS:
+- HY Spread: <3.5% = very tight/healthy, 3-4% = normal, 4.5-5% = caution, >5.5% = stress
+- TED Spread: <0.3 = healthy banking, 0.5-0.8 = elevated, >1.0 = crisis
+- % Above 50-MA: >65% = healthy breadth, 50-65% = mixed, <50% = weak
+- % Below 200-MA: <25% = healthy, 25-35% = caution, >50% = bear market
+- New H-L: >+10 = euphoria (contrarian sell), <-10 = capitulation (contrarian buy)
+- VIX Backwardation = institutions hedging (danger signal even if VIX calm)
+- Fear/Greed: >75 = extreme greed, <25 = extreme fear
+
+YOUR TASK:
+Write a direct, insightful CIO interpretation covering these sections:
+
+═══════════════════════════════════════════════════════════════════════
+
+## THE HEADLINE
+One punchy line about what you really see (not just the score). Be direct.
+
+## WHAT THE SCORE SAYS VS WHAT I SEE
+
+**WHAT THE SCORE SAYS:**
+Quick tier assessment:
+• Tier 1 (Credit/Liquidity): X.X/50 (XX%) - STRONG/WEAK/MIXED
+• Tier 2 (Breadth): X.X/30 (XX%) - STRONG/DECENT/WEAK
+• Tier 3 (Risk Appetite): X.X/15 (XX%) - STRONG/MIXED/WEAK
+• Tier 4 (Sentiment): X.X/5 (XX%) - HEALTHY/EXTREME
+
+**WHAT I SEE:**
+Bullet points of observations and concerns:
+  ✅ [Positive signals with specific numbers]
+  ⚠️  [Concerns with specific numbers]
+
+Look for:
+- Divergences (credit calm but risk appetite weak)
+- Extreme readings (euphoria, capitulation, hidden tensions)
+- Be SPECIFIC with actual numbers from today
+
+## MY HONEST INTERPRETATION
+
+Market regime and quality assessment:
+- What market regime is this? (healthy bull, late-stage caution, credit stress, etc.)
+- What's the quality of the score? (clean signal or hidden tensions?)
+- What are institutions really doing?
+- Synthesize the divergences you spotted
+
+## MY HONEST CALL
+
+Tactical guidance:
+- System allocation: XX/XX/XX/XX
+- Your adjustments (if any): 
+  • Tier 1: Keep X% but [specific guidance like "tighten stops to 12-15%"]
+  • Tier 2: [specific guidance]
+  • Tier 3: [specific guidance like "cut from 5% to 0-2%"]
+  • Cash: [specific guidance like "bump to 10%"]
+- Explain WHY: "Credit is calm (stay deployed) BUT [tension] = [action]"
+
+## THE CRITICAL QUESTION
+
+Pose the key question today's data raises. Examples:
+- "Why is VIX in backwardation with VIX at 15?"
+- "Why is credit so calm while breadth is breaking?"
+- "Why are institutions rotating defensive despite strong breadth?"
+
+Then answer it with 2-3 possible explanations:
+1. [First possibility - e.g., "Smart money hedging"]
+2. [Second possibility - e.g., "Technical quirk"]
+3. [Third possibility - e.g., "Early warning"]
+
+End with: "I don't know which it is. But I respect the signal."
+
+## WHAT WOULD CHANGE MY MIND
+
+Dynamic triggers based on TODAY's specific data:
+→ If [specific condition with actual numbers from today]
+→ If [another specific condition]
+→ If [third condition]
+
+## BOTTOM LINE
+
+One clear sentence: stay deployed/cautious/defensive and why.
+Include: what the system says vs what you think, and your final call.
+
+═══════════════════════════════════════════════════════════════════════
+
+STYLE REQUIREMENTS:
+- Direct and blunt (CEO-CIO relationship, not client-facing)
+- Use conversational phrases like "Here's what I really see", "Let me be honest"
+- Flag contradictions (e.g., "VIX says calm but backwardation says institutions hedging")
+- Be SPECIFIC with numbers from today's data
+- Give actionable guidance, not generic warnings
+- Use proper formatting with headers, bullet points, clear sections
+- Keep total response under 2000 characters for Telegram compatibility
+
+Write the complete interpretation now, following the exact structure above:"""
+
+        try:
+            import requests
+            
+            print("\n🧠 Generating CIO interpretation using Claude API...")
+            
+            # Call Claude API
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": claude_api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 2000,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                cio_text = result['content'][0]['text']
+                
+                # Format with header and footer
+                formatted_output = [
+                    "═══════════════════════════════════════════════════════════════════════",
+                    "🧠 CIO'S INTERPRETATION - Dynamic Analysis by Claude",
+                    "═══════════════════════════════════════════════════════════════════════",
+                    "",
+                    cio_text,
+                    "",
+                    "═══════════════════════════════════════════════════════════════════════",
+                    f"Generated by Claude Sonnet 4.5 | {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}",
+                    "═══════════════════════════════════════════════════════════════════════",
+                ]
+                
+                print("✅ CIO interpretation generated successfully")
+                return "\n".join(formatted_output)
+            
+            else:
+                print(f"⚠️  Claude API error: {response.status_code}")
+                print(f"   Response: {response.text[:200]}")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️  Error generating CIO interpretation: {e}")
+            return None
+    
     # =========================================================================
     # MAIN EXECUTION PIPELINE
     # =========================================================================
@@ -1098,7 +1695,8 @@ class RiskDashboard:
         4. Check V-Recovery override
         5. Detect divergences
         6. Generate & send report
-        7. Save history
+        7. Generate & send CIO interpretation (separate message)
+        8. Save history
         Returns: float - Total risk score (0-100)
         """
         print("\n" + "="*80)
@@ -1147,8 +1745,38 @@ class RiskDashboard:
         # Save history
         self.history_manager.save_history()
         
-        # Send to Telegram
+        # Send main report to Telegram
         send_to_telegram(report)
+        
+        print("\n" + "="*80)
+        print("GENERATING CIO INTERPRETATION")
+        print("="*80)
+        
+        # Generate and send CIO interpretation (separate message to avoid 4000 char limit)
+        # This uses Claude API for dynamic analysis
+        try:
+            cio_analysis = self.generate_cio_interpretation()
+            
+            if cio_analysis:
+                print("\n" + cio_analysis + "\n")
+                
+                # Save CIO analysis to separate file
+                cio_filename = f"cio_analysis_{self.timestamp.strftime('%Y%m%d')}.txt"
+                with open(cio_filename, 'w') as f:
+                    f.write(cio_analysis)
+                print(f"💾 CIO analysis saved to {cio_filename}\n")
+                
+                # Send CIO interpretation as second Telegram message
+                send_to_telegram(cio_analysis)
+                print("✅ CIO interpretation sent to Telegram\n")
+            else:
+                print("⚠️  CIO interpretation returned None")
+                print("   Check API key configuration in .env file")
+                print("   Expected: ANTHROPIC_API_KEY=sk-ant-api03-...\n")
+        except Exception as e:
+            print(f"❌ ERROR in CIO interpretation section: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
         
         return self.scores['total']
 
