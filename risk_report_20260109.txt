@@ -1,0 +1,52 @@
+🎯 RISK DASHBOARD v1.6
+📅 Jan 09, 2026 @ 17:47
+
+📊 SCORE: 81.8/100
+🎚️ ★★★★☆ NORMAL
+💼 STAY COURSE
+
+💰 ALLOCATION
+60/30/5/5
+(T1/T2/T3/Cash)
+
+💵 BREAKDOWN
+T1 Core: 60%
+T2 Tactical: 30%
+T3 Aggr: 5%
+Cash: 5%
+
+Deployed: 95%
+Risk: 95%
+
+📈 TIER SCORES
+
+T1 (Credit & Liquidity): 48.0/50 (96%)
+  • HY Spread: 20.0/20 [2.79%]
+  • Fed BS YoY: 15.0/15 [-3.8%]
+  • TED Spread: 10.0/10 [0.09]
+  • DXY Trend: 3.0/5 [0.7%]
+
+T2 (Market Breadth): 27.0/30 (90%)
+  • % >50-MA: 12.0/12 [71%]
+  • % <200-MA: 10.0/10 [27%]
+  • A-D Line: 5.0/5 [Confirming]
+  • New H-L: 0.0/3 [12]
+
+T3 (Risk Appetite): 5.0/15 (33%)
+  • XLU/XLK: 4.0/6 [-1.2%]
+  • GLD/SPY: 1.0/5 [1.4%]
+  • VIX Struct: 0.0/4 [Backwardation]
+
+T4 (Sentiment): 1.8/5 (36%)
+  • Yield Curve: 0.0/3 [0.70%]
+  • VIX Level: 1.5/1.5 [15.7]
+  • Fear/Greed: 0.3/0.5 [86]
+
+📝 SUMMARY
+✅ Good:
+• Credit markets healthy (HY spread tight)
+• Banking system stable (TED spread low)
+• Fed liquidity manageable
+
+⚠️ Watch:
+• VIX backwardation while VIX low = hidden tension

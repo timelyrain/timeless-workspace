@@ -236,6 +236,7 @@ import yfinance as yf
 import pandas as pd
 from fredapi import Fred
 import requests
+from io import StringIO
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
@@ -695,6 +696,8 @@ class RiskDashboard:
         self.history_manager = HistoricalDataManager()
         self.v_recovery_active = False
         self.v_recovery_reason = None
+        self.market_data = None  # For holding batch downloaded data
+        self.missing_signals = [] # Track failed indicators
     
     def fetch_all_data(self):
         """Fetch all 14 indicators from free data sources with error handling"""
@@ -702,6 +705,9 @@ class RiskDashboard:
         
         # S&P 100 (OEX) for institutional-grade breadth calculations
         self.sample_tickers = self._get_sp100_tickers()
+        
+        # Prefetch batch data for efficient breadth calculations
+        self._fetch_market_breadcrumbs()
         
         self.data = {
             # Tier 1
@@ -737,6 +743,9 @@ class RiskDashboard:
         # Verify data quality
         self._verify_data_quality()
         
+        # Capture missing signals for strict error handling (v1.6 requirement)
+        self.missing_signals = [k for k, v in self.data.items() if v is None]
+        
         valid = sum(1 for v in self.data.values() if v is not None)
         print(f"\n✅ Fetched {valid}/14 signals successfully\n")
         return self.data
@@ -745,10 +754,55 @@ class RiskDashboard:
     # DATA FETCHING HELPERS - All return None on error for graceful handling
     # =========================================================================
     
+    def _fetch_market_breadcrumbs(self):
+        """Fetch batch data using ThreadPool (Faster & more robust than yf.download)"""
+        print("   📊 Fetching breadth data (Parallel execution)...")
+        import concurrent.futures
+        
+        def fetch_ticker_data(ticker):
+            try:
+                # Fetch only Close price to save bandwidth
+                # auto_adjust=True is default in new yfinance, ensures we get split-adjusted prices
+                data = yf.Ticker(ticker).history(period="1y", auto_adjust=True)
+                if not data.empty:
+                    return data['Close'].rename(ticker)
+            except:
+                pass
+            return None
+
+        try:
+            # Use ThreadPool to fetch 100 tickers in parallel
+            # max_workers=20 is a safe number for API rate limits
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                results = list(executor.map(fetch_ticker_data, self.sample_tickers))
+            
+            # Filter valid results and combine into one DataFrame
+            valid_results = [r for r in results if r is not None]
+            
+            if valid_results:
+                # Concatenate along columns (axis=1) to create the wide matrix
+                # Sort index to ensure dates are aligned
+                self.market_data = pd.concat(valid_results, axis=1).sort_index()
+                print(f"   ✓ Parallel fetch complete for {len(self.market_data.columns)} tickers")
+            else:
+                print("   ⚠️ Parallel fetch returned empty data")
+                self.market_data = None
+                
+        except Exception as e:
+            print(f"   ⚠️ Parallel fetch failed: {e}. Will fallback to individual fetching.")
+            self.market_data = None
+            import traceback
+            traceback.print_exc()
+
     def _get_sp100_tickers(self):
-        """Return list of S&P 100 tickers for breadth calculation
-        Returns: list of ticker symbols (str)
-        """
+        """Return list of S&P 100 tickers, dynamically fetched with fallback"""
+        
+        # 1. Try to get dynamic list (Cache -> Web)
+        dynamic_list = self._fetch_sp100_dynamic()
+        if dynamic_list:
+            return dynamic_list
+            
+        print("   ⚠️  Using hardcoded fallback list for breadth")
         return [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
             'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'ABBV',
@@ -762,6 +816,78 @@ class RiskDashboard:
             'DUK', 'ADP', 'CI', 'PGR', 'SCHW', 'REGN', 'CL', 'MMM', 'BDX',
             'GE', 'SLB', 'USB', 'TMUS', 'CVS', 'FI', 'ETN', 'BSX', 'PNC'
         ]
+
+    def _fetch_sp100_dynamic(self):
+        """Fetch S&P 100 components from Wikipedia with caching"""
+        cache_file = Path(__file__).parent / "sp100_cache.json"
+        
+        stale_tickers = None # Store stale cache if available
+        
+        # 1. Check Cache Validity
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'r') as f:
+                    data = json.load(f)
+                    stale_tickers = data.get('tickers')
+                    
+                    # Check if cache is fresh (< 30 days)
+                    last_updated = datetime.strptime(data['timestamp'], '%Y-%m-%d')
+                    if (datetime.now() - last_updated).days < 30:
+                        print(f"   ✓ Loaded {len(data['tickers'])} tickers from cache ({data['timestamp']})")
+                        return data['tickers']
+            except Exception as e:
+                print(f"   ⚠️  Cache read failed: {e}")
+        
+        # 2. Fetch from Web if cache missing or stale
+        print("   🌐 Fetching fresh S&P 100 list from Wikipedia...")
+        try:
+            # Use requests with headers to avoid 403 Forbidden
+            url = 'https://en.wikipedia.org/wiki/S%26P_100'
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            r = requests.get(url, headers=headers)
+            r.raise_for_status()
+            
+            # Requires lxml or html5lib or beautifulsoup4
+            tables = pd.read_html(StringIO(r.text))
+            
+            # Find the table with 'Symbol' column
+            df = None
+            for t in tables:
+                if 'Symbol' in t.columns:
+                    df = t
+                    break
+            
+            if df is not None:
+                # Clean up tickers: replace '.' with '-' (e.g. BRK.B -> BRK-B)
+                tickers = df['Symbol'].astype(str).str.replace('.', '-', regex=False).tolist()
+                
+                # Sanity check on count (S&P 100 should be ~100)
+                if 90 <= len(tickers) <= 110:
+                    # Save to cache
+                    try:
+                        with open(cache_file, 'w') as f:
+                            json.dump({
+                                'timestamp': datetime.now().strftime('%Y-%m-%d'),
+                                'tickers': tickers
+                            }, f)
+                        print(f"   ✓ Fetched {len(tickers)} tickers from Wikipedia (Cached)")
+                        return tickers
+                    except Exception as e:
+                        print(f"   ⚠️  Could not write cache: {e}")
+                        return tickers # Valid list, just couldn't save
+                else:
+                    print(f"   ⚠️  Fetched suspicious number of tickers: {len(tickers)}")
+        except Exception as e:
+            print(f"   ⚠️  Wikipedia fetch failed: {e}")
+        
+        # 3. Fallback to stale cache if web fetch failed
+        if stale_tickers:
+            print("   ⚠️  Web fetch failed. Using stale cache as fallback.")
+            return stale_tickers
+            
+        return None
     
     def _fred_get(self, series, name):
         """Fetch data from FRED API with graceful error handling
@@ -829,6 +955,28 @@ class RiskDashboard:
             period: MA period (int, typically 50 or 200)
         Returns: float (percentage 0-100) or None
         """
+        # OPTIMIZED: Use batch data if available
+        if self.market_data is not None and not self.market_data.empty:
+            try:
+                # Calculate MA for entire dataframe
+                ma = self.market_data.rolling(window=period).mean()
+                
+                # Compare last prices to MA
+                last_prices = self.market_data.iloc[-1]
+                last_ma = ma.iloc[-1]
+                
+                # Count valid comparisons
+                above = (last_prices > last_ma).sum()
+                valid = last_prices.count()
+                
+                if valid > 0:
+                    pct = (above / valid * 100)
+                    print(f"   ✓ % Above {period}-MA: {pct:.0f}% ({above}/{valid}) [Batch]")
+                    return pct
+            except Exception as e:
+                print(f"   ⚠️ Batch calculation failed: {e}. Falling back to loop.")
+        
+        # FALLBACK: Individual fetching (slow)
         above = 0
         valid = 0
         for t in self.sample_tickers:
@@ -846,7 +994,7 @@ class RiskDashboard:
             return None
         
         pct = (above / valid * 100)
-        print(f"   ✓ % Above {period}-MA: {pct:.0f}% ({above}/{valid})")
+        print(f"   ✓ % Above {period}-MA: {pct:.0f}% ({above}/{valid}) [Slow]")
         return pct
     
     def _pct_below_ma(self, period):
@@ -855,6 +1003,28 @@ class RiskDashboard:
             period: MA period (int, typically 200)
         Returns: float (percentage 0-100) or None
         """
+        # OPTIMIZED: Use batch data if available
+        if self.market_data is not None and not self.market_data.empty:
+            try:
+                # Calculate MA for entire dataframe
+                ma = self.market_data.rolling(window=period).mean()
+                
+                # Compare last prices to MA
+                last_prices = self.market_data.iloc[-1]
+                last_ma = ma.iloc[-1]
+                
+                # Count valid comparisons
+                below = (last_prices < last_ma).sum()
+                valid = last_prices.count()
+                
+                if valid > 0:
+                    pct = (below / valid * 100)
+                    print(f"   ✓ % Below {period}-MA: {pct:.0f}% ({below}/{valid}) [Batch]")
+                    return pct
+            except Exception as e:
+                print(f"   ⚠️ Batch calculation failed: {e}. Falling back to loop.")
+
+        # FALLBACK: Individual fetching (slow)
         below = 0
         valid = 0
         for t in self.sample_tickers:
@@ -872,7 +1042,7 @@ class RiskDashboard:
             return None
         
         pct = (below / valid * 100)
-        print(f"   ✓ % Below {period}-MA: {pct:.0f}% ({below}/{valid})")
+        print(f"   ✓ % Below {period}-MA: {pct:.0f}% ({below}/{valid}) [Slow]")
         return pct
     
     def _ad_line_status(self):
@@ -897,6 +1067,32 @@ class RiskDashboard:
         """Calculate net new highs minus new lows in sample
         Returns: int (net count) or None
         """
+        # OPTIMIZED: Use batch data if available
+        if self.market_data is not None and not self.market_data.empty:
+            try:
+                # Use only last 3 months (~63 days)
+                recent_data = self.market_data.tail(63)
+                
+                if not recent_data.empty:
+                    current_prices = recent_data.iloc[-1]
+                    period_highs = recent_data.max()
+                    period_lows = recent_data.min()
+                    
+                    # Count highs and lows
+                    # High is within 0.5% of period max
+                    highs = (current_prices >= period_highs * 0.995).sum()
+                    # Low is within 0.5% of period min
+                    lows = (current_prices <= period_lows * 1.005).sum()
+                    
+                    valid = current_prices.count()
+                    
+                    net = highs - lows
+                    print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows}) [Batch]")
+                    return int(net)
+            except Exception as e:
+                print(f"   ⚠️ Batch calculation failed: {e}. Falling back to loop.")
+                
+        # FALLBACK: Individual fetching (slow)
         highs, lows = 0, 0
         valid = 0
         for t in self.sample_tickers:
@@ -917,7 +1113,7 @@ class RiskDashboard:
             return None
         
         net = highs - lows
-        print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows})")
+        print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows}) [Slow]")
         return net
     
     def _sector_rotation(self):
@@ -1381,6 +1577,26 @@ class RiskDashboard:
     # REPORTING
     # =========================================================================
     
+    def _send_error_notification(self):
+        """Send immediate alert about data failures"""
+        msg = [
+            "⚠️ SYSTEM ALERT: DATA FETCH FAILED",
+            f"📅 {self.timestamp.strftime('%Y-%m-%d %H:%M')}",
+            "",
+            "The following indicators failed to load (returned None):",
+        ]
+        for s in self.missing_signals:
+            msg.append(f"❌ {s}")
+            
+        msg.extend([
+            "",
+            "🚫 Score calculation aborted to prevent inaccurate results.",
+            "Please check API connections and source availability.",
+            "No Risk Signal or CIO interpretation will be generated until data is restored."
+        ])
+        
+        send_to_telegram("\n".join(msg))
+
     def generate_report(self):
         """Generate formatted text report with scores, allocations, and alerts
         Returns: str - Multi-line formatted report"""
@@ -1622,33 +1838,12 @@ class RiskDashboard:
             'message': f"Backwardation Day {streak}: {severity}. VIX calm at {d.get('vix', 'N/A'):.1f} but institutions buying {d.get('vix_magnitude', 0):.1f}% premium on near-term protection."
         }
     
-    def generate_cio_interpretation(self):
-        """Generate CIO's honest interpretation using Claude API for dynamic analysis
-        Returns: str - Multi-line CIO analysis report"""
-        
-        print("🔍 Checking for ANTHROPIC_API_KEY...")
-        
-        # Check if Claude API key is available
-        claude_api_key = os.getenv('ANTHROPIC_API_KEY')
-        
-        if not claude_api_key:
-            print("❌ ANTHROPIC_API_KEY not found in environment")
-            print("   Checked: os.getenv('ANTHROPIC_API_KEY')")
-            print("   Make sure .env file is in the same directory as the script")
-            print("   And contains: ANTHROPIC_API_KEY=sk-ant-api03-...")
-            return None
-        
-        if claude_api_key == 'YOUR_ANTHROPIC_API_KEY_HERE':
-            print("❌ ANTHROPIC_API_KEY is placeholder value")
-            print("   Replace with actual key from console.anthropic.com")
-            return None
-        
-        print(f"✅ API key found (starts with: {claude_api_key[:15]}...)")
-        
+    def _construct_cio_prompt(self):
+        """Build common data package and prompt for AI interpretations"""
         score = self.scores['total']
         d = self.data
         
-        # Build comprehensive data package for Claude
+        # Build comprehensive data package for AI
         data_package = {
             'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             'total_score': f"{score:.1f}/100",
@@ -1691,7 +1886,7 @@ class RiskDashboard:
             'v_recovery_active': self.v_recovery_active
         }
         
-        # Craft the prompt for Claude
+        # Craft the prompt for AI
         prompt = f"""You are the CIO (Chief Investment Officer) analyzing today's institutional risk dashboard for your CEO. The CEO is a sophisticated trader with $2M portfolio ($1M active trading, $1M in bonds). They value direct, blunt, witty analysis over diplomatic corporate speak.
 
 TODAY'S DATA:
@@ -1763,6 +1958,32 @@ USE ACTUAL NUMBERS FROM TODAY.
 BE SPECIFIC AND DIRECT.
 
 Write now:"""
+        return prompt
+
+    def generate_cio_interpretation(self):
+        """Generate CIO's honest interpretation using Claude API for dynamic analysis
+        Returns: str - Multi-line CIO analysis report"""
+        
+        print("🔍 Checking for ANTHROPIC_API_KEY...")
+        
+        # Check if Claude API key is available
+        claude_api_key = os.getenv('ANTHROPIC_API_KEY')
+        
+        if not claude_api_key:
+            print("❌ ANTHROPIC_API_KEY not found in environment")
+            print("   Checked: os.getenv('ANTHROPIC_API_KEY')")
+            print("   Make sure .env file is in the same directory as the script")
+            print("   And contains: ANTHROPIC_API_KEY=sk-ant-api03-...")
+            return None
+        
+        if claude_api_key == 'YOUR_ANTHROPIC_API_KEY_HERE':
+            print("❌ ANTHROPIC_API_KEY is placeholder value")
+            print("   Replace with actual key from console.anthropic.com")
+            return None
+        
+        print(f"✅ API key found (starts with: {claude_api_key[:15]}...)")
+        
+        prompt = self._construct_cio_prompt()
 
         try:
             import requests
@@ -1822,136 +2043,15 @@ Write now:"""
         
         if not gemini_api_key:
             print("❌ GEMINI_API_KEY not found in environment")
-            print("   Checked: os.getenv('GEMINI_API_KEY')")
-            print("   Make sure .env file is in the same directory as the script")
-            print("   And contains: GEMINI_API_KEY=...")
             return None
         
         if gemini_api_key == 'YOUR_GEMINI_API_KEY_HERE':
             print("❌ GEMINI_API_KEY is placeholder value")
-            print("   Replace with actual key from Google AI Studio")
             return None
         
         print(f"✅ API key found (starts with: {gemini_api_key[:15]}...)")
         
-        score = self.scores['total']
-        d = self.data
-        
-        # Build comprehensive data package for Gemini (same as Claude)
-        data_package = {
-            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            'total_score': f"{score:.1f}/100",
-            'tier_scores': {
-                'tier1_credit_liquidity': f"{self.scores['tier1']:.1f}/50 ({self.scores['tier1']/50*100:.0f}%)",
-                'tier2_breadth': f"{self.scores['tier2']:.1f}/30 ({self.scores['tier2']/30*100:.0f}%)",
-                'tier3_risk_appetite': f"{self.scores['tier3']:.1f}/15 ({self.scores['tier3']/15*100:.0f}%)",
-                'tier4_sentiment': f"{self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
-            },
-            'raw_indicators': {
-                'tier1': {
-                    'hy_spread': f"{d.get('hy_spread', 'N/A')}%" if d.get('hy_spread') else "N/A",
-                    'fed_bs_yoy': f"{d.get('fed_bs_yoy', 'N/A')}%" if d.get('fed_bs_yoy') else "N/A",
-                    'ted_spread': f"{d.get('ted_spread', 'N/A')}" if d.get('ted_spread') else "N/A",
-                    'dxy_trend': f"{d.get('dxy_trend', 'N/A')}%" if d.get('dxy_trend') else "N/A",
-                },
-                'tier2': {
-                    'pct_above_50ma': f"{d.get('pct_above_50ma', 'N/A')}%" if d.get('pct_above_50ma') else "N/A",
-                    'pct_below_200ma': f"{d.get('pct_below_200ma', 'N/A')}%" if d.get('pct_below_200ma') else "N/A",
-                    'ad_line': d.get('ad_line', 'N/A'),
-                    'new_hl': f"{d.get('new_hl', 'N/A')}" if d.get('new_hl') is not None else "N/A",
-                },
-                'tier3': {
-                    'sector_rot': f"{d.get('sector_rot', 'N/A')}%" if d.get('sector_rot') else "N/A",
-                    'gold_spy': f"{d.get('gold_spy', 'N/A')}%" if d.get('gold_spy') else "N/A",
-                    'vix_struct': d.get('vix_struct', 'N/A'),
-                },
-                'tier4': {
-                    'yield_curve': f"{d.get('yield_curve', 'N/A')}%" if d.get('yield_curve') else "N/A",
-                    'vix': f"{d.get('vix', 'N/A')}" if d.get('vix') else "N/A",
-                    'fear_greed': f"{d.get('fear_greed', 'N/A')}/100" if d.get('fear_greed') else "N/A",
-                }
-            },
-            'backwardation_context': self._get_backwardation_context(),
-            'allocation': {
-                'base': f"{int(self.get_base_allocation()[0]*100)}/{int(self.get_base_allocation()[1]*100)}/{int(self.get_base_allocation()[2]*100)}/{int(self.get_base_allocation()[3]*100)}",
-                'description': 'Tier1/Tier2/Tier3/Cash percentages'
-            },
-            'alerts': [alert for alert in self.alerts],
-            'v_recovery_active': self.v_recovery_active
-        }
-        
-        # Craft the prompt for Gemini (identical to Claude)
-        prompt = f"""You are the CIO (Chief Investment Officer) analyzing today's institutional risk dashboard for your CEO. The CEO is a sophisticated trader with $2M portfolio ($1M active trading, $1M in bonds). They value direct, blunt, witty analysis over diplomatic corporate speak.
-
-TODAY'S DATA:
-{json.dumps(data_package, indent=2)}
-
-CONTEXT YOU NEED TO KNOW:
-- Tier 1 (Credit/Liquidity) = 50% weight = Most important, "smart money" signals
-- Tier 2 (Breadth) = 30% weight = Confirms or warns about market structure
-- Tier 3 (Risk Appetite) = 15% weight = Shows institutional positioning
-- Tier 4 (Sentiment) = 5% weight = Noise, but extremes matter
-
-KEY SIGNAL INTERPRETATIONS:
-- HY Spread: <3.5% = very tight/healthy, 3-4% = normal, 4.5-5% = caution, >5.5% = stress
-- TED Spread: <0.3 = healthy banking, 0.5-0.8 = elevated, >1.0 = crisis
-- % Above 50-MA: >65% = healthy breadth, 50-65% = mixed, <50% = weak
-- % Below 200-MA: <25% = healthy, 25-35% = caution, >50% = bear market
-- New H-L: >+10 = euphoria (contrarian sell), <-10 = capitulation (contrarian buy)
-- VIX Backwardation = institutions hedging (danger signal even if VIX calm)
-  * Day 1-2: Watch mode
-  * Day 3-4: Pattern forming, heightened alert
-  * Day 5+: CRITICAL - institutions committed to hedging
-- Fear/Greed: >75 = extreme greed, <25 = extreme fear
-
-YOUR TASK:
-Write a brief CIO interpretation for iPhone Telegram.
-
-FORMAT:
-- Short, punchy lines
-- No decorative dividers
-- Mobile-friendly
-- Direct language
-
-STRUCTURE:
-
-💭 HEADLINE
-[One punchy line about what you see]
-
-📊 SCORE QUALITY
-T1: XX/50 (XX%) [STRONG/WEAK]
-T2: XX/30 (XX%) [STRONG/WEAK]
-T3: XX/15 (XX%) [STRONG/WEAK]
-T4: X/5 (XX%) [STRONG/WEAK]
-
-👁️ WHAT I SEE
-✅ [2-3 positives with numbers]
-⚠️ [2-3 concerns with numbers]
-
-🎯 MARKET REGIME
-[2-3 sentences on market type, score quality, what institutions doing]
-
-💡 MY CALL
-System: XX/XX/XX/XX
-[If adjustments:]
-Suggest: XX/XX/XX/XX
-Stops: X-X%
-Why: [brief reason]
-[If clean:]
-Run the playbook.
-
-🔄 FLIP TRIGGERS
-→ [Specific trigger with numbers]
-→ [Specific trigger with numbers]
-
-⚡ BOTTOM LINE
-[One clear sentence - deployed/cautious/defensive and why]
-
-KEEP UNDER 1200 CHARS.
-USE ACTUAL NUMBERS FROM TODAY.
-BE SPECIFIC AND DIRECT.
-
-Write now:"""
+        prompt = self._construct_cio_prompt()
 
         try:
             import google.generativeai as genai
@@ -2008,6 +2108,15 @@ Write now:"""
         
         # Fetch data and calculate scores
         self.fetch_all_data()
+        
+        # STOP EXECUTION IF DATA IS MISSING
+        # User requirement: Notify on error instead of continuing with inaccurate score
+        if self.missing_signals:
+            print(f"\n❌ CRITICAL: Found {len(self.missing_signals)} missing indicators.")
+            print("   Aborting assessment to prevent inaccurate scoring.")
+            self._send_error_notification()
+            return None
+
         self.calculate_scores()
         
         # Save to history (for V-Recovery detection)
