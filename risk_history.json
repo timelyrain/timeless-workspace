@@ -169,6 +169,14 @@
       "vix": 15.670000076293945,
       "vix_structure": "Backwardation",
       "vixy_vxx_ratio": 0.9653333391462053
+    },
+    {
+      "date": "2026-01-14",
+      "score": 80.8,
+      "spy": 693.8088989257812,
+      "vix": 15.699999809265137,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.9678284131385709
     }
   ],
   "overrides": []

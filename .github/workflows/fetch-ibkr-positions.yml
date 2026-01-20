@@ -1,0 +1,104 @@
+# IBKR Open Positions Fetcher - Daily automated sync
+# 
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   - IBKR_FLEX_TOKEN_HK: Your IBKR FlexWeb Service token (HK Account)
+#   - IBKR_QUERY_ID_HK: Your Flex Query ID (HK Account)
+#   - IBKR_FLEX_TOKEN_AL: Your IBKR FlexWeb Service token (AL Account)
+#   - IBKR_QUERY_ID_AL: Your Flex Query ID (AL Account)
+#   - TELEGRAM_TOKEN: Your Telegram bot token from @BotFather
+#   - CHAT_ID: Your Telegram channel/chat ID
+#
+# Schedule: Daily at 9:00 AM Malaysia Time (MYT, UTC+8)
+
+name: Fetch IBKR Positions
+
+on:
+  schedule:
+    # 9:00 AM Malaysia Time (MYT UTC+8) = 1:00 AM UTC
+    - cron: '0 1 * * *'  # Daily at 9:00 AM MYT
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  fetch-positions:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl requests python-dotenv
+      
+      - name: Create .env file
+        run: |
+          cd projects
+          echo "IBKR_FLEX_TOKEN_HK=${{ secrets.IBKR_FLEX_TOKEN_HK }}" >> .env
+          echo "IBKR_QUERY_ID_HK=${{ secrets.IBKR_QUERY_ID_HK }}" >> .env
+          echo "IBKR_FLEX_TOKEN_AL=${{ secrets.IBKR_FLEX_TOKEN_AL }}" >> .env
+          echo "IBKR_QUERY_ID_AL=${{ secrets.IBKR_QUERY_ID_AL }}" >> .env
+          echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" >> .env
+          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> .env
+          echo "✅ Created .env file in projects directory"
+          cd ..
+      
+      - name: Fetch IBKR positions
+        id: fetch
+        run: |
+          cd projects
+          python fetch-ibkr-positions.py > output.log 2>&1
+          EXIT_CODE=$?
+          cat output.log
+          
+          # Extract summary info for Telegram
+          POSITION_COUNT=$(grep -oP "Total Positions: \K\d+" output.log || echo "Unknown")
+          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S MYT')
+          
+          echo "position_count=$POSITION_COUNT" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          exit $EXIT_CODE
+      
+      - name: Send success notification to Telegram
+        if: success()
+        run: |
+          MESSAGE="✅ *IBKR Positions Updated*%0A%0A"
+          MESSAGE="${MESSAGE}📊 Total Positions: ${{ steps.fetch.outputs.position_count }}%0A"
+          MESSAGE="${MESSAGE}🕐 Updated: ${{ steps.fetch.outputs.timestamp }}%0A"
+          MESSAGE="${MESSAGE}📁 File: fetch-ibkr-positions.xlsx%0A%0A"
+          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.CHAT_ID }}" \
+            -d "text=${MESSAGE}" \
+            -d "parse_mode=Markdown"
+      
+      - name: Send error notification to Telegram
+        if: failure()
+        run: |
+          MESSAGE="❌ *IBKR Position Update Failed*%0A%0A"
+          MESSAGE="${MESSAGE}⚠️ Error occurred while fetching positions%0A"
+          MESSAGE="${MESSAGE}🕐 Time: $(date +'%Y-%m-%d %H:%M:%S MYT')%0A%0A"
+          MESSAGE="${MESSAGE}Please check GitHub Actions logs for details.%0A%0A"
+          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.CHAT_ID }}" \
+            -d "text=${MESSAGE}" \
+            -d "parse_mode=Markdown"
+      
+      - name: Upload Excel file as artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ibkr-positions-${{ github.run_number }}
+          path: projects/fetch-ibkr-positions.xlsx
+          retention-days: 30
