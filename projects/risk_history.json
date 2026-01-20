@@ -1,0 +1,14 @@
+{
+  "scores": [
+    {
+      "date": "2026-01-20",
+      "score": 78.3,
+      "spy": 683.8099975585938,
+      "vix": 19.979999542236328,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.9690539341536698
+    }
+  ],
+  "overrides": [],
+  "backwardation": []
+}

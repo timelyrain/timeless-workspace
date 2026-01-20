@@ -1,0 +1,30 @@
+🎯 RISK DASHBOARD v1.8
+📅 Jan 20, 2026 @ 23:29
+
+📊 SCORE: 78.3/100
+🎚️ ★★★★☆ NORMAL
+
+💼 PORTFOLIO ALLOCATION
+Global Core: 30%
+Growth Engine: 27%
+Income Strategy: 22%
+Hedge (QQQ Puts): 5%
+Reserves: 16% (Gold: 4%, Cash: 12%)
+
+🛡️ Stops: 12-15%
+📈 Options: Tighter strikes: 10-15 delta CSPs, 30 DTE
+
+💡 ACTION: STAY COURSE - Tighten stops, be selective on new CSPs
+
+📈 TIER SCORES
+T1: 48/50 (96%)
+T2: 27/30 (90%)
+T3: 2/15 (13%)
+T4: 1.3/5 (26%)
+
+📊 KEY SIGNALS
+HY Spread: 2.65%
+VIX: 20.0
+VIX: Backwardation
+% >50MA: 53%
+F&G: 75
