@@ -8,14 +8,18 @@
 #   - TELEGRAM_TOKEN: Your Telegram bot token from @BotFather
 #   - CHAT_ID: Your Telegram channel/chat ID
 #
-# Schedule: Daily at 9:00 AM Malaysia Time (MYT, UTC+8)
+# Schedule: Daily at 6:30 PM US Eastern Time (after market close and settlement)
+# This adjusts automatically for US DST (EST/EDT)
+# 6:30 PM ET = ~6:30-7:30 AM Malaysia time next day (depending on DST)
 
 name: Fetch IBKR Positions
 
 on:
   schedule:
-    # 9:00 AM Malaysia Time (MYT UTC+8) = 1:00 AM UTC
-    - cron: '0 1 * * *'  # Daily at 9:00 AM MYT
+    # 6:30 PM US Eastern Time (EST UTC-5 / EDT UTC-4)
+    # Using 23:30 UTC (6:30 PM EST) / 22:30 UTC (6:30 PM EDT)
+    # GitHub Actions uses UTC, so we use 23:30 UTC which equals 6:30 PM EST
+    - cron: '30 23 * * *'  # Daily at 6:30 PM ET
   workflow_dispatch:  # Allow manual triggers
 
 jobs:

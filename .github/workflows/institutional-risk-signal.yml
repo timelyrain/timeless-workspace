@@ -7,15 +7,18 @@
 #   - TELEGRAM_TOKEN_RISK: Your Telegram bot token from @BotFather
 #   - CHAT_ID: Your Telegram channel/chat ID
 #
-# Schedule: Daily at 9:30 PM NYSE time (after market close)
+# Schedule: Daily at 6:45 PM US Eastern Time (after market close and settlement)
+# This adjusts automatically for US DST (EST/EDT)
+# 6:45 PM ET = ~6:45-7:45 AM Malaysia time next day (depending on DST)
 
 name: Institutional Risk Signal
 
 on:
   schedule:
-    # 9:30 PM NYSE Time (EST UTC-5 / EDT UTC-4)
-    # Using 2:30 UTC (9:30 PM EST) - works year-round
-    - cron: '30 2 * * *'  # Daily at 9:30 PM NYSE
+    # 6:45 PM US Eastern Time (EST UTC-5 / EDT UTC-4)
+    # Using 23:45 UTC (6:45 PM EST) / 22:45 UTC (6:45 PM EDT)
+    # GitHub Actions uses UTC, so we use 23:45 UTC which equals 6:45 PM EST
+    - cron: '45 23 * * *'  # Daily at 6:45 PM ET
   workflow_dispatch:  # Allow manual triggers
 
 jobs:

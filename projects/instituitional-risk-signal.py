@@ -1570,7 +1570,7 @@ Provide your CIO perspective (max 1000 chars) covering:
 Be direct, use specific numbers, focus on actionable insights."""
 
             resp = requests.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={key}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}",
                 headers={"Content-Type": "application/json"},
                 json={"contents": [{"parts": [{"text": prompt}]}]},
                 timeout=30
