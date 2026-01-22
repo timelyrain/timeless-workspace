@@ -67,7 +67,7 @@ PORTFOLIO_2026 = {
         'global_core': 0.30,      # VWRA, ES3, DHL, 82846
         'growth_engine': 0.30,    # CSNDX, CTEC, HEAL, INRA, LOCK
         'income_strategy': 0.25,  # Wheel on GOOGL, PEP, V
-        'hedge': 0.05,            # QQQ puts (15% OTM)
+        'alpha_insurance': 0.05,  # Theme stocks (Sniper) + QQQ puts (Hedge)
         'reserves': 0.10          # Cash + Gold (split dynamically by risk score)
     }
 }
@@ -239,6 +239,106 @@ class HistoricalDataManager:
             return recent_overrides[0]['date']
         return None
     
+    def add_drift_snapshot(self, date, total_drift, category_drifts):
+        """Store daily portfolio drift snapshot"""
+        if 'drift_history' not in self.history:
+            self.history['drift_history'] = []
+        
+        entry = {
+            'date': date,
+            'total_drift': total_drift,
+            'categories': category_drifts
+        }
+        
+        # Remove existing entry for same date (in case of re-run)
+        self.history['drift_history'] = [d for d in self.history['drift_history'] if d['date'] != date]
+        self.history['drift_history'].append(entry)
+        
+        # Keep last 90 days
+        cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        self.history['drift_history'] = [d for d in self.history['drift_history'] if d['date'] >= cutoff_date]
+    
+    def get_drift_trend(self, days=7):
+        """Get drift trend over last N days"""
+        if 'drift_history' not in self.history or not self.history['drift_history']:
+            return None
+        
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        recent = sorted(
+            [d for d in self.history['drift_history'] if d['date'] >= cutoff],
+            key=lambda x: x['date']
+        )
+        
+        if len(recent) < 2:
+            return None
+        
+        # Calculate trend (improving = drift decreasing)
+        first_drift = recent[0]['total_drift']
+        last_drift = recent[-1]['total_drift']
+        change = last_drift - first_drift
+        change_pct = (change / first_drift * 100) if first_drift > 0 else 0
+        
+        return {
+            'history': recent,
+            'first_drift': first_drift,
+            'last_drift': last_drift,
+            'change': change,
+            'change_pct': change_pct,
+            'improving': change < 0,  # Drift decreasing = improving
+            'days': len(recent)
+        }
+    
+    def get_score_trend(self, days=7):
+        """Get risk score trend with regime changes"""
+        if not self.history.get('scores'):
+            return None
+        
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        recent = sorted(
+            [s for s in self.history['scores'] if s['date'] >= cutoff],
+            key=lambda x: x['date']
+        )
+        
+        if len(recent) < 2:
+            return None
+        
+        # Calculate score change
+        first_score = recent[0]['score']
+        last_score = recent[-1]['score']
+        change = last_score - first_score
+        
+        # Map scores to regimes
+        def get_regime(score):
+            if score >= 90: return 'ALL CLEAR'
+            elif score >= 75: return 'NORMAL'
+            elif score >= 60: return 'ELEVATED'
+            elif score >= 40: return 'HIGH RISK'
+            else: return 'EXTREME RISK'
+        
+        first_regime = get_regime(first_score)
+        last_regime = get_regime(last_score)
+        regime_changed = first_regime != last_regime
+        
+        # Track key signal changes
+        signal_changes = {}
+        if 'vix' in recent[0] and 'vix' in recent[-1]:
+            vix_change = recent[-1]['vix'] - recent[0]['vix']
+            vix_pct = (vix_change / recent[0]['vix'] * 100) if recent[0]['vix'] > 0 else 0
+            signal_changes['vix'] = {'change': vix_change, 'pct': vix_pct, 'first': recent[0]['vix'], 'last': recent[-1]['vix']}
+        
+        return {
+            'history': recent,
+            'first_score': first_score,
+            'last_score': last_score,
+            'change': change,
+            'improving': change > 0,  # Score increasing = improving
+            'first_regime': first_regime,
+            'last_regime': last_regime,
+            'regime_changed': regime_changed,
+            'signal_changes': signal_changes,
+            'days': len(recent)
+        }
+    
     def days_since_override_start(self):
         """Calculate days since override activated"""
         start_date = self.get_override_start_date()
@@ -255,12 +355,17 @@ class HistoricalDataManager:
 # =============================================================================
 
 class RiskDashboard:
-    # Symbol to category mapping for IBKR positions
+    # Symbol to category mapping for IBKR positions (from fetch-ibkr-positions-dashboard.xlsx)
     SYMBOL_MAPPING = {
-        'global_core': ['VWRA', 'VWCE', 'ES3', 'DHL', '82846', 'VT', 'VXUS'],
+        'global_core': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS'],
         'growth_engine': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'LOCK'],
-        'income_strategy': ['GOOGL', 'PEP', 'V'],  # Only the underlying stocks for wheel
-        'hedge': [],  # QQQ puts - will detect from AssetClass=OPT
+        'income_strategy': [
+            'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
+            'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
+            'NVDA', 'TSLA'
+        ],
+        'alpha_sniper': [],  # Theme stocks - anything not in above categories
+        'alpha_hedge': [],  # QQQ puts - detected from options
         'gold': ['GSD', 'GLD', 'IAU'],
     }
     
@@ -546,6 +651,8 @@ class RiskDashboard:
             from pathlib import Path
             
             excel_path = Path(__file__).parent / 'fetch-ibkr-positions.xlsx'
+            dashboard_path = Path(__file__).parent / 'fetch-ibkr-positions-dashboard.xlsx'
+            
             if not excel_path.exists():
                 return None
             
@@ -553,7 +660,14 @@ class RiskDashboard:
             df_hk = pd.read_excel(excel_path, sheet_name='PositionsHK')
             df_al = pd.read_excel(excel_path, sheet_name='PositionsAL')
             
-            # Combine and calculate total portfolio value
+            # Extract cash from IBKR positions (auto-detected from fetch-ibkr-positions.py)
+            cash_hk = df_hk[df_hk['AssetClass'] == 'CASH']['PositionValueUSD'].sum() if 'CASH' in df_hk['AssetClass'].values else 0
+            cash_al = df_al[df_al['AssetClass'] == 'CASH']['PositionValueUSD'].sum() if 'CASH' in df_al['AssetClass'].values else 0
+            
+            if cash_hk > 0 or cash_al > 0:
+                print(f"   📊 Cash auto-detected from IBKR: HK ${cash_hk:,.0f}, AL ${cash_al:,.0f}")
+            
+            # Combine and calculate total portfolio value (including cash)
             total_value = df_hk['PositionValueUSD'].sum() + df_al['PositionValueUSD'].sum()
             
             if total_value == 0:
@@ -564,21 +678,50 @@ class RiskDashboard:
                 'global_core': 0,
                 'growth_engine': 0,
                 'income_strategy': 0,
-                'hedge': 0,
+                'alpha_sniper': 0,
+                'alpha_hedge': 0,
                 'gold': 0,
                 'cash': 0,
                 'other': 0,
                 'total': total_value
             }
             
-            # Process both dataframes
+            # First pass: Identify multi-leg option strategies (spreads/iron condors)
+            # Group options by underlying + expiry to detect spreads
+            multi_leg_strategies = {}
+            for df in [df_hk, df_al]:
+                for _, row in df.iterrows():
+                    symbol = str(row['Symbol']).strip()
+                    asset_class = row.get('AssetClass', '')
+                    
+                    if asset_class in ['OPT', 'FOP']:
+                        # Extract underlying (e.g., EW2G6 from "EW2G6 P6525")
+                        underlying = symbol.split()[0] if ' ' in symbol else symbol[:6]
+                        expiry = row.get('Expiry', '')
+                        key = f"{underlying}_{expiry}"
+                        
+                        if key not in multi_leg_strategies:
+                            multi_leg_strategies[key] = {'legs': [], 'has_short': False}
+                        
+                        multi_leg_strategies[key]['legs'].append(symbol)
+                        if row.get('Side', '') == 'Short':
+                            multi_leg_strategies[key]['has_short'] = True
+            
+            # Identify spread strategies (2+ legs on same underlying)
+            spread_underlyings = {k.split('_')[0] for k, v in multi_leg_strategies.items() if len(v['legs']) >= 2 and v['has_short']}
+            
+            # Second pass: Categorize positions
             for df in [df_hk, df_al]:
                 for _, row in df.iterrows():
                     symbol = str(row['Symbol']).strip()
                     value = row['PositionValueUSD']
                     asset_class = row.get('AssetClass', '')
                     
-                    # Categorize
+                    # Get option metadata
+                    side = row.get('Side', '')
+                    put_call = row.get('Put/Call', '')
+                    
+                    # Categorize stocks by symbol mapping first
                     categorized = False
                     for category, symbols in self.SYMBOL_MAPPING.items():
                         if symbol in symbols:
@@ -586,27 +729,98 @@ class RiskDashboard:
                             categorized = True
                             break
                     
-                    # Check for hedge (QQQ puts)
-                    if not categorized and asset_class in ['OPT', 'FOP'] and 'QQQ' in symbol:
-                        positions['hedge'] += value
-                        categorized = True
+                    # Options categorization logic
+                    if not categorized and asset_class in ['OPT', 'FOP']:
+                        underlying = symbol.split()[0] if ' ' in symbol else symbol[:6]
+                        
+                        # Rule 1: Multi-leg spreads with shorts = Income Strategy (all legs)
+                        if underlying in spread_underlyings:
+                            positions['income_strategy'] += value
+                            categorized = True
+                        
+                        # Rule 2: Single-leg short options (CSPs/covered calls) = Income Strategy
+                        elif side == 'Short':
+                            positions['income_strategy'] += value
+                            categorized = True
+                        
+                        # Rule 3: Single-leg long puts (not part of spread) = Alpha Hedge
+                        elif side == 'Long' and put_call == 'P':
+                            positions['alpha_hedge'] += value
+                            categorized = True
+                        
+                        # Rule 4: Long calls on income tickers = Income Strategy (e.g., LEAPS)
+                        elif side == 'Long' and put_call == 'C':
+                            for income_ticker in self.SYMBOL_MAPPING['income_strategy']:
+                                if income_ticker in symbol:
+                                    positions['income_strategy'] += value
+                                    categorized = True
+                                    break
+                            
+                            # If not income ticker, treat as Alpha Sniper (speculative)
+                            if not categorized:
+                                positions['alpha_sniper'] += value
+                                categorized = True
                     
                     # Check for cash
                     if not categorized and asset_class == 'CASH':
                         positions['cash'] += value
                         categorized = True
+                    if not categorized and asset_class == 'STK':
+                        positions['alpha_sniper'] += value
+                        categorized = True
                     
                     # Everything else goes to 'other'
                     if not categorized:
                         positions['other'] += value
+                        print(f"   ⚠️  UNCATEGORIZED: {symbol} (${value:,.0f}) - {asset_class}")
+            
+            # Add cash from dashboard
+            positions['cash'] += cash_hk + cash_al
+            
+            # Store raw position details for rebalancing recommendations
+            positions['position_details'] = {
+                'total_value': total_value,
+                'by_category': {},
+                'by_symbol': {}
+            }
+            
+            # Recalculate to capture position details by symbol
+            for df in [df_hk, df_al]:
+                for _, row in df.iterrows():
+                    symbol = str(row['Symbol']).strip()
+                    value = row['PositionValueUSD']
+                    asset_class = row.get('AssetClass', '')
+                    
+                    if asset_class == 'STK' and abs(value) > 1:
+                        positions['position_details']['by_symbol'][symbol] = {
+                            'value': value,
+                            'asset_class': asset_class
+                        }
             
             # Convert to percentages
             for key in positions:
-                if key != 'total':
+                if key != 'total' and key != 'position_details':
                     positions[key] = positions[key] / total_value
+            
+            # Combine alpha categories (should be ~5% total per dashboard)
+            positions['alpha_insurance'] = positions['alpha_sniper'] + positions['alpha_hedge']
             
             # Combine gold + cash into reserves
             positions['reserves'] = positions['gold'] + positions['cash']
+            
+            # Debug output
+            print(f"\n📊 IBKR POSITIONS LOADED:")
+            print(f"   Total Portfolio Value: ${total_value:,.0f}")
+            print(f"   Global Core: {positions['global_core']*100:.1f}%")
+            print(f"   Growth Engine: {positions['growth_engine']*100:.1f}%")
+            print(f"   Income Strategy: {positions['income_strategy']*100:.1f}%")
+            print(f"   Alpha & Insurance: {positions['alpha_insurance']*100:.1f}%")
+            print(f"     ├─ Sniper (themes): {positions['alpha_sniper']*100:.1f}%")
+            print(f"     └─ Hedge (QQQ puts): {positions['alpha_hedge']*100:.1f}%")
+            print(f"   Reserves: {positions['reserves']*100:.1f}%")
+            print(f"     ├─ Gold: {positions['gold']*100:.1f}%")
+            print(f"     └─ Cash: {positions['cash']*100:.1f}%")
+            print(f"   Other (uncategorized): {positions['other']*100:.1f}%\n")
             
             return positions
             
@@ -625,17 +839,28 @@ class RiskDashboard:
         alerts = []
         
         # Calculate drift for each category
-        for category in ['global_core', 'growth_engine', 'income_strategy', 'hedge', 'reserves']:
+        print(f"🎯 DRIFT CALCULATION:")
+        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
             target_pct = target_allocation.get(category, 0)
             actual_pct = actual.get(category, 0)
             diff = actual_pct - target_pct
             drift[category] = diff
             total_drift += abs(diff)
             
+            print(f"   {category}: Actual {actual_pct*100:.1f}% - Target {target_pct*100:.1f}% = {diff*100:+.1f}% (abs: {abs(diff)*100:.1f}%)")
+            
             # Flag significant drifts (>3%)
             if abs(diff) > 0.03:
                 direction = 'overweight' if diff > 0 else 'underweight'
                 alerts.append(f"{category.replace('_', ' ').title()}: {direction} by {abs(diff)*100:.0f}%")
+        
+        print(f"   ───────────────────────────────────")
+        print(f"   TOTAL DRIFT: {total_drift*100:.1f}%\n")
+        
+        # Save drift snapshot to history
+        today = datetime.now().strftime('%Y-%m-%d')
+        self.history_manager.add_drift_snapshot(today, total_drift, drift)
+        self.history_manager.save_history()
         
         return {
             'drift': drift,
@@ -643,6 +868,136 @@ class RiskDashboard:
             'alerts': alerts,
             'show': total_drift > 0.05  # Only show if total drift > 5%
         }
+    
+    def generate_rebalancing_recommendations(self, target_allocation, drift_analysis):
+        """Generate specific buy/sell recommendations to reach target allocation"""
+        if not self.actual_positions or not drift_analysis['show']:
+            return None
+        
+        actual = self.actual_positions
+        total_value = actual.get('position_details', {}).get('total_value', 0)
+        
+        if total_value == 0:
+            return None
+        
+        recommendations = {
+            'sells': [],
+            'buys': [],
+            'total_to_sell': 0,
+            'total_to_buy': 0
+        }
+        
+        # Identify what to sell (overweight categories)
+        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
+            drift = drift_analysis['drift'].get(category, 0)
+            
+            if drift > 0.03:  # Overweight by >3%
+                amount = drift * total_value
+                recommendations['sells'].append({
+                    'category': category,
+                    'current_pct': actual[category] * 100,
+                    'target_pct': target_allocation[category] * 100,
+                    'drift_pct': drift * 100,
+                    'amount': amount
+                })
+                recommendations['total_to_sell'] += amount
+        
+        # Identify what to buy (underweight categories)
+        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
+            drift = drift_analysis['drift'].get(category, 0)
+            
+            if drift < -0.03:  # Underweight by >3%
+                amount = abs(drift) * total_value
+                recommendations['buys'].append({
+                    'category': category,
+                    'current_pct': actual[category] * 100,
+                    'target_pct': target_allocation[category] * 100,
+                    'drift_pct': drift * 100,
+                    'amount': amount
+                })
+                recommendations['total_to_buy'] += amount
+        
+        return recommendations if recommendations['sells'] or recommendations['buys'] else None
+    
+    def analyze_options_positions(self):
+        """Analyze income strategy options for expiry and urgency"""
+        try:
+            import pandas as pd
+            from pathlib import Path
+            from datetime import datetime, timedelta
+            
+            excel_path = Path(__file__).parent / 'fetch-ibkr-positions.xlsx'
+            if not excel_path.exists():
+                return None
+            
+            df_hk = pd.read_excel(excel_path, sheet_name='PositionsHK')
+            df_al = pd.read_excel(excel_path, sheet_name='PositionsAL')
+            
+            analysis = {
+                'csps': [],
+                'covered_calls': [],
+                'spreads': [],
+                'stocks': [],
+                'total_premium': 0,
+                'days_to_nearest_expiry': None
+            }
+            
+            today = datetime.now()
+            nearest_expiry = None
+            
+            # Analyze all options
+            for df in [df_hk, df_al]:
+                opts = df[df['AssetClass'].isin(['OPT', 'FOP'])]
+                for _, row in opts.iterrows():
+                    symbol = row['Symbol']
+                    side = row.get('Side', '')
+                    put_call = row.get('Put/Call', '')
+                    value = row['PositionValueUSD']
+                    expiry = row.get('Expiry', '')
+                    
+                    # Calculate days to expiry
+                    days_to_expiry = None
+                    if pd.notna(expiry):
+                        try:
+                            expiry_date = pd.to_datetime(expiry)
+                            days_to_expiry = (expiry_date - today).days
+                            
+                            if nearest_expiry is None or days_to_expiry < nearest_expiry:
+                                nearest_expiry = days_to_expiry
+                        except:
+                            pass
+                    
+                    # Categorize
+                    if side == 'Short':
+                        if put_call == 'P':
+                            analysis['csps'].append({
+                                'symbol': symbol,
+                                'value': value,
+                                'days_to_expiry': days_to_expiry
+                            })
+                        elif put_call == 'C':
+                            analysis['covered_calls'].append({
+                                'symbol': symbol,
+                                'value': value,
+                                'days_to_expiry': days_to_expiry
+                            })
+                        analysis['total_premium'] += abs(value)
+                
+                # Get stocks in income strategy
+                income_tickers = self.SYMBOL_MAPPING['income_strategy']
+                stocks = df[(df['AssetClass'] == 'STK') & (df['Symbol'].isin(income_tickers))]
+                for _, row in stocks.iterrows():
+                    analysis['stocks'].append({
+                        'symbol': row['Symbol'],
+                        'value': row['PositionValueUSD']
+                    })
+            
+            analysis['days_to_nearest_expiry'] = nearest_expiry
+            return analysis
+            
+        except Exception as e:
+            print(f"   ⚠️  Could not analyze options: {e}")
+            return None
     
     # =============================================================================
     # NEW v1.8: 2026 PORTFOLIO ALLOCATION LOGIC
@@ -663,7 +1018,7 @@ class RiskDashboard:
                 'global_core': base['global_core'],
                 'growth_engine': base['growth_engine'],
                 'income_strategy': base['income_strategy'],
-                'hedge': base['hedge'],
+                'alpha_insurance': base['alpha_insurance'],
                 'reserves': base['reserves'],
                 'gold_pct': 0.03,  # 3% of reserves in gold
                 'cash_pct': 0.07,  # 7% in cash
@@ -678,7 +1033,7 @@ class RiskDashboard:
                 'global_core': base['global_core'],
                 'growth_engine': base['growth_engine'] * 0.9,  # Slightly reduce growth
                 'income_strategy': base['income_strategy'] * 0.9,  # More conservative
-                'hedge': base['hedge'],
+                'alpha_insurance': base['alpha_insurance'],
                 'reserves': base['reserves'] + 0.06,  # Raise reserves to 16%
                 'gold_pct': 0.04,  # 4% in gold
                 'cash_pct': 0.12,  # 12% in cash
@@ -693,7 +1048,7 @@ class RiskDashboard:
                 'global_core': base['global_core'],
                 'growth_engine': base['growth_engine'] * 0.7,  # Cut growth significantly
                 'income_strategy': base['income_strategy'] * 0.5,  # Very defensive options
-                'hedge': base['hedge'] * 2,  # Double hedge (10% in QQQ puts)
+                'alpha_insurance': base['alpha_insurance'] * 2,  # Double alpha/hedge (10%)
                 'reserves': 0.25,  # Raise reserves to 25%
                 'gold_pct': 0.10,  # 10% in gold
                 'cash_pct': 0.15,  # 15% in cash
@@ -708,7 +1063,7 @@ class RiskDashboard:
                 'global_core': base['global_core'] * 0.8,  # Trim core slightly
                 'growth_engine': base['growth_engine'] * 0.3,  # Skeleton growth
                 'income_strategy': 0,  # Exit all income strategies
-                'hedge': base['hedge'] * 3,  # 15% in QQQ puts
+                'alpha_insurance': base['alpha_insurance'] * 3,  # 15% alpha/hedge
                 'reserves': 0.40,  # 40% reserves
                 'gold_pct': 0.15,  # 15% in gold
                 'cash_pct': 0.25,  # 25% in cash
@@ -723,7 +1078,7 @@ class RiskDashboard:
                 'global_core': base['global_core'] * 0.5,  # Cut core in half
                 'growth_engine': 0,  # Exit all growth
                 'income_strategy': 0,  # No options
-                'hedge': base['hedge'] * 5,  # 25% in QQQ puts
+                'alpha_insurance': base['alpha_insurance'] * 5,  # 25% alpha/hedge
                 'reserves': 0.55,  # 55% reserves
                 'gold_pct': 0.20,  # 20% in gold
                 'cash_pct': 0.35,  # 35% in cash
@@ -943,16 +1298,24 @@ class RiskDashboard:
         self.actual_positions = self.load_actual_positions()
         drift_analysis = self.compare_to_target(portfolio) if self.actual_positions else None
         
+        # Get rebalancing recommendations and options analysis
+        rebalance_recs = self.generate_rebalancing_recommendations(portfolio, drift_analysis) if drift_analysis else None
+        options_analysis = self.analyze_options_positions() if self.actual_positions else None
+        
+        # Get drift trend and score trend
+        drift_trend = self.history_manager.get_drift_trend(days=7) if drift_analysis else None
+        score_trend = self.history_manager.get_score_trend(days=7)
+        
         # Portfolio allocation breakdown
         if drift_analysis and drift_analysis['show']:
-            # Show target vs actual with drift
-            lines.extend(["💼 PORTFOLIO ALLOCATION (Target → Actual)"])
+            # Show actual vs target with action needed
+            lines.extend(["💼 PORTFOLIO ALLOCATION (Actual → Target)"])
             
             categories = [
                 ('Global Core', 'global_core'),
                 ('Growth Engine', 'growth_engine'),
                 ('Income Strategy', 'income_strategy'),
-                ('Hedge (QQQ Puts)', 'hedge'),
+                ('Alpha & Insurance', 'alpha_insurance'),
                 ('Reserves', 'reserves')
             ]
             
@@ -963,13 +1326,25 @@ class RiskDashboard:
                 
                 if abs(diff) > 3:
                     indicator = "⚠️" if abs(diff) > 5 else "⚡"
-                    lines.append(f"{label}: {target:.0f}% → {actual:.0f}% ({diff:+.0f}% {indicator})")
+                    # Show action needed: negative diff means underweight (need to add +), positive means overweight (need to reduce -)
+                    action = f"{-diff:+.0f}%"
+                    lines.append(f"{label}: {actual:.0f}% → {target:.0f}% ({action} {indicator})")
                 else:
-                    lines.append(f"{label}: {target:.0f}% → {actual:.0f}%")
+                    lines.append(f"{label}: {actual:.0f}% → {target:.0f}%")
+            
+            # Show drift with trend if available
+            drift_line = f"⚠️ DRIFT: {drift_analysis['total_drift']*100:.0f}% total"
+            if drift_trend:
+                if drift_trend['improving']:
+                    trend_icon = "📉" if abs(drift_trend['change']) > 0.02 else "↘️"
+                    drift_line += f" {trend_icon} ({abs(drift_trend['change']*100):.0f}% from {drift_trend['days']}d ago)"
+                else:
+                    trend_icon = "📈" if drift_trend['change'] > 0.02 else "↗️"
+                    drift_line += f" {trend_icon} (+{drift_trend['change']*100:.0f}% from {drift_trend['days']}d ago)"
             
             lines.extend([
                 "",
-                f"⚠️ DRIFT: {drift_analysis['total_drift']*100:.0f}% total",
+                drift_line,
                 f"📋 {', '.join(drift_analysis['alerts'][:2])}",  # Show top 2 alerts
                 ""
             ])
@@ -980,7 +1355,7 @@ class RiskDashboard:
                 f"Global Core: {portfolio['global_core']*100:.0f}%",
                 f"Growth Engine: {portfolio['growth_engine']*100:.0f}%",
                 f"Income Strategy: {portfolio['income_strategy']*100:.0f}%",
-                f"Hedge (QQQ Puts): {portfolio['hedge']*100:.0f}%",
+                f"Alpha & Insurance: {portfolio['alpha_insurance']*100:.0f}%",
                 f"Reserves: {portfolio['reserves']*100:.0f}% (Gold: {portfolio['gold_pct']*100:.0f}%, Cash: {portfolio['cash_pct']*100:.0f}%)",
                 ""
             ])
@@ -993,6 +1368,48 @@ class RiskDashboard:
             "",
         ])
         
+        # Add rebalancing recommendations if significant drift
+        if rebalance_recs and (rebalance_recs['sells'] or rebalance_recs['buys']):
+            lines.extend(["🔄 REBALANCING RECOMMENDATIONS"])
+            
+            if rebalance_recs['sells']:
+                lines.append("SELL (Overweight):")
+                for rec in rebalance_recs['sells'][:3]:  # Top 3
+                    cat_name = rec['category'].replace('_', ' ').title()
+                    lines.append(f"  • {cat_name}: ${rec['amount']/1000:.0f}k ({rec['drift_pct']:.0f}% over)")
+            
+            if rebalance_recs['buys']:
+                lines.append("BUY (Underweight):")
+                for rec in rebalance_recs['buys'][:3]:  # Top 3
+                    cat_name = rec['category'].replace('_', ' ').title()
+                    lines.append(f"  • {cat_name}: ${rec['amount']/1000:.0f}k ({abs(rec['drift_pct']):.0f}% under)")
+            
+            lines.append("")
+        
+        # Add options analysis if available
+        if options_analysis:
+            total_csps = len(options_analysis['csps'])
+            total_ccs = len(options_analysis['covered_calls'])
+            total_stocks = len(options_analysis['stocks'])
+            days_to_expiry = options_analysis['days_to_nearest_expiry']
+            
+            if total_csps > 0 or total_ccs > 0 or total_stocks > 0:
+                lines.extend(["📊 INCOME STRATEGY POSITIONS"])
+                
+                if total_csps > 0:
+                    lines.append(f"  • CSPs: {total_csps} active")
+                if total_ccs > 0:
+                    lines.append(f"  • Covered Calls: {total_ccs} active")
+                if total_stocks > 0:
+                    stock_value = sum(s['value'] for s in options_analysis['stocks'])
+                    lines.append(f"  • Stock Holdings: {total_stocks} positions (${stock_value/1000:.0f}k)")
+                
+                if days_to_expiry is not None:
+                    urgency = "🔴 URGENT" if days_to_expiry <= 3 else "🟡 Soon" if days_to_expiry <= 7 else "🟢 OK"
+                    lines.append(f"  • Nearest Expiry: {days_to_expiry} days {urgency}")
+                
+                lines.append("")
+        
         # Tier scores
         lines.extend([
             "📈 TIER SCORES",
@@ -1002,6 +1419,31 @@ class RiskDashboard:
             f"T4: {self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
             "",
         ])
+        
+        # Score trend (historical comparison)
+        if score_trend and score_trend['days'] >= 2:
+            lines.extend(["📊 RISK TREND ({} days)".format(score_trend['days'])])
+            
+            # Show score movement
+            if score_trend['improving']:
+                trend_icon = "📈" if score_trend['change'] > 5 else "↗️"
+                lines.append(f"{trend_icon} Score: {score_trend['first_score']:.0f} → {score_trend['last_score']:.0f} (+{score_trend['change']:.0f} pts)")
+            else:
+                trend_icon = "📉" if score_trend['change'] < -5 else "↘️"
+                lines.append(f"{trend_icon} Score: {score_trend['first_score']:.0f} → {score_trend['last_score']:.0f} ({score_trend['change']:.0f} pts)")
+            
+            # Show regime change if occurred
+            if score_trend['regime_changed']:
+                lines.append(f"⚠️ Regime: {score_trend['first_regime']} → {score_trend['last_regime']}")
+            
+            # Show key signal changes
+            if 'vix' in score_trend['signal_changes']:
+                vix = score_trend['signal_changes']['vix']
+                if abs(vix['pct']) > 10:  # Only show if >10% change
+                    direction = "↑" if vix['change'] > 0 else "↓"
+                    lines.append(f"  • VIX: {vix['first']:.1f} → {vix['last']:.1f} ({direction}{abs(vix['pct']):.0f}%)")
+            
+            lines.append("")
         
         # Key signals
         lines.extend([
@@ -1033,10 +1475,11 @@ class RiskDashboard:
         return "\n".join(lines)
     
     # =============================================================================
-    # AI CIO INTERPRETATION
+    # AI CIO INTERPRETATIONS - Dual Analysis (Claude + Gemini)
     # =============================================================================
     
-    def generate_cio_interpretation(self):
+    def generate_claude_interpretation(self):
+        """Claude CIO Analysis"""
         key = os.getenv('ANTHROPIC_API_KEY')
         if not key or 'YOUR_' in key:
             return None
@@ -1052,7 +1495,7 @@ Portfolio Allocation:
 - Global Core (VWRA/ES3/DHL/82846): {portfolio['global_core']*100:.0f}%
 - Growth Engine (CSNDX/CTEC/HEAL/INRA/LOCK): {portfolio['growth_engine']*100:.0f}%
 - Income Strategy (Wheel on GOOGL/PEP/V): {portfolio['income_strategy']*100:.0f}%
-- Hedge (QQQ Puts 15% OTM): {portfolio['hedge']*100:.0f}%
+- Alpha & Insurance (Sniper + QQQ Puts): {portfolio['alpha_insurance']*100:.0f}%
 - Reserves: {portfolio['reserves']*100:.0f}% (Gold: {portfolio['gold_pct']*100:.0f}%, Cash: {portfolio['cash_pct']*100:.0f}%)
 Action: {portfolio['action']}
 
@@ -1080,10 +1523,64 @@ Write brief CIO interpretation for mobile:
                 timeout=30
             )
             if resp.status_code == 200:
-                return f"🧠 CIO INTERPRETATION\n📅 {self.timestamp.strftime('%b %d, %Y')}\n\n{resp.json()['content'][0]['text']}"
+                return f"🧠 CLAUDE CIO ANALYSIS\n📅 {self.timestamp.strftime('%b %d, %Y')}\n\n{resp.json()['content'][0]['text']}"
             return None
         except Exception as e:
-            print(f"⚠️ CIO Error: {e}")
+            print(f"⚠️ Claude CIO Error: {e}")
+            return None
+    
+    def generate_gemini_interpretation(self):
+        """Gemini CIO Analysis - Second Opinion"""
+        key = os.getenv('GEMINI_API_KEY')
+        if not key or 'YOUR_' in key:
+            return None
+        
+        try:
+            portfolio = self.get_portfolio_allocation()
+            prompt = f"""You are the Chief Investment Officer providing a second opinion on today's risk dashboard for a $1M portfolio targeting 15% annual returns.
+
+TODAY'S MARKET SNAPSHOT:
+Risk Score: {self.scores['total']:.1f}/100
+Market Regime: {portfolio['regime']}
+
+Current Portfolio:
+- Global Core ETFs: {portfolio['global_core']*100:.0f}%
+- Growth Engine: {portfolio['growth_engine']*100:.0f}%
+- Income Strategy (Options): {portfolio['income_strategy']*100:.0f}%
+- Alpha & Insurance: {portfolio['alpha_insurance']*100:.0f}%
+- Reserves: {portfolio['reserves']*100:.0f}% (Gold {portfolio['gold_pct']*100:.0f}% | Cash {portfolio['cash_pct']*100:.0f}%)
+
+Recommended Action: {portfolio['action']}
+
+Key Market Indicators:
+- High Yield Spread: {self.data.get('hy_spread', 'N/A')}% (credit stress)
+- VIX: {self.data.get('vix', 'N/A')} (fear gauge)
+- Stocks Above 50MA: {self.data.get('pct_above_50ma', 'N/A')}% (breadth)
+- Market Breadth: {self.data.get('ad_line', 'N/A')}
+
+Provide your CIO perspective (max 1000 chars) covering:
+💭 HEADLINE: One-line market view
+📊 SCORE INSIGHT: Quality assessment
+👁️ KEY OBSERVATIONS: 2-3 critical points
+🎯 REGIME CONTEXT: Market environment assessment
+💡 PORTFOLIO STANCE: Specific position guidance
+🔄 WATCH TRIGGERS: Conditions that would change your view
+⚡ EXECUTIVE SUMMARY: Bottom line call
+
+Be direct, use specific numbers, focus on actionable insights."""
+
+            resp = requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={key}",
+                headers={"Content-Type": "application/json"},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=30
+            )
+            if resp.status_code == 200:
+                text = resp.json()['candidates'][0]['content']['parts'][0]['text']
+                return f"💎 GEMINI CIO ANALYSIS\n📅 {self.timestamp.strftime('%b %d, %Y')}\n\n{text}"
+            return None
+        except Exception as e:
+            print(f"⚠️ Gemini CIO Error: {e}")
             return None
     
     # =============================================================================
@@ -1139,11 +1636,16 @@ Write brief CIO interpretation for mobile:
         self.history_manager.save_history()
         send_to_telegram(report)
         
-        # CIO interpretation
-        cio = self.generate_cio_interpretation()
-        if cio:
-            print("\n" + cio + "\n")
-            send_to_telegram(cio)
+        # Dual CIO interpretations (4-eye principle)
+        claude_cio = self.generate_claude_interpretation()
+        if claude_cio:
+            print("\n" + claude_cio + "\n")
+            send_to_telegram(claude_cio)
+        
+        gemini_cio = self.generate_gemini_interpretation()
+        if gemini_cio:
+            print("\n" + gemini_cio + "\n")
+            send_to_telegram(gemini_cio)
         
         return self.scores['total']
 

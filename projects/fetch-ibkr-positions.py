@@ -47,10 +47,12 @@ load_dotenv()
 # Configuration - HK Account
 IBKR_FLEX_TOKEN_HK = os.getenv('IBKR_FLEX_TOKEN_HK')
 IBKR_QUERY_ID_HK = os.getenv('IBKR_QUERY_ID_HK')
+IBKR_CASH_QUERY_ID_HK = os.getenv('IBKR_CASH_QUERY_ID_HK')
 
 # Configuration - AL Account
 IBKR_FLEX_TOKEN_AL = os.getenv('IBKR_FLEX_TOKEN_AL')
 IBKR_QUERY_ID_AL = os.getenv('IBKR_QUERY_ID_AL')
+IBKR_CASH_QUERY_ID_AL = os.getenv('IBKR_CASH_QUERY_ID_AL')
 
 # Telegram Configuration
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -216,6 +218,90 @@ def parse_csv_to_dataframe(csv_data, account_name):
         return None
 
 
+def fetch_and_merge_cash_balances(df_positions, account_name, flex_token, cash_query_id):
+    """
+    Fetch cash balances and merge with positions data as 'CASH' AssetClass rows
+    """
+    if not cash_query_id:
+        print(f"   ⚠️  No cash query ID configured for {account_name}, skipping cash fetch")
+        return df_positions
+    
+    print(f"\n💵 Fetching cash balances for {account_name}...")
+    
+    # Request cash report
+    reference_code = request_flex_report(f"{account_name}-CASH", flex_token, cash_query_id)
+    if not reference_code:
+        print(f"   ⚠️  Failed to request cash report for {account_name}")
+        return df_positions
+    
+    # Fetch cash report
+    csv_data = fetch_flex_report(f"{account_name}-CASH", flex_token, reference_code)
+    if not csv_data:
+        print(f"   ⚠️  No cash data received for {account_name}")
+        return df_positions
+    
+    try:
+        # Parse cash CSV
+        df_cash = pd.read_csv(StringIO(csv_data))
+        
+        # Cash report has: EndingCash column with single USD total
+        if len(df_cash) == 0:
+            print(f"   ℹ️  No cash balances found for {account_name}")
+            return df_positions
+        
+        # Get total cash in USD (single row with EndingCash column)
+        if 'EndingCash' in df_cash.columns:
+            total_cash_usd = float(df_cash['EndingCash'].iloc[0]) if len(df_cash) > 0 else 0
+        elif 'endingcash' in df_cash.columns:
+            total_cash_usd = float(df_cash['endingcash'].iloc[0]) if len(df_cash) > 0 else 0
+        else:
+            print(f"   ⚠️  EndingCash column not found in cash report for {account_name}")
+            print(f"   Available columns: {df_cash.columns.tolist()}")
+            return df_positions
+        
+        # Skip if balance is zero or very small
+        if abs(total_cash_usd) < 0.01:
+            print(f"   ℹ️  No significant cash balance for {account_name}")
+            return df_positions
+        
+        # Create a single cash row matching positions DataFrame schema
+        cash_row = {
+            'ClientAccountID': df_positions['ClientAccountID'].iloc[0] if len(df_positions) > 0 else account_name,
+            'CurrencyPrimary': 'USD',
+            'FXRateToBase': 1.0,
+            'AssetClass': 'CASH',
+            'SubCategory': 'Cash',
+            'Symbol': 'USD',
+            'Description': 'Cash Balance (Total USD)',
+            'Multiplier': 1,
+            'Strike': None,
+            'Expiry': None,
+            'Put/Call': None,
+            'ReportDate': df_positions['ReportDate'].iloc[0] if len(df_positions) > 0 else datetime.now().strftime('%Y-%m-%d'),
+            'Quantity': total_cash_usd,
+            'MarkPrice': 1.0,
+            'PositionValue': total_cash_usd,
+            'OpenPrice': None,
+            'CostBasisPrice': None,
+            'CostBasisMoney': None,
+            'FifoPnlUnrealized': 0,
+            'Side': 'Long',
+            'PositionValueUSD': total_cash_usd
+        }
+        
+        df_cash_formatted = pd.DataFrame([cash_row])
+        # Merge with positions
+        df_merged = pd.concat([df_positions, df_cash_formatted], ignore_index=True)
+        print(f"   ✅ Added cash balance: ${total_cash_usd:,.2f} USD")
+        return df_merged
+            
+    except Exception as e:
+        print(f"   ⚠️  Error processing cash data for {account_name}: {e}")
+        import traceback
+        traceback.print_exc()
+        return df_positions
+
+
 def update_excel_file(df_hk, df_al):
     """
     Update Excel file with new position data for both accounts
@@ -356,7 +442,7 @@ def main():
         df_hk = None
         df_al = None
         
-        # ===== Process HK Account =====
+        # ===== STEP 1: Fetch all position reports first =====
         print("\n" + "=" * 70)
         print("FETCHING HK ACCOUNT POSITIONS")
         print("=" * 70)
@@ -395,6 +481,21 @@ def main():
                 print("⚠️  Failed to request AL report")
         else:
             print("⚠️  AL account not configured, skipping")
+        
+        # ===== STEP 2: Now fetch cash balances after all positions complete =====
+        print("\n" + "=" * 70)
+        print("FETCHING CASH BALANCES")
+        print("=" * 70)
+        
+        # Fetch HK cash (positions already fully complete at this point)
+        if df_hk is not None and IBKR_CASH_QUERY_ID_HK:
+            print("\n💵 Fetching HK cash balance...")
+            df_hk = fetch_and_merge_cash_balances(df_hk, "HK", IBKR_FLEX_TOKEN_HK, IBKR_CASH_QUERY_ID_HK)
+        
+        # Fetch AL cash
+        if df_al is not None and IBKR_CASH_QUERY_ID_AL:
+            print("\n💵 Fetching AL cash balance...")
+            df_al = fetch_and_merge_cash_balances(df_al, "AL", IBKR_FLEX_TOKEN_AL, IBKR_CASH_QUERY_ID_AL)
         
         # ===== Update Excel File =====
         if df_hk is None and df_al is None:

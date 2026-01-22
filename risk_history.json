@@ -185,7 +185,52 @@
       "vix": 19.299999237060547,
       "vix_structure": "Backwardation",
       "vixy_vxx_ratio": 0.9681267642380553
+    },
+    {
+      "date": "2026-01-20",
+      "score": 78.3,
+      "spy": 683.489990234375,
+      "vix": 19.299999237060547,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.9689330739727542
+    },
+    {
+      "date": "2026-01-22",
+      "score": 80.3,
+      "spy": 685.4000244140625,
+      "vix": 16.899999618530273,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.965620326292038
+    },
+    {
+      "date": "2026-01-22",
+      "score": 80.3,
+      "spy": 685.4000244140625,
+      "vix": 16.899999618530273,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.965620326292038
+    },
+    {
+      "date": "2026-01-22",
+      "score": 80.3,
+      "spy": 685.4000244140625,
+      "vix": 16.899999618530273,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.965620326292038
     }
   ],
-  "overrides": []
+  "overrides": [],
+  "drift_history": [
+    {
+      "date": "2026-01-22",
+      "total_drift": 0.7460523887443,
+      "categories": {
+        "global_core": 0.12795230136644198,
+        "growth_engine": -0.14676518104045813,
+        "income_strategy": -0.08809036987071397,
+        "alpha_insurance": -0.015476698068823382,
+        "reserves": 0.36776783839786265
+      }
+    }
+  ]
 }
