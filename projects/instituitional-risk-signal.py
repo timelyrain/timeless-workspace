@@ -667,6 +667,72 @@ class RiskDashboard:
             print(f"   ✗ SKEW: Error")
             return None
     
+    def _vvix_index(self):
+        """VVIX (VIX of VIX): Measures uncertainty about volatility
+        Spikes before major market moves, leading indicator for VIX itself
+        """
+        try:
+            vvix_data = yf.Ticker('^VVIX').history(period='5d')
+            if len(vvix_data) > 0:
+                vvix = vvix_data['Close'].iloc[-1]
+                print(f"   ✓ VVIX: {vvix:.1f}")
+                return float(vvix)
+            else:
+                print(f"   ✗ VVIX: No data")
+                return None
+        except Exception as e:
+            print(f"   ✗ VVIX: Error")
+            return None
+    
+    def _vix9d_ratio(self):
+        """VIX9D/VIX Ratio: Short-term (9-day) vs medium-term (30-day) fear
+        VIX9D > VIX = Elevated near-term event risk
+        VIX9D < VIX = Near-term calm but medium-term concern
+        """
+        try:
+            vix9d_data = yf.Ticker('^VIX9D').history(period='5d')
+            vix_data = yf.Ticker('^VIX').history(period='5d')
+            
+            if len(vix9d_data) > 0 and len(vix_data) > 0:
+                vix9d = vix9d_data['Close'].iloc[-1]
+                vix = vix_data['Close'].iloc[-1]
+                
+                if vix > 0:
+                    ratio_pct = ((vix9d / vix) - 1) * 100
+                    print(f"   ✓ VIX9D/VIX: {ratio_pct:+.1f}%")
+                    return float(ratio_pct)
+                else:
+                    print(f"   ✗ VIX9D/VIX: Invalid VIX")
+                    return None
+            else:
+                print(f"   ✗ VIX9D/VIX: No data")
+                return None
+        except Exception as e:
+            print(f"   ✗ VIX9D/VIX: Error")
+            return None
+    
+    def _vxn_vix_spread(self):
+        """VXN-VIX Spread: NASDAQ-100 vol vs S&P 500 vol
+        Positive spread = Tech fear > Market fear (QQQ risk)
+        Negative spread = Tech calm, broader market fear
+        """
+        try:
+            vxn_data = yf.Ticker('^VXN').history(period='5d')
+            vix_data = yf.Ticker('^VIX').history(period='5d')
+            
+            if len(vxn_data) > 0 and len(vix_data) > 0:
+                vxn = vxn_data['Close'].iloc[-1]
+                vix = vix_data['Close'].iloc[-1]
+                spread = vxn - vix
+                print(f"   ✓ VXN-VIX: {spread:+.2f}")
+                return float(spread)
+            else:
+                print(f"   ✗ VXN-VIX: No data")
+                return None
+        except Exception as e:
+            print(f"   ✗ VXN-VIX: Error")
+            return None
+    
     def _breadth_extreme_adjustment(self, pct_above_50ma):
         """Detect extreme overbought/oversold conditions for score adjustment
         >80% = Overbought penalty, <30% = Oversold bonus
@@ -682,7 +748,7 @@ class RiskDashboard:
             return 0   # Normal range
     
     def fetch_all_data(self):
-        print("\n📊 Fetching 16 indicators...\n")
+        print("\n📊 Fetching 19 indicators...\n")
         self.sample_tickers = self._get_sp100_tickers()
         self.missing_signals = []
         
@@ -713,6 +779,11 @@ class RiskDashboard:
         self.data['vix_term_slope'] = vix_term_slope
         self.data['vix_term_struct'] = vix_term_struct
         self.data['skew'] = self._skew_index()
+        
+        # Advanced Options Intelligence
+        self.data['vvix'] = self._vvix_index()
+        self.data['vix9d_ratio'] = self._vix9d_ratio()
+        self.data['vxn_vix_spread'] = self._vxn_vix_spread()
         
         # Count only numeric indicators (exclude string labels like vix_term_struct)
         valid = sum(1 for k, v in self.data.items() if v is not None and k != 'vix_term_struct')
@@ -777,7 +848,7 @@ class RiskDashboard:
         s12 = self._score_range(d.get('yield_curve'), [(0.5,3),(0.2,2.5),(-0.2,2),(-0.5,1)], 0)
         s13 = self._score_range(d.get('vix'), [(12,0),(16,1.5),(20,1),(30,0.5)], 0)
         
-        # SKEW Index (new tail risk indicator)
+        # SKEW Index (tail risk indicator)
         skew = d.get('skew')
         if skew is not None:
             if skew < 110:         # Extreme complacency
@@ -791,19 +862,67 @@ class RiskDashboard:
         else:
             s14 = 0
         
+        # VVIX (VIX of VIX - uncertainty about volatility)
+        vvix = d.get('vvix')
+        if vvix is not None:
+            if vvix < 75:          # Dangerous complacency
+                s15 = 0
+            elif vvix < 95:        # Calm (normal)
+                s15 = 4
+            elif vvix < 110:       # Moderate uncertainty
+                s15 = 6
+            elif vvix < 125:       # Elevated uncertainty (caution)
+                s15 = 8
+            else:                   # Extreme uncertainty = opportunity
+                s15 = 10
+        else:
+            s15 = 0
+        
+        # VIX9D/VIX Ratio (short-term event risk)
+        vix9d_ratio = d.get('vix9d_ratio')
+        if vix9d_ratio is not None:
+            if vix9d_ratio < -10:      # Very calm near-term (complacency)
+                s16 = 0
+            elif vix9d_ratio < 0:      # Calm near-term
+                s16 = 4
+            elif vix9d_ratio < 10:     # Elevated near-term (healthy)
+                s16 = 6
+            else:                       # Extreme near-term fear = opportunity
+                s16 = 8
+        else:
+            s16 = 0
+        
+        # VXN-VIX Spread (tech vs market fear)
+        vxn_vix = d.get('vxn_vix_spread')
+        if vxn_vix is not None:
+            if vxn_vix > 6:            # Extreme tech fear (tech selling)
+                s17 = 0
+            elif vxn_vix > 3:          # Elevated tech fear
+                s17 = 2
+            elif vxn_vix > -2:         # Balanced
+                s17 = 5
+            else:                       # Tech complacency (tech rally)
+                s17 = 3
+        else:
+            s17 = 0
+        
         # Total includes credit_score (composite) + all other indicators
-        total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14
+        total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17
         
         self.scores = {
             'total': total,
             'tier1': credit_score + s2 + s4,  # Credit composite + Fed BS + DXY
             'tier2': s5 + s6 + s7 + s8 + s9 + s10,  # Positioning + flows
-            'tier3': s11 + s12 + s13 + s14,  # Structure + sentiment (VIX Term, SKEW, VIX, Yield)
+            'tier3': s11 + s12 + s13 + s14 + s15 + s16 + s17,  # Options intelligence + structure
             'credit_score': credit_score,
             'vix_term': s11,  # VIX Term Structure score
             'skew_score': s14,  # SKEW Index score
+            'vvix_score': s15,  # VVIX score
+            'vix9d_score': s16,  # VIX9D ratio score
+            'vxn_score': s17,  # VXN-VIX spread score
             's2': s2, 's4': s4, 's5': s5, 's6': s6, 's7': s7, 's8': s8,
-            's9': s9, 's10': s10, 's11': s11, 's12': s12, 's13': s13, 's14': s14
+            's9': s9, 's10': s10, 's11': s11, 's12': s12, 's13': s13, 's14': s14,
+            's15': s15, 's16': s16, 's17': s17
         }
         return self.scores
     
@@ -1590,7 +1709,7 @@ class RiskDashboard:
             "📈 TIER SCORES",
             f"T1: {self.scores['tier1']:.1f}/45 Credit+Macro ({self.scores['tier1']/45*100:.0f}%)",
             f"T2: {self.scores['tier2']:.1f}/39 Positioning+Flows ({self.scores['tier2']/39*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.1f}/26 Structure+Sentiment ({self.scores['tier3']/26*100:.0f}%)",
+            f"T3: {self.scores['tier3']:.1f}/49 Options+Structure ({self.scores['tier3']/49*100:.0f}%)",
             "",
         ])
         
