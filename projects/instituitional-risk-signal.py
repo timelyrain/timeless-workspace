@@ -1,12 +1,15 @@
 """
 ╔══════════════════════════════════════════════════════════════════════╗
-║                 INSTITUTIONAL RISK SIGNAL v1.8                       ║
+║                 INSTITUTIONAL RISK SIGNAL v2.0                       ║
 ╚══════════════════════════════════════════════════════════════════════╝
 
-WHAT'S NEW IN v1.8:
-🎯 2026 PORTFOLIO MAPPING - Real allocation guidance for your actual positions
-📊 ACTIONABLE ADJUSTMENTS - Specific guidance per position type
-✅ All v1.7 features preserved (V-Recovery 8%, Kill-Switch, AI CIO)
+WHAT'S NEW IN v2.0 (Jan 2026):
+🎯 INSTITUTIONAL A+ GRADE - 22 indicators (was 16) with professional-quality logic
+📊 CREDIT INTELLIGENCE - HY+IG spread composite, stress ratio, rate-of-change penalties
+📈 OPTIONS INTELLIGENCE - VVIX, VIX9D, VXN-VIX (volatility of volatility, event risk, tech divergence)
+💰 INSTITUTIONAL FLOWS - ETF flows (9 ETFs), Credit flows (4 ETFs), Sector rotation (11 sectors)
+🔢 NORMALIZED SCORING - Proper /100 scale (was broken at 106/100, now 64/100)
+✅ All v1.8 features preserved (2026 Portfolio Mapping, V-Recovery, Kill-Switch, Dual AI CIO)
 
 YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
 - 30% Global Core (VWRA, ES3, DHL, 82846 - diversified value)
@@ -22,7 +25,12 @@ Score 60-75: ELEVATED - Reduce speculative, defensive options
 Score 40-60: HIGH RISK - Cut QQQ/spec, raise cash via options
 Score <40: EXTREME - Max defense, protect capital
 
-14 SIGNALS + V-RECOVERY + PORTFOLIO MAPPING | INSTITUTIONAL-GRADE
+22 INDICATORS + INSTITUTIONAL FLOWS + OPTIONS INTELLIGENCE | A+ GRADE
+
+TIER SCORING (154 pts raw → normalized to /100):
+├─ Tier 1 (45 pts): Credit composite + Fed BS + DXY
+├─ Tier 2 (60 pts): Positioning + Institutional flows (ETF/Credit/Sector)
+└─ Tier 3 (49 pts): Options intelligence (VIX Term, SKEW, VVIX, VIX9D, VXN) + Structure
 
 SYSTEM: 15% Portfolio Risk Monitor (Arthur Protocol)
 CONTEXT: See ARTHUR_CONTEXT.md for full strategy and logic constraints.
@@ -436,7 +444,7 @@ class HistoricalDataManager:
             return 0
 
 # =============================================================================
-# RISK DASHBOARD - v1.8 with 2026 Portfolio Mapping
+# RISK DASHBOARD - v2.0 with 22 Institutional Indicators
 # =============================================================================
 
 class RiskDashboard:
@@ -465,7 +473,7 @@ class RiskDashboard:
         self.missing_signals = []
         self.actual_positions = None
     
-    # [DATA FETCHING METHODS - Keep all from v1.7]
+    # [DATA FETCHING METHODS - Enhanced in v2.0 with institutional flows]
     def _get_sp100_tickers(self):
         return [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
@@ -1485,7 +1493,7 @@ class RiskDashboard:
             return None
     
     # =============================================================================
-    # NEW v1.8: 2026 PORTFOLIO ALLOCATION LOGIC
+    # v2.0: 2026 PORTFOLIO ALLOCATION LOGIC (score normalized to /100)
     # =============================================================================
     
     def get_portfolio_allocation(self):
@@ -1616,7 +1624,7 @@ class RiskDashboard:
                 return False, None
             
             # Check if override already active and apply kill-switch
-            # Use consecutive streak logic (not calendar days) to match v1.7 behavior
+            # Use consecutive streak logic (not calendar days) to match v1.7+ behavior
             override_streak = self.history_manager.get_override_streak()
             if override_streak >= 5:
                 current_score = self.scores['total']
@@ -1771,7 +1779,7 @@ class RiskDashboard:
             portfolio = self.get_portfolio_allocation()  # Recalc with override
         
         lines = [
-            "🎯 RISK DASHBOARD v1.8",
+            "🎯 RISK DASHBOARD v2.0",
             f"📅 {self.timestamp.strftime('%b %d, %Y @ %H:%M')}",
             "",
             f"📊 SCORE: {score:.1f}/100",
@@ -2073,7 +2081,7 @@ Be direct, use specific numbers, focus on actionable insights."""
     
     def run_assessment(self):
         print("\n" + "="*80)
-        print("STARTING DAILY RISK ASSESSMENT v1.8 - 2026 PORTFOLIO")
+        print("STARTING DAILY RISK ASSESSMENT v2.0 - 2026 PORTFOLIO")
         print("="*80)
         
         self.fetch_all_data()
@@ -2147,8 +2155,8 @@ Be direct, use specific numbers, focus on actionable insights."""
 def main():
     print("""
 ╔══════════════════════════════════════════════════════════════════════╗
-║              INSTITUTIONAL RISK DASHBOARD v1.8                       ║
-║         14 Signals + V-Recovery + 2026 Portfolio Mapping             ║
+║              INSTITUTIONAL RISK DASHBOARD v2.0                       ║
+║    22 Indicators + Institutional Flows + Options Intelligence        ║
 ╚══════════════════════════════════════════════════════════════════════╝
     """)
     dashboard = RiskDashboard()
