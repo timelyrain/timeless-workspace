@@ -602,15 +602,24 @@ class RiskDashboard:
     
     def _gold_spy_ratio(self):
         try:
+            import pandas as pd
             gld = yf.Ticker('GLD').history(period='2mo')['Close']
             spy = yf.Ticker('SPY').history(period='2mo')['Close']
             if len(gld) < 20 or len(spy) < 20:
                 return None
             ratio = gld / spy
-            trend = ((ratio.iloc[-1] - ratio.rolling(20).mean().iloc[-1]) / ratio.rolling(20).mean().iloc[-1]) * 100
+            current = ratio.iloc[-1]
+            ma20 = ratio.rolling(20).mean().iloc[-1]
+            
+            # Check for NaN values before calculation
+            if pd.isna(current) or pd.isna(ma20) or ma20 == 0:
+                print(f"   ✗ GLD/SPY: Invalid data")
+                return None
+            
+            trend = ((current - ma20) / ma20) * 100
             print(f"   ✓ GLD/SPY: {trend:+.1f}%")
             return float(trend)
-        except:
+        except Exception as e:
             print(f"   ✗ GLD/SPY: Error")
             return None
     
@@ -705,8 +714,10 @@ class RiskDashboard:
         self.data['vix_term_struct'] = vix_term_struct
         self.data['skew'] = self._skew_index()
         
-        valid = sum(1 for v in self.data.values() if v is not None)
-        print(f"\n✅ Fetched {valid}/18 signals successfully\n")
+        # Count only numeric indicators (exclude string labels like vix_term_struct)
+        valid = sum(1 for k, v in self.data.items() if v is not None and k != 'vix_term_struct')
+        total = len([k for k in self.data.keys() if k != 'vix_term_struct'])
+        print(f"\n✅ Fetched {valid}/{total} signals successfully\n")
         return self.data
     
     def calculate_scores(self):
