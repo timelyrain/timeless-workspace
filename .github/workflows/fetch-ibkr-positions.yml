@@ -108,4 +108,3 @@ jobs:
           name: ibkr-positions
           path: projects/fetch-ibkr-positions.xlsx
           retention-days: 7
-          retention-days: 30
