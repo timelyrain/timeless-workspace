@@ -288,6 +288,91 @@ class HistoricalDataManager:
             'days': len(recent)
         }
     
+    def add_indicator_data(self, date, indicators):
+        """Store daily indicator values for historical comparison"""
+        if 'indicators' not in self.history:
+            self.history['indicators'] = []
+        
+        # Remove existing entry for same date
+        self.history['indicators'] = [d for d in self.history['indicators'] if d.get('date') != date]
+        
+        entry = {'date': date, **indicators}
+        self.history['indicators'].append(entry)
+        
+        # Keep last 90 days
+        cutoff_date = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+        self.history['indicators'] = [d for d in self.history['indicators'] if d.get('date', '') >= cutoff_date]
+    
+    def get_spread_change(self, indicator_name, days=30):
+        """Calculate N-day rate of change for credit spreads
+        Returns dict with old_value, new_value, change_pct, widening flag
+        """
+        if 'indicators' not in self.history or not self.history['indicators']:
+            return None
+        
+        # Sort by date
+        sorted_data = sorted(self.history['indicators'], key=lambda x: x.get('date', ''))
+        
+        if len(sorted_data) < 2:
+            return None
+        
+        # Get current and N-days-ago value
+        current_entry = sorted_data[-1]
+        current_value = current_entry.get(indicator_name)
+        
+        # Find entry from N days ago
+        target_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        old_entry = None
+        for entry in sorted_data:
+            if entry.get('date', '') <= target_date:
+                old_entry = entry
+        
+        if not old_entry:
+            return None
+        
+        old_value = old_entry.get(indicator_name)
+        
+        if old_value is None or current_value is None or old_value == 0:
+            return None
+        
+        change_pct = ((current_value - old_value) / old_value) * 100
+        
+        return {
+            'old_value': old_value,
+            'new_value': current_value,
+            'change_pct': change_pct,
+            'widening': change_pct > 0  # For spreads, widening = increasing
+        }
+    
+    def get_spread_change(self, indicator_name, days=30):
+        """Calculate N-day rate of change for credit spreads"""
+        if not self.history.get('scores'):
+            return None
+        
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        recent = sorted(
+            [s for s in self.history['scores'] if s['date'] >= cutoff and indicator_name in s.get('data', {})],
+            key=lambda x: x['date']
+        )
+        
+        if len(recent) < 2:
+            return None
+        
+        old_value = recent[0]['data'][indicator_name]
+        new_value = recent[-1]['data'][indicator_name]
+        
+        if old_value is None or new_value is None or old_value == 0:
+            return None
+        
+        change_pct = ((new_value - old_value) / old_value) * 100
+        return {
+            'old_value': old_value,
+            'new_value': new_value,
+            'change_pct': change_pct,
+            'days': len(recent),
+            'widening': change_pct > 0
+        }
+    
     def get_score_trend(self, days=7):
         """Get risk score trend with regime changes"""
         if not self.history.get('scores'):
@@ -580,6 +665,7 @@ class RiskDashboard:
         
         self.data = {
             'hy_spread': self._fred_get('BAMLH0A0HYM2', 'HY Spread'),
+            'ig_spread': self._fred_get('BAMLC0A0CM', 'IG Spread'),
             'fed_bs_yoy': self._fed_bs_yoy(),
             'ted_spread': self._fred_get('TEDRATE', 'TED Spread'),
             'dxy_trend': self._dxy_trend(),
@@ -593,6 +679,12 @@ class RiskDashboard:
             'vix': self._yf_get('^VIX', 'VIX'),
         }
         
+        # Calculate credit stress ratio (HY/IG)
+        if self.data.get('hy_spread') and self.data.get('ig_spread'):
+            self.data['credit_stress_ratio'] = self.data['hy_spread'] / self.data['ig_spread']
+        else:
+            self.data['credit_stress_ratio'] = None
+        
         vix_struct, vixy_vxx_ratio, vix_magnitude = self._vix_structure()
         self.data['vix_struct'] = vix_struct
         self.data['vixy_vxx_ratio'] = vixy_vxx_ratio
@@ -600,14 +692,36 @@ class RiskDashboard:
         self.data['fear_greed'] = self._fear_greed()
         
         valid = sum(1 for v in self.data.values() if v is not None)
-        print(f"\n✅ Fetched {valid}/14 signals successfully\n")
+        print(f"\n✅ Fetched {valid}/17 signals successfully\n")
         return self.data
     
     def calculate_scores(self):
         d = self.data
+        
+        # Credit Market Indicators (Enhanced)
+        # 1. HY Spread with rate of change penalty
         s1 = self._score_range(d.get('hy_spread'), [(3,20),(4,16),(4.5,12),(5.5,6)], 0)
+        hy_change = self.history_manager.get_spread_change('hy_spread', 30)
+        if hy_change and hy_change['change_pct'] > 20:  # Rapid widening = stress
+            s1 = max(0, s1 - 5)
+        
+        # 2. IG Spread (new)
+        s_ig = self._score_range(d.get('ig_spread'), [(1.2,20),(1.5,16),(2.0,12),(2.5,6)], 0)
+        ig_change = self.history_manager.get_spread_change('ig_spread', 30)
+        if ig_change and ig_change['change_pct'] > 20:
+            s_ig = max(0, s_ig - 5)
+        
+        # 3. Credit Stress Ratio (HY/IG) - new composite
+        s_ratio = self._score_range(d.get('credit_stress_ratio'), [(2.5,20),(3.0,16),(3.5,10),(4.0,4)], 0)
+        
+        # 4. TED Spread (primary short-term credit indicator)
+        s_ted = self._score_range(d.get('ted_spread'), [(0.3,15),(0.5,12),(0.75,8),(1,4)], 0)
+        
+        # Combine credit scores (weighted: HY 30%, IG 30%, Ratio 25%, TED 15%)
+        credit_score = (s1 * 0.30) + (s_ig * 0.30) + (s_ratio * 0.25) + (s_ted * 0.15)
+        
+        # Other existing indicators
         s2 = self._score_range(d.get('fed_bs_yoy'), [(10,15),(2,12),(-2,9),(-10,4)], 0)
-        s3 = self._score_range(d.get('ted_spread'), [(0.3,10),(0.5,8),(0.75,5),(1,2)], 0)
         s4 = self._score_range(d.get('dxy_trend'), [(-3,5),(-1,4),(1,3),(3,1)], 0)
         s5 = self._score_range(d.get('pct_above_50ma'), [(75,12),(65,10),(55,7),(45,4),(35,2)], 0)
         s6 = self._score_range(d.get('pct_below_200ma'), [(15,10),(25,8),(35,6),(50,3),(65,1)], 0, inverse=True)
@@ -621,14 +735,17 @@ class RiskDashboard:
         fg = d.get('fear_greed')
         s14 = 0.5 if (fg and 35 <= fg <= 65) else 0.3 if fg else 0
         
-        total = s1+s2+s3+s4+s5+s6+s7+s8+s9+s10+s11+s12+s13+s14
+        # Total includes credit_score (composite) + all other indicators
+        total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14
         
         self.scores = {
             'total': total,
-            'tier1': s1+s2+s3+s4,
-            'tier2': s5+s6+s7+s8,
-            'tier3': s9+s10+s11,
-            'tier4': s12+s13+s14,
+            'tier1': credit_score + s2 + s4,  # Credit composite + Fed BS + DXY
+            'tier2': s5 + s6 + s7 + s8 + s9 + s10,  # Positioning + flows
+            'tier3': s11 + s12 + s13 + s14,  # Structure + sentiment
+            'credit_score': credit_score,  # New composite credit indicator
+            's2': s2, 's4': s4, 's5': s5, 's6': s6, 's7': s7, 's8': s8,
+            's9': s9, 's10': s10, 's11': s11, 's12': s12, 's13': s13, 's14': s14
         }
         return self.scores
     
@@ -1413,10 +1530,9 @@ class RiskDashboard:
         # Tier scores
         lines.extend([
             "📈 TIER SCORES",
-            f"T1: {self.scores['tier1']:.0f}/50 ({self.scores['tier1']/50*100:.0f}%)",
-            f"T2: {self.scores['tier2']:.0f}/30 ({self.scores['tier2']/30*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.0f}/15 ({self.scores['tier3']/15*100:.0f}%)",
-            f"T4: {self.scores['tier4']:.1f}/5 ({self.scores['tier4']/5*100:.0f}%)",
+            f"T1: {self.scores['tier1']:.1f}/45 Credit+Macro ({self.scores['tier1']/45*100:.0f}%)",
+            f"T2: {self.scores['tier2']:.1f}/39 Positioning+Flows ({self.scores['tier2']/39*100:.0f}%)",
+            f"T3: {self.scores['tier3']:.1f}/9 Structure+Sentiment ({self.scores['tier3']/9*100:.0f}%)",
             "",
         ])
         
@@ -1597,6 +1713,17 @@ Be direct, use specific numbers, focus on actionable insights."""
         if self.missing_signals:
             print(f"\n❌ CRITICAL: {len(self.missing_signals)} missing signals")
             return None
+        
+        # Store indicator data for historical comparison
+        self.history_manager.add_indicator_data(
+            date=self.timestamp.strftime('%Y-%m-%d'),
+            indicators={
+                'hy_spread': self.data.get('hy_spread'),
+                'ig_spread': self.data.get('ig_spread'),
+                'credit_stress_ratio': self.data.get('credit_stress_ratio'),
+                'ted_spread': self.data.get('ted_spread'),
+            }
+        )
         
         self.calculate_scores()
         

@@ -217,20 +217,45 @@
       "vix": 16.899999618530273,
       "vix_structure": "Backwardation",
       "vixy_vxx_ratio": 0.965620326292038
+    },
+    {
+      "date": "2026-01-22",
+      "score": 66.05,
+      "spy": 685.4000244140625,
+      "vix": 15.920000076293945,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.965620326292038
+    },
+    {
+      "date": "2026-01-22",
+      "score": 66.05,
+      "spy": 685.4000244140625,
+      "vix": 15.930000305175781,
+      "vix_structure": "Backwardation",
+      "vixy_vxx_ratio": 0.965620326292038
     }
   ],
   "overrides": [],
   "drift_history": [
     {
       "date": "2026-01-22",
-      "total_drift": 0.7460523887443,
+      "total_drift": 0.5698716490028721,
       "categories": {
         "global_core": 0.12795230136644198,
-        "growth_engine": -0.14676518104045813,
-        "income_strategy": -0.08809036987071397,
-        "alpha_insurance": -0.015476698068823382,
-        "reserves": 0.36776783839786265
+        "growth_engine": -0.0867651810404581,
+        "income_strategy": 0.01190963012928603,
+        "alpha_insurance": -0.06547669806882339,
+        "reserves": 0.2777678383978627
       }
+    }
+  ],
+  "indicators": [
+    {
+      "date": "2026-01-22",
+      "hy_spread": 2.73,
+      "ig_spread": 0.75,
+      "credit_stress_ratio": 3.64,
+      "ted_spread": 0.09
     }
   ]
 }
