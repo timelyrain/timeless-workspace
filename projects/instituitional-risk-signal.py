@@ -733,6 +733,136 @@ class RiskDashboard:
             print(f"   ✗ VXN-VIX: Error")
             return None
     
+    def _etf_flow_divergence(self):
+        """ETF Flow Divergence: Institutional money flow across 9 major ETFs
+        Tracks volume surge + price momentum to detect inflows/outflows
+        SPY, QQQ, IWM, DIA, EEM, TLT, GLD, HYG, LQD
+        """
+        try:
+            etfs = ['SPY', 'QQQ', 'IWM', 'DIA', 'EEM', 'TLT', 'GLD', 'HYG', 'LQD']
+            inflow_count = 0
+            outflow_count = 0
+            
+            for etf in etfs:
+                try:
+                    ticker = yf.Ticker(etf)
+                    hist = ticker.history(period='2mo')
+                    
+                    if len(hist) >= 25:
+                        # Volume surge analysis (5d avg vs 20d avg)
+                        vol_5d = hist['Volume'].iloc[-5:].mean()
+                        vol_20d = hist['Volume'].iloc[-20:].mean()
+                        vol_change = ((vol_5d / vol_20d) - 1) * 100
+                        
+                        # Price momentum (5-day)
+                        price_change = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-5]) - 1) * 100
+                        
+                        # Flow classification
+                        if vol_change > 10 and price_change > 0:
+                            inflow_count += 1
+                        elif vol_change > 10 and price_change < 0:
+                            outflow_count += 1
+                except:
+                    continue
+            
+            neutral_count = len(etfs) - inflow_count - outflow_count
+            print(f"   ✓ ETF Flows: {inflow_count} in, {outflow_count} out, {neutral_count} neutral")
+            
+            # Return tuple: (inflow_count, outflow_count)
+            return (inflow_count, outflow_count)
+            
+        except Exception as e:
+            print(f"   ✗ ETF Flows: Error")
+            return None
+    
+    def _credit_flow_stress(self):
+        """Credit Market Flow Stress: HYG, LQD, JNK, EMB flow analysis
+        Credit flows lead equity flows by 1-2 weeks
+        Higher threshold (15% vol + 1% price) for credit-specific detection
+        """
+        try:
+            credit_etfs = ['HYG', 'LQD', 'JNK', 'EMB']
+            inflow_count = 0
+            outflow_count = 0
+            
+            for etf in credit_etfs:
+                try:
+                    ticker = yf.Ticker(etf)
+                    hist = ticker.history(period='2mo')
+                    
+                    if len(hist) >= 25:
+                        # Volume surge (5d vs 20d)
+                        vol_5d = hist['Volume'].iloc[-5:].mean()
+                        vol_20d = hist['Volume'].iloc[-20:].mean()
+                        vol_change = ((vol_5d / vol_20d) - 1) * 100
+                        
+                        # Price change (5-day)
+                        price_change = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-5]) - 1) * 100
+                        
+                        # Credit-specific thresholds (stricter)
+                        if vol_change > 15 and price_change > 1:
+                            inflow_count += 1
+                        elif vol_change > 15 and price_change < -1:
+                            outflow_count += 1
+                except:
+                    continue
+            
+            neutral_count = len(credit_etfs) - inflow_count - outflow_count
+            print(f"   ✓ Credit Flows: {inflow_count} in, {outflow_count} out, {neutral_count} neutral")
+            
+            # Return tuple: (inflow_count, outflow_count)
+            return (inflow_count, outflow_count)
+            
+        except Exception as e:
+            print(f"   ✗ Credit Flows: Error")
+            return None
+    
+    def _sector_rotation_strength(self):
+        """Sector Rotation Strength: 11-sector flow ranking spread
+        Measures capital rotation intensity via top 3 vs bottom 3 spread
+        Wide spread = healthy rotation, narrow = stagnant capital
+        """
+        try:
+            sectors = ['XLK', 'XLF', 'XLV', 'XLE', 'XLY', 'XLP', 'XLI', 'XLB', 'XLRE', 'XLU', 'XLC']
+            sector_scores = []
+            
+            for etf in sectors:
+                try:
+                    ticker = yf.Ticker(etf)
+                    hist = ticker.history(period='2mo')
+                    
+                    if len(hist) >= 25:
+                        # Volume score (5d vs 20d)
+                        vol_5d = hist['Volume'].iloc[-5:].mean()
+                        vol_20d = hist['Volume'].iloc[-20:].mean()
+                        vol_score = ((vol_5d / vol_20d) - 1) * 100
+                        
+                        # Price momentum (10-day)
+                        price_score = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-10]) - 1) * 100
+                        
+                        # Combined flow score (weighted: 30% vol, 70% price)
+                        flow_score = (vol_score * 0.3) + (price_score * 0.7)
+                        sector_scores.append(flow_score)
+                except:
+                    continue
+            
+            if len(sector_scores) >= 6:
+                # Sort and calculate spread
+                sector_scores = sorted(sector_scores, reverse=True)
+                top3_avg = sum(sector_scores[:3]) / 3
+                bottom3_avg = sum(sector_scores[-3:]) / 3
+                rotation_spread = top3_avg - bottom3_avg
+                
+                print(f"   ✓ Sector Rotation: {rotation_spread:.1f} pts spread")
+                return float(rotation_spread)
+            else:
+                print(f"   ✗ Sector Rotation: Insufficient data")
+                return None
+                
+        except Exception as e:
+            print(f"   ✗ Sector Rotation: Error")
+            return None
+    
     def _breadth_extreme_adjustment(self, pct_above_50ma):
         """Detect extreme overbought/oversold conditions for score adjustment
         >80% = Overbought penalty, <30% = Oversold bonus
@@ -748,7 +878,7 @@ class RiskDashboard:
             return 0   # Normal range
     
     def fetch_all_data(self):
-        print("\n📊 Fetching 19 indicators...\n")
+        print("\n📊 Fetching 22 indicators...\n")
         self.sample_tickers = self._get_sp100_tickers()
         self.missing_signals = []
         
@@ -785,7 +915,12 @@ class RiskDashboard:
         self.data['vix9d_ratio'] = self._vix9d_ratio()
         self.data['vxn_vix_spread'] = self._vxn_vix_spread()
         
-        # Count only numeric indicators (exclude string labels like vix_term_struct)
+        # Institutional Flow Tracking
+        self.data['etf_flows'] = self._etf_flow_divergence()
+        self.data['credit_flows'] = self._credit_flow_stress()
+        self.data['sector_rotation_strength'] = self._sector_rotation_strength()
+        
+        # Count only numeric indicators (exclude string labels like vix_term_struct and tuples)
         valid = sum(1 for k, v in self.data.items() if v is not None and k != 'vix_term_struct')
         total = len([k for k in self.data.keys() if k != 'vix_term_struct'])
         print(f"\n✅ Fetched {valid}/{total} signals successfully\n")
@@ -906,13 +1041,59 @@ class RiskDashboard:
         else:
             s17 = 0
         
+        # ETF Flow Divergence (institutional money flow)
+        etf_flows = d.get('etf_flows')
+        if etf_flows is not None and isinstance(etf_flows, tuple):
+            inflow_count, outflow_count = etf_flows
+            if inflow_count >= 7:          # Strong inflows = risk-on
+                s18 = 8
+            elif inflow_count >= 5:        # Moderate inflows
+                s18 = 6
+            elif outflow_count >= 7:       # Strong outflows = risk-off
+                s18 = 0
+            elif outflow_count >= 5:       # Moderate outflows
+                s18 = 2
+            else:                           # Mixed/neutral
+                s18 = 5
+        else:
+            s18 = 0
+        
+        # Credit Market Flow Stress
+        credit_flows = d.get('credit_flows')
+        if credit_flows is not None and isinstance(credit_flows, tuple):
+            credit_in, credit_out = credit_flows
+            if credit_in >= 3:             # All inflows = credit healthy
+                s19 = 7
+            elif credit_in >= 2:           # Mostly inflows
+                s19 = 5
+            elif credit_out >= 2:          # Multiple outflows = stress
+                s19 = 0
+            elif credit_out >= 1:          # Some stress
+                s19 = 2
+            else:                           # Neutral
+                s19 = 4
+        else:
+            s19 = 0
+        
+        # Sector Rotation Strength
+        rotation_spread = d.get('sector_rotation_strength')
+        if rotation_spread is not None:
+            if rotation_spread > 20:       # Strong rotation = healthy bull
+                s20 = 6
+            elif rotation_spread > 10:     # Moderate rotation
+                s20 = 4
+            else:                           # Weak rotation = choppy/bear
+                s20 = 0
+        else:
+            s20 = 0
+        
         # Total includes credit_score (composite) + all other indicators
-        total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17
+        total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
         
         self.scores = {
             'total': total,
             'tier1': credit_score + s2 + s4,  # Credit composite + Fed BS + DXY
-            'tier2': s5 + s6 + s7 + s8 + s9 + s10,  # Positioning + flows
+            'tier2': s5 + s6 + s7 + s8 + s9 + s10 + s18 + s19 + s20,  # Positioning + institutional flows
             'tier3': s11 + s12 + s13 + s14 + s15 + s16 + s17,  # Options intelligence + structure
             'credit_score': credit_score,
             'vix_term': s11,  # VIX Term Structure score
@@ -920,9 +1101,12 @@ class RiskDashboard:
             'vvix_score': s15,  # VVIX score
             'vix9d_score': s16,  # VIX9D ratio score
             'vxn_score': s17,  # VXN-VIX spread score
+            'etf_flow_score': s18,  # ETF flow divergence score
+            'credit_flow_score': s19,  # Credit flow stress score
+            'rotation_score': s20,  # Sector rotation strength score
             's2': s2, 's4': s4, 's5': s5, 's6': s6, 's7': s7, 's8': s8,
             's9': s9, 's10': s10, 's11': s11, 's12': s12, 's13': s13, 's14': s14,
-            's15': s15, 's16': s16, 's17': s17
+            's15': s15, 's16': s16, 's17': s17, 's18': s18, 's19': s19, 's20': s20
         }
         return self.scores
     
@@ -1708,7 +1892,7 @@ class RiskDashboard:
         lines.extend([
             "📈 TIER SCORES",
             f"T1: {self.scores['tier1']:.1f}/45 Credit+Macro ({self.scores['tier1']/45*100:.0f}%)",
-            f"T2: {self.scores['tier2']:.1f}/39 Positioning+Flows ({self.scores['tier2']/39*100:.0f}%)",
+            f"T2: {self.scores['tier2']:.1f}/60 Positioning+InstFlows ({self.scores['tier2']/60*100:.0f}%)",
             f"T3: {self.scores['tier3']:.1f}/49 Options+Structure ({self.scores['tier3']/49*100:.0f}%)",
             "",
         ])
