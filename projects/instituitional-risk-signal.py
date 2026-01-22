@@ -614,52 +614,66 @@ class RiskDashboard:
             print(f"   ✗ GLD/SPY: Error")
             return None
     
-    def _vix_structure(self):
+    def _vix_term_structure(self):
+        """VIX Term Structure: Measures options market sentiment via VIX futures curve
+        Contango (VIX3M > VIX) = Complacency, Backwardation = Fear
+        """
         try:
-            vxx = yf.Ticker('VXX').history(period='5d')['Close'].iloc[-1]
-            vixy = yf.Ticker('VIXY').history(period='5d')['Close'].iloc[-1]
-            ratio = vixy / vxx
-            if ratio > 1.03:
+            vix_spot = yf.Ticker('^VIX').history(period='5d')['Close'].iloc[-1]
+            vix_3m = yf.Ticker('^VIX3M').history(period='5d')['Close'].iloc[-1]
+            
+            # Calculate term structure slope (3M vs Spot)
+            term_slope_pct = ((vix_3m - vix_spot) / vix_spot) * 100
+            
+            # Determine structure
+            if term_slope_pct > 25:
+                struct = 'Extreme Contango'
+            elif term_slope_pct > 15:
                 struct = 'Contango'
-                magnitude_pct = (ratio - 1.0) * 100
-            elif ratio < 0.97:
-                struct = 'Backwardation'
-                magnitude_pct = (1.0 - ratio) * 100
-            else:
+            elif term_slope_pct > -5:
                 struct = 'Flat'
-                magnitude_pct = 0.0
-            streak_info = ""
-            if struct == 'Backwardation':
-                streak, avg_mag = self.history_manager.get_backwardation_streak()
-                if streak > 0:
-                    streak_info = f" Day {streak}"
-                    self.history_manager.add_backwardation_event(
-                        date=datetime.now().strftime('%Y-%m-%d'),
-                        vixy_vxx_ratio=ratio,
-                        magnitude_pct=magnitude_pct
-                    )
-            print(f"   ✓ VIX Struct: {struct}{streak_info} (ratio={ratio:.3f})")
-            return struct, ratio, magnitude_pct
-        except:
-            print(f"   ✗ VIX Struct: Error")
-            return None, None, None
+            else:
+                struct = 'Backwardation'
+            
+            print(f"   ✓ VIX Term: {struct} ({term_slope_pct:+.1f}%)")
+            return term_slope_pct, struct
+        except Exception as e:
+            print(f"   ✗ VIX Term: Error")
+            return None, None
     
-    def _fear_greed(self):
-        if self.data.get('vix') is None:
-            return None
+    def _skew_index(self):
+        """CBOE SKEW Index: Measures tail risk in options market
+        >140 = Crash fear, 100-130 = Normal, <100 = Complacency
+        """
         try:
-            vix = self.data['vix']
-            if vix < 10: vix = 10
-            if vix > 50: vix = 50
-            score = 100 - ((vix - 10) * 2.5)
-            score = max(0, min(100, score))
-            print(f"   ✓ Fear/Greed: {score:.0f}/100")
-            return float(score)
-        except:
+            skew_data = yf.Ticker('^SKEW').history(period='5d')
+            if len(skew_data) > 0:
+                skew = skew_data['Close'].iloc[-1]
+                print(f"   ✓ SKEW: {skew:.1f}")
+                return float(skew)
+            else:
+                print(f"   ✗ SKEW: No data")
+                return None
+        except Exception as e:
+            print(f"   ✗ SKEW: Error")
             return None
+    
+    def _breadth_extreme_adjustment(self, pct_above_50ma):
+        """Detect extreme overbought/oversold conditions for score adjustment
+        >80% = Overbought penalty, <30% = Oversold bonus
+        """
+        if pct_above_50ma is None:
+            return 0
+        
+        if pct_above_50ma > 80:
+            return -5  # Overbought penalty
+        elif pct_above_50ma < 30:
+            return 3   # Oversold bonus (opportunity)
+        else:
+            return 0   # Normal range
     
     def fetch_all_data(self):
-        print("\n📊 Fetching 14 indicators...\n")
+        print("\n📊 Fetching 16 indicators...\n")
         self.sample_tickers = self._get_sp100_tickers()
         self.missing_signals = []
         
@@ -685,14 +699,14 @@ class RiskDashboard:
         else:
             self.data['credit_stress_ratio'] = None
         
-        vix_struct, vixy_vxx_ratio, vix_magnitude = self._vix_structure()
-        self.data['vix_struct'] = vix_struct
-        self.data['vixy_vxx_ratio'] = vixy_vxx_ratio
-        self.data['vix_magnitude'] = vix_magnitude
-        self.data['fear_greed'] = self._fear_greed()
+        # VIX Term Structure and SKEW
+        vix_term_slope, vix_term_struct = self._vix_term_structure()
+        self.data['vix_term_slope'] = vix_term_slope
+        self.data['vix_term_struct'] = vix_term_struct
+        self.data['skew'] = self._skew_index()
         
         valid = sum(1 for v in self.data.values() if v is not None)
-        print(f"\n✅ Fetched {valid}/17 signals successfully\n")
+        print(f"\n✅ Fetched {valid}/18 signals successfully\n")
         return self.data
     
     def calculate_scores(self):
@@ -723,17 +737,48 @@ class RiskDashboard:
         # Other existing indicators
         s2 = self._score_range(d.get('fed_bs_yoy'), [(10,15),(2,12),(-2,9),(-10,4)], 0)
         s4 = self._score_range(d.get('dxy_trend'), [(-3,5),(-1,4),(1,3),(3,1)], 0)
+        
+        # Breadth with extreme detection
         s5 = self._score_range(d.get('pct_above_50ma'), [(75,12),(65,10),(55,7),(45,4),(35,2)], 0)
+        s5_adj = self._breadth_extreme_adjustment(d.get('pct_above_50ma'))  # +3 or -5 pts
+        s5 = max(0, s5 + s5_adj)  # Apply adjustment with floor at 0
+        
         s6 = self._score_range(d.get('pct_below_200ma'), [(15,10),(25,8),(35,6),(50,3),(65,1)], 0, inverse=True)
         s7 = {'Confirming':5, 'Flat':2, 'Diverging':0}.get(d.get('ad_line'), 0)
         s8 = self._score_range(d.get('new_hl'), [(10,3),(5,2.5),(0,2),(-5,1),(-10,0.5)], 0)
         s9 = self._score_range(d.get('sector_rot'), [(-5,6),(-2,5),(2,4),(5,2)], 0)
         s10 = self._score_range(d.get('gold_spy'), [(-3,5),(-1,4),(1,3),(3,1)], 0)
-        s11 = {'Contango':4, 'Flat':2, 'Backwardation':0}.get(d.get('vix_struct'), 0)
+        
+        # VIX Term Structure (replaces old VIX struct)
+        vix_term = d.get('vix_term_slope')
+        if vix_term is not None:
+            if vix_term > 25:      # Extreme contango = complacency
+                s11 = 0
+            elif vix_term > 15:    # Mild contango = calm
+                s11 = 4
+            elif vix_term > -5:    # Flat = neutral
+                s11 = 8
+            else:                   # Backwardation = fear/opportunity
+                s11 = 12
+        else:
+            s11 = 0
+        
         s12 = self._score_range(d.get('yield_curve'), [(0.5,3),(0.2,2.5),(-0.2,2),(-0.5,1)], 0)
         s13 = self._score_range(d.get('vix'), [(12,0),(16,1.5),(20,1),(30,0.5)], 0)
-        fg = d.get('fear_greed')
-        s14 = 0.5 if (fg and 35 <= fg <= 65) else 0.3 if fg else 0
+        
+        # SKEW Index (new tail risk indicator)
+        skew = d.get('skew')
+        if skew is not None:
+            if skew < 110:         # Extreme complacency
+                s14 = 0
+            elif skew < 130:       # Normal
+                s14 = 6
+            elif skew < 145:       # Healthy caution
+                s14 = 8
+            else:                   # Excessive fear = opportunity
+                s14 = 10
+        else:
+            s14 = 0
         
         # Total includes credit_score (composite) + all other indicators
         total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14
@@ -742,8 +787,10 @@ class RiskDashboard:
             'total': total,
             'tier1': credit_score + s2 + s4,  # Credit composite + Fed BS + DXY
             'tier2': s5 + s6 + s7 + s8 + s9 + s10,  # Positioning + flows
-            'tier3': s11 + s12 + s13 + s14,  # Structure + sentiment
-            'credit_score': credit_score,  # New composite credit indicator
+            'tier3': s11 + s12 + s13 + s14,  # Structure + sentiment (VIX Term, SKEW, VIX, Yield)
+            'credit_score': credit_score,
+            'vix_term': s11,  # VIX Term Structure score
+            'skew_score': s14,  # SKEW Index score
             's2': s2, 's4': s4, 's5': s5, 's6': s6, 's7': s7, 's8': s8,
             's9': s9, 's10': s10, 's11': s11, 's12': s12, 's13': s13, 's14': s14
         }
@@ -1532,7 +1579,7 @@ class RiskDashboard:
             "📈 TIER SCORES",
             f"T1: {self.scores['tier1']:.1f}/45 Credit+Macro ({self.scores['tier1']/45*100:.0f}%)",
             f"T2: {self.scores['tier2']:.1f}/39 Positioning+Flows ({self.scores['tier2']/39*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.1f}/9 Structure+Sentiment ({self.scores['tier3']/9*100:.0f}%)",
+            f"T3: {self.scores['tier3']:.1f}/26 Structure+Sentiment ({self.scores['tier3']/26*100:.0f}%)",
             "",
         ])
         
