@@ -1090,8 +1090,15 @@ class RiskDashboard:
         # Total includes credit_score (composite) + all other indicators
         total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
         
+        # Normalize to /100 scale (max raw score is 154 pts)
+        # Original system was 110 pts designed for /100 scale
+        # After upgrades: Tier1=45, Tier2=60, Tier3=49 = 154 pts
+        SCORE_NORMALIZATION = 154 / 100
+        total_normalized = total / SCORE_NORMALIZATION
+        
         self.scores = {
-            'total': total,
+            'total': total_normalized,  # Normalized to /100
+            'total_raw': total,  # Keep raw for debugging
             'tier1': credit_score + s2 + s4,  # Credit composite + Fed BS + DXY
             'tier2': s5 + s6 + s7 + s8 + s9 + s10 + s18 + s19 + s20,  # Positioning + institutional flows
             'tier3': s11 + s12 + s13 + s14 + s15 + s16 + s17,  # Options intelligence + structure
