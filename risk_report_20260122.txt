@@ -1,31 +1,31 @@
 🎯 RISK DASHBOARD v1.8
-📅 Jan 22, 2026 @ 22:18
+📅 Jan 22, 2026 @ 23:53
 
-📊 SCORE: 66.0/100
-🎚️ ★★★☆☆ ELEVATED
+📊 SCORE: 92.8/100
+🎚️ ★★★★★ ALL CLEAR
 
 💼 PORTFOLIO ALLOCATION (Actual → Target)
 Global Core: 43% → 30% (-13% ⚠️)
-Growth Engine: 12% → 21% (+9% ⚠️)
-Income Strategy: 14% → 12%
-Alpha & Insurance: 3% → 10% (+7% ⚠️)
-Reserves: 53% → 25% (-28% ⚠️)
+Growth Engine: 12% → 30% (+18% ⚠️)
+Income Strategy: 14% → 25% (+11% ⚠️)
+Alpha & Insurance: 3% → 5%
+Reserves: 53% → 10% (-43% ⚠️)
 
-⚠️ DRIFT: 57% total
-📋 Global Core: overweight by 13%, Growth Engine: underweight by 9%
+⚠️ DRIFT: 86% total
+📋 Global Core: overweight by 13%, Growth Engine: underweight by 18%
 
-🛡️ Stops: 10-12%
-📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions
+🛡️ Stops: 15-20%
+📈 Options: Sell CSPs at 30-45 DTE, 15-20 delta on GOOGL, PEP, V
 
-💡 ACTION: REDUCE RISK - Cut growth/income, raise reserves and hedge
+💡 ACTION: FULL DEPLOYMENT - Run base allocation
 
 🔄 REBALANCING RECOMMENDATIONS
 SELL (Overweight):
   • Global Core: $127k (13% over)
-  • Reserves: $276k (28% over)
+  • Reserves: $425k (43% over)
 BUY (Underweight):
-  • Growth Engine: $86k (9% under)
-  • Alpha Insurance: $65k (7% under)
+  • Growth Engine: $176k (18% under)
+  • Income Strategy: $112k (11% under)
 
 📊 INCOME STRATEGY POSITIONS
   • CSPs: 9 active
@@ -35,17 +35,22 @@ BUY (Underweight):
 
 📈 TIER SCORES
 T1: 33.2/45 Credit+Macro (74%)
-T2: 31.0/39 Positioning+Flows (79%)
-T3: 1.8/9 Structure+Sentiment (20%)
+T2: 34.0/39 Positioning+Flows (87%)
+T3: 25.5/49 Options+Structure (52%)
 
-📊 RISK TREND (7 days)
-📉 Score: 78 → 66 (-12 pts)
-⚠️ Regime: NORMAL → ELEVATED
-  • VIX: 19.3 → 15.9 (↓17%)
+📊 RISK TREND (13 days)
+📈 Score: 78 → 93 (+14 pts)
+⚠️ Regime: NORMAL → ALL CLEAR
+  • VIX: 19.3 → 15.9 (↓18%)
 
 📊 KEY SIGNALS
-HY Spread: 2.73%
+HY Spread: 2.69%
 VIX: 15.9
-VIX: Backwardation
-% >50MA: 51%
-F&G: 85
+% >50MA: 58%
+F&G: N/A
+
+🚨 ALERTS
+
+✅ ALL CLEAR
+HEALTHY MARKET CONDITIONS
+→ FULL DEPLOYMENT OK

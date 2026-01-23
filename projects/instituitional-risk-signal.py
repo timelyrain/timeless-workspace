@@ -32,6 +32,22 @@ TIER SCORING (154 pts raw → normalized to /100):
 ├─ Tier 2 (60 pts): Positioning + Institutional flows (ETF/Credit/Sector)
 └─ Tier 3 (49 pts): Options intelligence (VIX Term, SKEW, VVIX, VIX9D, VXN) + Structure
 
+TODO - FUTURE ENHANCEMENTS (Requires Paid Data):
+❌ CBOE Put/Call Ratio - yfinance options data too unreliable/incomplete
+   Recommended providers:
+   • Polygon.io ($199/mo) - Best API quality, institutional-grade
+   • Barchart ($30/mo) - Most affordable with CBOE P/C ratio access
+   • Alpha Vantage Premium ($49/mo) - Good balance of cost/quality
+   Current workaround: VIX/VVIX/SKEW/VIX9D cover sentiment adequately
+
+✅ VALIDATION FRAMEWORK (No Additional Cost):
+   Walk-forward validation using existing risk_history.json data
+   • Run projects/instituitional-risk-signal-validation-report-monthly.py monthly to validate signal quality
+   • Analyzes score correlation vs SPY forward returns
+   • Checks regime change accuracy vs actual drawdowns
+   • Alert timing analysis (did warnings precede drops?)
+   • No extra API calls - uses data already collected daily
+
 SYSTEM: 15% Portfolio Risk Monitor (Arthur Protocol)
 CONTEXT: See ARTHUR_CONTEXT.md for full strategy and logic constraints.
 """
@@ -148,10 +164,11 @@ class HistoricalDataManager:
                 with open(self.history_file, 'r') as f:
                     return json.load(f)
             except:
-                return {'scores': [], 'overrides': [], 'backwardation': []}
-        return {'scores': [], 'overrides': [], 'backwardation': []}
+                return {'scores': [], 'overrides': [], 'backwardation': [], 'alerts': []}
+        return {'scores': [], 'overrides': [], 'backwardation': [], 'alerts': []}
     
     def save_history(self):
+        """Save risk history to JSON file"""
         try:
             with open(self.history_file, 'w') as f:
                 json.dump(self.history, f, indent=2)
@@ -159,6 +176,7 @@ class HistoricalDataManager:
             print(f"⚠️  Could not save history: {e}")
     
     def add_score(self, date, score, spy_price, vix, vix_structure=None, vixy_vxx_ratio=None):
+        """Add daily risk score entry to history and maintain 90-day rolling window"""
         entry = {'date': date, 'score': score, 'spy': spy_price, 'vix': vix}
         if vix_structure:
             entry['vix_structure'] = vix_structure
@@ -170,6 +188,7 @@ class HistoricalDataManager:
         self.history['scores'] = [s for s in self.history['scores'] if s['date'] >= cutoff_date]
     
     def add_backwardation_event(self, date, vixy_vxx_ratio, magnitude_pct):
+        """Record VIX backwardation event for tracking consecutive occurrences"""
         if 'backwardation' not in self.history:
             self.history['backwardation'] = []
         self.history['backwardation'].append({'date': date, 'ratio': vixy_vxx_ratio, 'magnitude': magnitude_pct})
@@ -177,6 +196,7 @@ class HistoricalDataManager:
         self.history['backwardation'] = [b for b in self.history['backwardation'] if b['date'] >= cutoff_date]
     
     def get_backwardation_streak(self):
+        """Count consecutive days of VIX backwardation (for extreme fear detection)"""
         if 'backwardation' not in self.history or not self.history['backwardation']:
             return 0, 0.0
         events = sorted(self.history['backwardation'], key=lambda x: x['date'], reverse=True)
@@ -197,6 +217,7 @@ class HistoricalDataManager:
         return streak, avg_magnitude
     
     def add_override_event(self, date, reason, conditions):
+        """Record V-Recovery override event with reason and triggering conditions"""
         self.history['overrides'].append({'date': date, 'reason': reason, 'conditions': conditions})
         if len(self.history['overrides']) > 50:
             self.history['overrides'] = self.history['overrides'][-50:]
@@ -228,10 +249,12 @@ class HistoricalDataManager:
         return streak
     
     def get_recent_scores(self, days=30):
+        """Get risk scores from the last N days"""
         cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         return [s for s in self.history['scores'] if s['date'] >= cutoff]
     
     def had_extreme_score_recently(self, threshold=30, days=30):
+        """Check if risk score fell below threshold within specified days (for kill-switch)"""
         recent = self.get_recent_scores(days)
         if not recent:
             return False
@@ -312,47 +335,6 @@ class HistoricalDataManager:
         self.history['indicators'] = [d for d in self.history['indicators'] if d.get('date', '') >= cutoff_date]
     
     def get_spread_change(self, indicator_name, days=30):
-        """Calculate N-day rate of change for credit spreads
-        Returns dict with old_value, new_value, change_pct, widening flag
-        """
-        if 'indicators' not in self.history or not self.history['indicators']:
-            return None
-        
-        # Sort by date
-        sorted_data = sorted(self.history['indicators'], key=lambda x: x.get('date', ''))
-        
-        if len(sorted_data) < 2:
-            return None
-        
-        # Get current and N-days-ago value
-        current_entry = sorted_data[-1]
-        current_value = current_entry.get(indicator_name)
-        
-        # Find entry from N days ago
-        target_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-        old_entry = None
-        for entry in sorted_data:
-            if entry.get('date', '') <= target_date:
-                old_entry = entry
-        
-        if not old_entry:
-            return None
-        
-        old_value = old_entry.get(indicator_name)
-        
-        if old_value is None or current_value is None or old_value == 0:
-            return None
-        
-        change_pct = ((current_value - old_value) / old_value) * 100
-        
-        return {
-            'old_value': old_value,
-            'new_value': current_value,
-            'change_pct': change_pct,
-            'widening': change_pct > 0  # For spreads, widening = increasing
-        }
-    
-    def get_spread_change(self, indicator_name, days=30):
         """Calculate N-day rate of change for credit spreads"""
         if not self.history.get('scores'):
             return None
@@ -402,6 +384,7 @@ class HistoricalDataManager:
         
         # Map scores to regimes
         def get_regime(score):
+            """Convert numeric risk score to regime label"""
             if score >= 90: return 'ALL CLEAR'
             elif score >= 75: return 'NORMAL'
             elif score >= 60: return 'ELEVATED'
@@ -431,6 +414,32 @@ class HistoricalDataManager:
             'signal_changes': signal_changes,
             'days': len(recent)
         }
+    
+    def should_suppress_alert(self, alert_type, days=1):
+        """Check if alert was already sent in the last N days (prevent spam)"""
+        if 'alerts' not in self.history:
+            self.history['alerts'] = []
+        
+        cutoff = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        recent_alerts = [a for a in self.history['alerts'] if a.get('date', '') >= cutoff]
+        
+        # Check if this alert type was sent recently
+        return any(a.get('type') == alert_type for a in recent_alerts)
+    
+    def add_alert(self, date, alert_type, message):
+        """Record sent alert for deduplication"""
+        if 'alerts' not in self.history:
+            self.history['alerts'] = []
+        
+        self.history['alerts'].append({
+            'date': date,
+            'type': alert_type,
+            'message': message
+        })
+        
+        # Keep only last 30 days of alerts
+        cutoff_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        self.history['alerts'] = [a for a in self.history['alerts'] if a.get('date', '') >= cutoff_date]
     
     def days_since_override_start(self):
         """Calculate days since override activated"""
@@ -474,13 +483,92 @@ class RiskDashboard:
         self.actual_positions = None
     
     # [DATA FETCHING METHODS - Enhanced in v2.0 with institutional flows]
+    def _update_sp100_cache_if_stale(self):
+        """Check if sp100_cache.json is >30 days old and update from Wikipedia if needed"""
+        cache_file = 'projects/sp100_cache.json'
+        try:
+            # Check file modification time
+            import os
+            if os.path.exists(cache_file):
+                file_mtime = os.path.getmtime(cache_file)
+                age_days = (datetime.now().timestamp() - file_mtime) / 86400
+                
+                if age_days > 30:
+                    print(f"   ⚠️  sp100_cache.json is {age_days:.0f} days old, updating from Wikipedia...")
+                    self._fetch_sp100_from_wikipedia(cache_file)
+            else:
+                print(f"   ⚠️  sp100_cache.json not found, creating from Wikipedia...")
+                self._fetch_sp100_from_wikipedia(cache_file)
+        except Exception as e:
+            print(f"   ⚠️  Could not check/update sp100_cache.json: {e}")
+    
+    def _fetch_sp100_from_wikipedia(self, cache_file):
+        """Fetch S&P 100 tickers from Wikipedia and update cache file"""
+        try:
+            import pandas as pd
+            # Fetch Wikipedia S&P 100 table
+            url = 'https://en.wikipedia.org/wiki/S%26P_100'
+            tables = pd.read_html(url)
+            
+            # Find the table with 'Symbol' column
+            sp100_table = None
+            for table in tables:
+                if 'Symbol' in table.columns:
+                    sp100_table = table
+                    break
+            
+            if sp100_table is None:
+                raise Exception("Could not find S&P 100 table with Symbol column")
+            
+            tickers = sp100_table['Symbol'].tolist()
+            tickers = [t.strip() for t in tickers if isinstance(t, str) and t.strip()]
+            
+            if len(tickers) < 90:
+                raise Exception(f"Only found {len(tickers)} tickers, expected ~100")
+            
+            # Save to cache
+            cache_data = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d'),
+                'tickers': sorted(tickers)
+            }
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            
+            print(f"   ✅ Updated sp100_cache.json: {len(tickers)} tickers from Wikipedia")
+        except Exception as e:
+            print(f"   ❌ Failed to update sp100_cache.json from Wikipedia: {e}")
+            print(f"      Will use existing cache or fallback list")
+    
     def _get_sp100_tickers(self):
+        """Get S&P 100 tickers for breadth analysis - loads from sp100_cache.json with fallback"""
+        # Check if cache needs updating (only on first call)
+        if not hasattr(self, '_sp100_cache_checked'):
+            self._update_sp100_cache_if_stale()
+            self._sp100_cache_checked = True
+        
+        try:
+            cache_file = 'projects/sp100_cache.json'
+            with open(cache_file, 'r') as f:
+                cache = json.load(f)
+                tickers = cache.get('tickers', [])
+                if tickers and len(tickers) >= 90:  # Sanity check
+                    return tickers
+        except Exception as e:
+            print(f"   ⚠️  Could not load sp100_cache.json: {e}, using fallback list")
+        
+        # Fallback hardcoded list (if cache fails)
         return [
             'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
             'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'ABBV',
             'KO', 'PEP', 'COST', 'AVGO', 'TMO', 'MCD', 'CSCO', 'ABT', 'ACN',
             'DHR', 'VZ', 'ADBE', 'NKE', 'TXN', 'NEE', 'PM', 'LIN', 'CRM',
             'ORCL', 'UNP', 'DIS', 'BMY', 'CMCSA', 'NFLX', 'WFC', 'UNH', 'AMD',
+            'HON', 'QCOM', 'LOW', 'UPS', 'INTC', 'RTX', 'CAT', 'BA', 'GE',
+            'AMGN', 'SPGI', 'INTU', 'SBUX', 'GS', 'AXP', 'BLK', 'IBM', 'BKNG',
+            'MDLZ', 'GILD', 'TGT', 'DE', 'AMAT', 'MMM', 'ADI', 'CVS', 'MO',
+            'SYK', 'CI', 'ISRG', 'REGN', 'NOW', 'ZTS', 'CB', 'SO', 'DUK',
+            'PLD', 'MMC', 'EL', 'TJX', 'BDX', 'USB', 'SCHW', 'MS', 'PNC',
+            'ADP', 'CL', 'FIS', 'CCI', 'LRCX', 'EOG', 'SLB', 'ITW', 'EMR',
         ]
     
     def _fred_get(self, series, name):
@@ -886,6 +974,7 @@ class RiskDashboard:
             return 0   # Normal range
     
     def fetch_all_data(self):
+        """Fetch all 22 market indicators from FRED and yfinance APIs"""
         print("\n📊 Fetching 22 indicators...\n")
         self.sample_tickers = self._get_sp100_tickers()
         self.missing_signals = []
@@ -931,30 +1020,45 @@ class RiskDashboard:
         # Count only numeric indicators (exclude string labels like vix_term_struct and tuples)
         valid = sum(1 for k, v in self.data.items() if v is not None and k != 'vix_term_struct')
         total = len([k for k in self.data.keys() if k != 'vix_term_struct'])
-        print(f"\n✅ Fetched {valid}/{total} signals successfully\n")
+        
+        # Track data quality
+        self.data_quality = {
+            'total': total,
+            'valid': valid,
+            'success_rate': (valid / total * 100) if total > 0 else 0,
+            'failed': self.missing_signals.copy()
+        }
+        
+        if valid == total:
+            print(f"\n✅ Fetched {valid}/{total} signals successfully (100%)\n")
+        else:
+            print(f"\n⚠️  Fetched {valid}/{total} signals ({self.data_quality['success_rate']:.1f}%)")
+            print(f"    Missing: {', '.join(self.missing_signals)}\n")
+        
         return self.data
     
     def calculate_scores(self):
+        """Calculate risk scores across 3 tiers (Credit+Macro, Positioning+InstFlows, Options+Structure)"""
         d = self.data
         
         # Credit Market Indicators (Enhanced)
-        # 1. HY Spread with rate of change penalty
-        s1 = self._score_range(d.get('hy_spread'), [(3,20),(4,16),(4.5,12),(5.5,6)], 0)
+        # 1. HY Spread with rate of change penalty (neutral on missing = use average score)
+        s1 = self._score_range(d.get('hy_spread'), [(3,20),(4,16),(4.5,12),(5.5,6)], 0, neutral_on_missing=True)
         hy_change = self.history_manager.get_spread_change('hy_spread', 30)
         if hy_change and hy_change['change_pct'] > 20:  # Rapid widening = stress
             s1 = max(0, s1 - 5)
         
         # 2. IG Spread (new)
-        s_ig = self._score_range(d.get('ig_spread'), [(1.2,20),(1.5,16),(2.0,12),(2.5,6)], 0)
+        s_ig = self._score_range(d.get('ig_spread'), [(1.2,20),(1.5,16),(2.0,12),(2.5,6)], 0, neutral_on_missing=True)
         ig_change = self.history_manager.get_spread_change('ig_spread', 30)
         if ig_change and ig_change['change_pct'] > 20:
             s_ig = max(0, s_ig - 5)
         
         # 3. Credit Stress Ratio (HY/IG) - new composite
-        s_ratio = self._score_range(d.get('credit_stress_ratio'), [(2.5,20),(3.0,16),(3.5,10),(4.0,4)], 0)
+        s_ratio = self._score_range(d.get('credit_stress_ratio'), [(2.5,20),(3.0,16),(3.5,10),(4.0,4)], 0, neutral_on_missing=True)
         
         # 4. TED Spread (primary short-term credit indicator)
-        s_ted = self._score_range(d.get('ted_spread'), [(0.3,15),(0.5,12),(0.75,8),(1,4)], 0)
+        s_ted = self._score_range(d.get('ted_spread'), [(0.3,15),(0.5,12),(0.75,8),(1,4)], 0, neutral_on_missing=True)
         
         # Combine credit scores (weighted: HY 30%, IG 30%, Ratio 25%, TED 15%)
         credit_score = (s1 * 0.30) + (s_ig * 0.30) + (s_ratio * 0.25) + (s_ted * 0.15)
@@ -989,7 +1093,7 @@ class RiskDashboard:
             s11 = 0
         
         s12 = self._score_range(d.get('yield_curve'), [(0.5,3),(0.2,2.5),(-0.2,2),(-0.5,1)], 0)
-        s13 = self._score_range(d.get('vix'), [(12,0),(16,1.5),(20,1),(30,0.5)], 0)
+        s13 = self._score_range(d.get('vix'), [(12,0),(16,1.5),(20,1),(30,0.5)], 0, neutral_on_missing=True)
         
         # SKEW Index (tail risk indicator)
         skew = d.get('skew')
@@ -1125,8 +1229,13 @@ class RiskDashboard:
         }
         return self.scores
     
-    def _score_range(self, val, thresholds, default, inverse=False):
+    def _score_range(self, val, thresholds, default, inverse=False, neutral_on_missing=False):
+        """Score based on thresholds. If neutral_on_missing=True, use midpoint instead of 0 for missing data."""
         if val is None:
+            if neutral_on_missing and thresholds:
+                # Use neutral score (average of min/max possible scores)
+                scores = [s for _, s in thresholds]
+                return sum(scores) / len(scores) if scores else default
             return default
         for thresh, score in thresholds:
             if (val < thresh if not inverse else val > thresh):
@@ -1615,6 +1724,7 @@ class RiskDashboard:
     # =============================================================================
     
     def check_v_recovery_trigger(self):
+        """Check if V-Recovery override should activate based on SPY decline and VIX spike"""
         if not CONFIG['V_RECOVERY_ENABLED']:
             return False, None
         
@@ -1681,84 +1791,109 @@ class RiskDashboard:
     # =============================================================================
     
     def detect_divergences(self):
+        """Detect market divergences (low VIX with high credit stress or weak breadth)"""
         self.alerts = []
         d = self.data
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Helper to add alert with deduplication
+        def add_alert_if_new(alert_type, severity, icon, msg, action, suppress_days=1):
+            """Add alert only if not sent in last N days (prevent spam on glitches)"""
+            if not self.history_manager.should_suppress_alert(alert_type, days=suppress_days):
+                self.alerts.append({
+                    'type': alert_type,
+                    'severity': severity,
+                    'icon': icon,
+                    'msg': msg,
+                    'action': action
+                })
+                self.history_manager.add_alert(today, alert_type, msg)
         
         if d.get('vix') and d['vix'] < 15:
             if (d.get('hy_spread') and d['hy_spread'] > 4.5) or \
                (d.get('pct_above_50ma') and d['pct_above_50ma'] < 50):
-                self.alerts.append({
-                    'type': 'HIDDEN DANGER',
-                    'severity': 'CRITICAL',
-                    'icon': '🚨🚨🚨',
-                    'msg': 'VIX CALM BUT CREDIT/BREADTH DETERIORATING',
-                    'action': 'REDUCE RISK NOW'
-                })
+                add_alert_if_new(
+                    'HIDDEN DANGER',
+                    'CRITICAL',
+                    '🚨🚨🚨',
+                    'VIX CALM BUT CREDIT/BREADTH DETERIORATING',
+                    'REDUCE RISK NOW',
+                    suppress_days=1  # Alert once per day max
+                )
         
         if (d.get('fed_bs_yoy') and d['fed_bs_yoy'] < -5) and \
            (d.get('dxy_trend') and d['dxy_trend'] > 3):
-            self.alerts.append({
-                'type': 'LIQUIDITY DRAIN',
-                'severity': 'HIGH',
-                'icon': '🚨🚨',
-                'msg': 'FED CONTRACTING + DOLLAR SURGING',
-                'action': 'REDUCE RISK ASSETS 20-30%'
-            })
+            add_alert_if_new(
+                'LIQUIDITY DRAIN',
+                'HIGH',
+                '🚨🚨',
+                'FED CONTRACTING + DOLLAR SURGING',
+                'REDUCE RISK ASSETS 20-30%',
+                suppress_days=2  # Alert every 2 days if condition persists
+            )
         
         if (d.get('hy_spread') and d['hy_spread'] > 5) or \
            (d.get('ted_spread') and d['ted_spread'] > 0.8):
-            self.alerts.append({
-                'type': 'CREDIT WARNING',
-                'severity': 'HIGH',
-                'icon': '🚨🚨',
-                'msg': 'CREDIT MARKETS PRICING STRESS',
-                'action': 'GO DEFENSIVE'
-            })
+            add_alert_if_new(
+                'CREDIT WARNING',
+                'HIGH',
+                '🚨🚨',
+                'CREDIT MARKETS PRICING STRESS',
+                'GO DEFENSIVE',
+                suppress_days=1
+            )
         
         if d.get('vix_struct') == 'Backwardation':
             streak, avg_mag = self.history_manager.get_backwardation_streak()
             if streak >= 5:
-                self.alerts.append({
-                    'type': 'BACKWARDATION PERSISTING',
-                    'severity': 'CRITICAL',
-                    'icon': '🚨🚨🚨',
-                    'msg': f'VIX BACKWARDATION DAY {streak}',
-                    'action': 'TIGHTEN STOPS, REDUCE TIER 3'
-                })
+                add_alert_if_new(
+                    'BACKWARDATION PERSISTING',
+                    'CRITICAL',
+                    '🚨🚨🚨',
+                    f'VIX BACKWARDATION DAY {streak}',
+                    'TIGHTEN STOPS, REDUCE TIER 3',
+                    suppress_days=0  # Alert every day for critical condition
+                )
             elif streak >= 3:
-                self.alerts.append({
-                    'type': 'BACKWARDATION PATTERN',
-                    'severity': 'HIGH',
-                    'icon': '🚨🚨',
-                    'msg': f'VIX BACKWARDATION DAY {streak}',
-                    'action': 'WATCH CREDIT & BREADTH'
-                })
+                add_alert_if_new(
+                    'BACKWARDATION PATTERN',
+                    'HIGH',
+                    '🚨🚨',
+                    f'VIX BACKWARDATION DAY {streak}',
+                    'WATCH CREDIT & BREADTH',
+                    suppress_days=1
+                )
             elif streak >= 1 and d.get('vix') and d['vix'] < 16:
-                self.alerts.append({
-                    'type': 'HIDDEN TENSION',
-                    'severity': 'MEDIUM',
-                    'icon': '⚠️',
-                    'msg': f'VIX CALM BUT BACKWARDATION DETECTED',
-                    'action': 'INSTITUTIONS BUYING PROTECTION'
-                })
+                add_alert_if_new(
+                    'HIDDEN TENSION',
+                    'MEDIUM',
+                    '⚠️',
+                    f'VIX CALM BUT BACKWARDATION DETECTED',
+                    'INSTITUTIONS BUYING PROTECTION',
+                    suppress_days=2
+                )
         
         if self.v_recovery_active:
-            self.alerts.append({
-                'type': 'V-RECOVERY ACTIVE',
-                'severity': 'INFO',
-                'icon': '🚀',
-                'msg': self.v_recovery_reason,
-                'action': 'AGGRESSIVE RE-ENTRY'
-            })
+            add_alert_if_new(
+                'V-RECOVERY ACTIVE',
+                'INFO',
+                '🚀',
+                self.v_recovery_reason,
+                'AGGRESSIVE RE-ENTRY',
+                suppress_days=1
+            )
         
         if not self.alerts and self.scores['total'] >= 85:
-            self.alerts.append({
-                'type': 'ALL CLEAR',
-                'severity': 'SAFE',
-                'icon': '✅',
-                'msg': 'HEALTHY MARKET CONDITIONS',
-                'action': 'FULL DEPLOYMENT OK'
-            })
+            # Only send ALL CLEAR once every 7 days (don't spam)
+            if not self.history_manager.should_suppress_alert('ALL CLEAR', days=7):
+                self.alerts.append({
+                    'type': 'ALL CLEAR',
+                    'severity': 'SAFE',
+                    'icon': '✅',
+                    'msg': 'HEALTHY MARKET CONDITIONS',
+                    'action': 'FULL DEPLOYMENT OK'
+                })
+                self.history_manager.add_alert(today, 'ALL CLEAR', 'HEALTHY MARKET CONDITIONS')
         
         return self.alerts
     
@@ -1767,6 +1902,7 @@ class RiskDashboard:
     # =============================================================================
     
     def generate_report(self):
+        """Generate comprehensive risk report with scores, allocations, and recommendations"""
         score = self.scores['total']
         d = self.data
         
@@ -1782,10 +1918,23 @@ class RiskDashboard:
             "🎯 RISK DASHBOARD v2.0",
             f"📅 {self.timestamp.strftime('%b %d, %Y @ %H:%M')}",
             "",
+        ]
+        
+        # Data Quality Report
+        dq = self.data_quality
+        if dq['success_rate'] == 100:
+            lines.append(f"✅ DATA: {dq['valid']}/{dq['total']} signals (100%)")
+        else:
+            lines.append(f"⚠️  DATA: {dq['valid']}/{dq['total']} signals ({dq['success_rate']:.0f}%)")
+            if dq['failed']:
+                lines.append(f"   Missing: {', '.join(dq['failed'][:3])}{'...' if len(dq['failed']) > 3 else ''}")
+        lines.append("")
+        
+        lines.extend([
             f"📊 SCORE: {score:.1f}/100",
             f"🎚️ {portfolio['regime']}",
             "",
-        ]
+        ])
         
         # Load actual positions and compare to target
         self.actual_positions = self.load_actual_positions()
@@ -2080,15 +2229,15 @@ Be direct, use specific numbers, focus on actionable insights."""
     # =============================================================================
     
     def run_assessment(self):
+        """Execute complete daily risk assessment workflow: fetch data, calculate scores, generate reports, send to Telegram"""
         print("\n" + "="*80)
         print("STARTING DAILY RISK ASSESSMENT v2.0 - 2026 PORTFOLIO")
         print("="*80)
         
         self.fetch_all_data()
         
-        if self.missing_signals:
-            print(f"\n❌ CRITICAL: {len(self.missing_signals)} missing signals")
-            return None
+        # Note: We continue even with missing signals (using neutral scores)
+        # This prevents complete assessment failure due to temporary API issues
         
         # Store indicator data for historical comparison
         self.history_manager.add_indicator_data(
@@ -2153,6 +2302,7 @@ Be direct, use specific numbers, focus on actionable insights."""
         return self.scores['total']
 
 def main():
+    """Main entry point - initialize dashboard and run daily assessment"""
     print("""
 ╔══════════════════════════════════════════════════════════════════════╗
 ║              INSTITUTIONAL RISK DASHBOARD v2.0                       ║

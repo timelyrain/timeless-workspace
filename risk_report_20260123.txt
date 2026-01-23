@@ -1,0 +1,52 @@
+🎯 RISK DASHBOARD v2.0
+📅 Jan 23, 2026 @ 14:58
+
+✅ DATA: 22/22 signals (100%)
+
+📊 SCORE: 62.2/100
+🎚️ ★★★☆☆ ELEVATED
+
+💼 PORTFOLIO ALLOCATION (Actual → Target)
+Global Core: 43% → 30% (-13% ⚠️)
+Growth Engine: 12% → 21% (+9% ⚠️)
+Income Strategy: 14% → 12%
+Alpha & Insurance: 3% → 10% (+7% ⚠️)
+Reserves: 53% → 25% (-28% ⚠️)
+
+⚠️ DRIFT: 57% total 📉 (29% from 2d ago)
+📋 Global Core: overweight by 13%, Growth Engine: underweight by 9%
+
+🛡️ Stops: 10-12%
+📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions
+
+💡 ACTION: REDUCE RISK - Cut growth/income, raise reserves and hedge
+
+🔄 REBALANCING RECOMMENDATIONS
+SELL (Overweight):
+  • Global Core: $127k (13% over)
+  • Reserves: $276k (28% over)
+BUY (Underweight):
+  • Growth Engine: $86k (9% under)
+  • Alpha Insurance: $65k (7% under)
+
+📊 INCOME STRATEGY POSITIONS
+  • CSPs: 9 active
+  • Covered Calls: 6 active
+  • Stock Holdings: 5 positions ($140k)
+  • Nearest Expiry: 6 days 🟡 Soon
+
+📈 TIER SCORES
+T1: 33.2/45 Credit+Macro (74%)
+T2: 37.0/60 Positioning+InstFlows (62%)
+T3: 25.5/49 Options+Structure (52%)
+
+📊 RISK TREND (19 days)
+📉 Score: 78 → 62 (-16 pts)
+⚠️ Regime: NORMAL → ELEVATED
+  • VIX: 19.3 → 15.6 (↓19%)
+
+📊 KEY SIGNALS
+HY Spread: 2.69%
+VIX: 15.6
+% >50MA: 64%
+F&G: N/A
