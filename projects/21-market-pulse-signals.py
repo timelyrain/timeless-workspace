@@ -1,8 +1,10 @@
 import os
 import json
+import re
 import requests
 import feedparser
 import google.generativeai as genai
+from bs4 import BeautifulSoup
 from datetime import datetime
 from dotenv import load_dotenv
 from pathlib import Path
@@ -16,16 +18,78 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_MARKET")
 CHAT_ID = os.environ.get("CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Comprehensive free RSS feeds - institutional grade sources
+# Source quality tiers for prioritization
+SOURCE_TIERS = {
+    'tier1': ['Bloomberg Markets', 'WSJ Markets', 'Financial Times Markets', 'FT Global Economy'],
+    'tier2': ['CNBC Breaking', 'CNBC Top News', 'SEC News', 'Finviz News', 'Benzinga'],
+    'tier3': ['MarketWatch', 'Yahoo Finance', 'Investing.com', 'Seeking Alpha', 'TradingView Ideas', 'ZeroHedge', 'Nikkei Asia']
+}
+
+# Impact keywords for scoring (Phase 1)
+IMPACT_KEYWORDS = {
+    'CRITICAL': [
+        'earnings beat', 'earnings miss', 'guidance raised', 'guidance cut', 
+        'merger', 'acquisition', 'buyout', 'takeover',
+        'FDA approval', 'FDA rejection', 'bankruptcy', 'delisting',
+        'CEO resigns', 'CEO appointed', 'massive layoffs', 'restructuring plan'
+    ],
+    'HIGH': [
+        'federal reserve', 'fed decision', 'interest rate', 'rate cut', 'rate hike',
+        'jobs report', 'unemployment', 'inflation', 'CPI', 'PPI',
+        'tariff', 'trade war', 'sanctions', 'geopolitical',
+        'earnings report', 'revenue beat', 'revenue miss',
+        'layoffs', 'job cuts'
+    ],
+    'MEDIUM': [
+        'analyst upgrade', 'analyst downgrade', 'price target',
+        'buyback', 'dividend', 'stock split',
+        'partnership', 'contract', 'deal',
+        'product launch', 'new product'
+    ],
+    'LOW': [
+        'could', 'might', 'may', 'opinion', 'analysis',
+        'how to invest', 'investment tips', 'market outlook'
+    ]
+}
+
+# Fluff patterns to filter out
+FLUFF_PATTERNS = [
+    r'^how to\s+',
+    r'^why you should\s+',
+    r'^\d+ reasons\s+',
+    r'^best\s+\w+\s+to\s+',
+    r'investment tips',
+    r'what investors need to know',
+    r'^i\'?m inheriting',
+    r'^should i\s+',
+]
+
+# Comprehensive RSS feeds - institutional grade sources (all tested & verified working)
 RSS_FEEDS = {
-    # Major Financial News Outlets
-    "Reuters Business": "https://feeds.reuters.com/reuters/businessNews",
+    # Premium Financial News (Tier 1)
+    "Bloomberg Markets": "https://feeds.bloomberg.com/markets/news.rss",
     "WSJ Markets": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "Financial Times Markets": "https://www.ft.com/markets?format=rss",
+    "FT Global Economy": "https://www.ft.com/global-economy?format=rss",
+    
+    # Major Financial Media (Tier 2)
+    "CNBC Breaking": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "CNBC Top News": "https://www.cnbc.com/id/100727362/device/rss/rss.html",
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
-    "Investing.com": "https://www.investing.com/rss/news.rss",
     "Yahoo Finance": "https://finance.yahoo.com/news/rssindex",
+    "Investing.com": "https://www.investing.com/rss/news.rss",
+    
+    # Trading & Analysis Platforms
     "Seeking Alpha": "https://seekingalpha.com/feed.xml",
+    "Benzinga": "https://www.benzinga.com/feed",
+    "TradingView Ideas": "https://www.tradingview.com/feed/",
     "ZeroHedge": "https://feeds.feedburner.com/zerohedge/feed",
+    
+    # Institutional & Regulatory
+    "SEC News": "https://www.sec.gov/news/pressreleases.rss",
+    
+    # International Markets
+    "Nikkei Asia": "https://asia.nikkei.com/rss/feed/nar",
     
     # Google News - Targeted Searches (24h filter)
     "Google: Market News": "https://news.google.com/rss/search?q=stock+market+when:24h&hl=en-US&gl=US&ceid=US:en",
@@ -34,14 +98,130 @@ RSS_FEEDS = {
     "Google: Earnings": "https://news.google.com/rss/search?q=earnings+report+when:24h&hl=en-US&gl=US&ceid=US:en",
 }
 
+def fetch_finviz_news():
+    """Scrape Finviz news page (RSS feed is broken, so we scrape directly)"""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+    }
+    
+    try:
+        response = requests.get('https://finviz.com/news.ashx', headers=headers, timeout=10)
+        if response.status_code != 200:
+            return []
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        news_table = soup.find('table', class_='styled-table-new')
+        if not news_table:
+            return []
+        
+        headlines = []
+        for link in news_table.find_all('a', href=True):
+            text = link.get_text(strip=True)
+            # Skip empty, very short, or navigation links
+            if len(text) > 20 and not text.startswith(('Home', 'Screener', 'Maps')):
+                # Clean up timestamp if present (e.g., "Jan-23-26 06:30PM")
+                text = re.sub(r'^[A-Z][a-z]{2}-\d{2}-\d{2}\s+\d{2}:\d{2}[AP]M\s+', '', text)
+                if text and len(text) > 15:
+                    headlines.append(text)
+        
+        # Deduplicate and return top 10
+        seen = set()
+        unique = []
+        for h in headlines:
+            if h.lower() not in seen:
+                seen.add(h.lower())
+                unique.append(h)
+                if len(unique) >= 10:
+                    break
+        return unique
+        
+    except Exception as e:
+        print(f"    ✗ Finviz scraping error: {e}")
+        return []
+
+def calculate_impact_score(headline):
+    """Phase 1: Calculate impact score based on keywords"""
+    headline_lower = headline.lower()
+    
+    # Check for fluff patterns first (auto-disqualify)
+    for pattern in FLUFF_PATTERNS:
+        if re.search(pattern, headline_lower):
+            return 0, 'FLUFF'
+    
+    # Score based on keywords
+    for keyword in IMPACT_KEYWORDS['CRITICAL']:
+        if keyword in headline_lower:
+            return 100, 'CRITICAL'
+    
+    for keyword in IMPACT_KEYWORDS['HIGH']:
+        if keyword in headline_lower:
+            return 75, 'HIGH'
+    
+    for keyword in IMPACT_KEYWORDS['MEDIUM']:
+        if keyword in headline_lower:
+            return 50, 'MEDIUM'
+    
+    for keyword in IMPACT_KEYWORDS['LOW']:
+        if keyword in headline_lower:
+            return 10, 'LOW'
+    
+    return 30, 'NORMAL'  # Default for news without specific keywords
+
+def extract_tickers(headline):
+    """Extract stock tickers from headline"""
+    # Common patterns: (TICKER), $TICKER, or standalone 3-5 letter caps
+    patterns = [
+        r'\(([A-Z]{1,5})\)',  # (AAPL)
+        r'\$([A-Z]{1,5})\b',  # $AAPL
+        r'\b([A-Z]{2,5})\b(?=\s+(?:stock|shares|earnings|revenue))',  # AAPL stock
+    ]
+    
+    tickers = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, headline)
+        tickers.update(matches)
+    
+    # Filter out common false positives
+    false_positives = {'CEO', 'CFO', 'IPO', 'ETF', 'SEC', 'FDA', 'USA', 'NYSE', 'AI', 'EV', 'ESG', 'M&A'}
+    return [t for t in tickers if t not in false_positives]
+
+def get_source_tier(source):
+    """Get tier number for a source"""
+    for tier, sources in SOURCE_TIERS.items():
+        if source in sources:
+            return int(tier[-1])  # Extract number from 'tier1', 'tier2', etc.
+    return 3  # Default to tier 3
+
 def get_market_headlines():
-    """Fetches top headlines from multiple institutional sources"""
-    print(f"Fetching news from {len(RSS_FEEDS)} sources...")
+    """Fetches top headlines from multiple institutional sources with intelligent filtering"""
+    print(f"Fetching news from {len(RSS_FEEDS) + 1} sources...")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     
-    all_headlines = []
+    all_headlines = []  # List of dicts with metadata
     sources_fetched = 0
     
+    # First, fetch Finviz via scraping (special case)
+    print(f"  ✓ Fetching from Finviz News (scraped)...")
+    finviz_headlines = fetch_finviz_news()
+    if finviz_headlines:
+        for headline in finviz_headlines:
+            score, impact = calculate_impact_score(headline)
+            tickers = extract_tickers(headline)
+            all_headlines.append({
+                'source': 'Finviz News',
+                'title': headline,
+                'tier': 2,
+                'impact_score': score,
+                'impact_level': impact,
+                'tickers': tickers,
+                'timestamp': datetime.now()
+            })
+        print(f"    → Got {len(finviz_headlines)} headlines")
+        sources_fetched += 1
+    else:
+        print(f"    ⚠ No entries found")
+    
+    # Then fetch RSS feeds with tier-based limits
     for source, url in RSS_FEEDS.items():
         try:
             print(f"  ✓ Fetching from {source}...")
@@ -50,17 +230,34 @@ def get_market_headlines():
             if not feed.entries:
                 print(f"    ⚠ No entries found")
                 continue
-                
-            # Get top 3-4 stories from each source
+            
+            tier = get_source_tier(source)
+            max_items = 4 if tier == 1 else (3 if tier == 2 else 2)
+            
             count = 0
-            for entry in feed.entries[:4]:
+            for entry in feed.entries[:max_items]:
                 # Clean up title (remove source attribution from Google News)
                 title = entry.title
                 if ' - ' in title and source.startswith('Google'):
                     title = title.split(' - ')[0]
                 
-                headline = f"**{source}**: {title}"
-                all_headlines.append(headline)
+                # Calculate impact and extract tickers
+                score, impact = calculate_impact_score(title)
+                tickers = extract_tickers(title)
+                
+                # Skip fluff content
+                if impact == 'FLUFF':
+                    continue
+                
+                all_headlines.append({
+                    'source': source,
+                    'title': title,
+                    'tier': tier,
+                    'impact_score': score,
+                    'impact_level': impact,
+                    'tickers': tickers,
+                    'timestamp': datetime.now()
+                })
                 count += 1
             
             print(f"    → Got {count} headlines")
@@ -70,50 +267,94 @@ def get_market_headlines():
             print(f"    ✗ Error: {e}")
             continue
     
-    print(f"\n📊 Total: {len(all_headlines)} headlines from {sources_fetched} sources\n")
+    print(f"\n📊 Raw total: {len(all_headlines)} headlines from {sources_fetched} sources")
     
     if not all_headlines:
-        return ""
+        return "", []
     
-    # Deduplicate case-insensitively and cap to top 25 to avoid overwhelming Gemini
-    deduped = []
-    seen = set()
-    for h in all_headlines:
-        key = h.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(h)
-        if len(deduped) >= 25:
-            break
-
-    return "\n".join(deduped)
+    # Phase 1: Filter and sort by impact
+    print(f"🔍 Phase 1: Impact scoring & filtering...")
+    filtered = [h for h in all_headlines if h['impact_score'] > 0]
+    print(f"   → Filtered out {len(all_headlines) - len(filtered)} low-quality items")
+    
+    # Phase 2: Smart deduplication (case-insensitive title matching)
+    print(f"🔍 Phase 2: Basic deduplication...")
+    seen_titles = {}
+    deduplicated = []
+    
+    for h in filtered:
+        title_key = h['title'].lower()
+        
+        # Check for exact or very similar match (first 50 chars)
+        title_prefix = title_key[:50]
+        is_duplicate = False
+        
+        for seen_key in seen_titles.keys():
+            if title_prefix in seen_key or seen_key in title_prefix:
+                # Found duplicate - keep the higher tier source
+                existing = seen_titles[seen_key]
+                if h['tier'] < existing['tier'] or (h['tier'] == existing['tier'] and h['impact_score'] > existing['impact_score']):
+                    deduplicated.remove(existing)
+                    seen_titles[title_key] = h
+                    deduplicated.append(h)
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            seen_titles[title_key] = h
+            deduplicated.append(h)
+    
+    print(f"   → Removed {len(filtered) - len(deduplicated)} duplicates")
+    
+    # Sort by impact score (descending) and tier (ascending - tier 1 is best)
+    deduplicated.sort(key=lambda x: (x['impact_score'], -x['tier']), reverse=True)
+    
+    # Take top 30 for further processing
+    top_headlines = deduplicated[:30]
+    
+    print(f"📊 Phase 1+2 complete: {len(top_headlines)} high-quality headlines selected\n")
+    
+    # Format for Gemini (Phase 3 will do semantic clustering)
+    formatted = []
+    for h in top_headlines:
+        ticker_str = f" [{', '.join(h['tickers'])}]" if h['tickers'] else ""
+        impact_emoji = "🔴" if h['impact_level'] == 'CRITICAL' else ("🟠" if h['impact_level'] == 'HIGH' else "🟡")
+        formatted.append(f"{impact_emoji} **{h['source']}**: {h['title']}{ticker_str}")
+    
+    return "\n".join(formatted), top_headlines
 
 def analyze_with_gemini(headlines):
-    """Sends headlines to Gemini 2.0 for analysis"""
-    print("🤖 Analyzing with Gemini AI...\n")
+    """Sends headlines to Gemini 2.0 for analysis with Phase 3: Semantic clustering"""
+    print("🤖 Phase 3: AI-powered semantic analysis & consolidation...\n")
     
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-2.0-flash-exp')
     
     prompt = (
-        f"You are a witty, engaging financial analyst who makes market news fun to read. "
-        f"Analyze today's market headlines with personality:\n\n"
-        f"{headlines}\n\n"
-        f"Write a daily market briefing that's informative AND entertaining. Cover:\n\n"
-        f"1. **Market Vibe Check** 🎯: What's the overall sentiment? (Bulls charging? 🐂 Bears hibernating? 🐻 Or everyone confused? 🤷)\n"
-        f"2. **Hot Topics** 🔥: What's actually moving markets today? (3-4 key stories with some flair)\n"
-        f"3. **The Big Boards** 📊: How are the indices likely to react? (S&P, Nasdaq, Dow)\n"
-        f"4. **Sector Spotlight** 💡: Which sectors are getting all the attention?\n"
-        f"5. **Name Drops** 🏢: Any companies stealing the show today?\n\n"
-        f"Writing style:\n"
-        f"- Use emojis strategically (but don't go crazy)\n"
-        f"- Add witty one-liners and metaphors\n"
-        f"- Keep it conversational and fun\n"
-        f"- Stay factual - no BS, just facts with personality\n"
-        f"- Under 500 words\n"
-        f"- Use markdown for structure\n\n"
-        f"Think: 'Professional trader at happy hour explaining the day' energy 🍻"
+        f"You are an elite financial analyst creating an actionable market briefing. "
+        f"The headlines below are PRE-FILTERED and SCORED by impact (🔴 CRITICAL, 🟠 HIGH, 🟡 MEDIUM).\n\n"
+        f"YOUR TASK:\n"
+        f"1. **Consolidate duplicate/similar stories** into single topics (e.g., 5 headlines about Tesla → 1 Tesla summary)\n"
+        f"2. **Prioritize by trading impact** - what will actually move markets?\n"
+        f"3. **Extract key tickers** mentioned and their directional bias\n\n"
+        f"HEADLINES:\n{headlines}\n\n"
+        f"Write a streamlined daily briefing:\n\n"
+        f"1. **🎯 Market Vibe Check**: Overall sentiment in ONE sentence (Bulls/Bears/Confused?)\n\n"
+        f"2. **🔥 Top Market Movers** (3-5 consolidated topics, not 20 separate headlines):\n"
+        f"   - Focus on what's ACTIONABLE for traders\n"
+        f"   - Merge similar stories (e.g., 'Fed rate expectations' not 3 separate Fed headlines)\n"
+        f"   - Include specific tickers where relevant\n"
+        f"   - Use 🟢 for bullish, 🔴 for bearish, ⚪ for neutral\n\n"
+        f"3. **📊 Index Outlook**: S&P 500, Nasdaq, Dow - ONE line each\n\n"
+        f"4. **🎯 Tickers in Focus**: List 3-5 most mentioned/impactful stocks with brief context\n\n"
+        f"5. **💡 Sector Rotation**: Which sectors are moving and why (1-2 sentences)\n\n"
+        f"STYLE RULES:\n"
+        f"- Under 400 words total\n"
+        f"- Consolidate aggressively - quality over quantity\n"
+        f"- No fluff or filler\n"
+        f"- Professional but engaging\n"
+        f"- Focus on TRADEABLE information\n\n"
+        f"Think: 'Bloomberg Terminal morning brief' meets 'trader's actionable intel' 📈"
     )
 
     response = model.generate_content(prompt)
@@ -250,8 +491,8 @@ if __name__ == "__main__":
         print("⚠️  Warning: Telegram credentials missing. Analysis will print to console only.")
 
     try:
-        # 1. Get News from multiple sources
-        headlines_text = get_market_headlines()
+        # 1. Get News from multiple sources (with optimization phases 1+2)
+        headlines_text, headline_metadata = get_market_headlines()
         
         if not headlines_text:
             error_msg = "⚠️ No market news found from any source."
@@ -260,21 +501,24 @@ if __name__ == "__main__":
                 send_telegram_message(error_msg)
             exit()
 
-        # 2. Analyze with Gemini (narrative + structured)
+        # 2. Analyze with Gemini (Phase 3: semantic consolidation + narrative + structured)
         analysis = analyze_with_gemini(headlines_text)
         structured_json = analyze_structured_with_gemini(headlines_text)
         structured_block = build_structured_section(structured_json)
         
-        # 3. Format message
+        # 3. Format message with optimization stats
         timestamp = datetime.now().strftime('%B %d, %Y at %I:%M %p')
-        header = f"🚀 **Your Daily Market Tea** ☕\n_{timestamp}_\n\n"
+        header = f"🚀 **Optimized Market Intel** 📊\n_{timestamp}_\n\n"
         
-        headline_count = len(headlines_text.split('\n'))
+        # Count impact levels
+        critical_count = sum(1 for h in headline_metadata if h['impact_level'] == 'CRITICAL')
+        high_count = sum(1 for h in headline_metadata if h['impact_level'] == 'HIGH')
+        
         footer = (
             f"\n\n━━━━━━━━━━━━━━━━━\n"
-            f"📰 _Brewed from {headline_count} fresh headlines_\n"
-            f"🔍 _Sources: Reuters, WSJ, MarketWatch, Investing.com, Yahoo Finance, Seeking Alpha, ZeroHedge & Google News_\n"
-            f"🤖 _Analyzed by your friendly neighborhood KHK AI_"
+            f"📊 _Intelligence: {len(headline_metadata)} curated headlines ({critical_count} critical, {high_count} high-impact)_\n"
+            f"🔍 _Sources: Bloomberg, WSJ, FT, CNBC, Finviz, SEC & 13 premium feeds_\n"
+            f"🤖 _AI-optimized by KHK Intelligence (3-phase filtering)_"
         )
         
         full_message = header
@@ -292,6 +536,7 @@ if __name__ == "__main__":
             print(full_message)
         
         print("\n✅ Bot execution completed successfully!")
+        print(f"📈 Processed {len(headline_metadata)} optimized headlines")
         
     except Exception as e:
         error_msg = f"❌ Critical Error: {str(e)}"
