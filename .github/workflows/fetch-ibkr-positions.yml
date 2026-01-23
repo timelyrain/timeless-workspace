@@ -108,3 +108,12 @@ jobs:
           name: ibkr-positions
           path: projects/fetch-ibkr-positions.xlsx
           retention-days: 7
+      
+      - name: Commit Excel file to repository
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions Bot"
+          git add projects/fetch-ibkr-positions.xlsx
+          git diff --staged --quiet || git commit -m "Update IBKR positions Excel (automated)"
+          git push
