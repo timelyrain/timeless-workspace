@@ -1,0 +1,139 @@
+# Portfolio Risk Analyzer (VaR/CVaR) - Daily automated risk assessment
+# 
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   - TELEGRAM_TOKEN_VAR_CVAR: Your Telegram bot token from @BotFather (dedicated for VaR/CVaR alerts)
+#   - CHAT_ID: Your Telegram channel/chat ID
+#
+# Schedule: Daily at 6:50 PM US Eastern Time (5 min after institutional risk signal)
+# This adjusts automatically for US DST (EST/EDT)
+# 6:50 PM ET = ~6:50-7:50 AM Malaysia time next day (depending on DST)
+#
+# Execution Order:
+#   1. 6:30 PM ET - fetch-ibkr-positions.yml (updates Excel)
+#   2. 6:45 PM ET - institutional-risk-signal.yml (market regime analysis)
+#   3. 6:50 PM ET - portfolio-risk-var-cvar.yml (this workflow - portfolio risk quantification)
+
+name: Portfolio Risk VaR/CVaR
+
+on:
+  schedule:
+    # 6:50 PM US Eastern Time (EST UTC-5 / EDT UTC-4)
+    # Using 23:50 UTC (6:50 PM EST) / 22:50 UTC (6:50 PM EDT)
+    # GitHub Actions uses UTC, so we use 23:50 UTC which equals 6:50 PM EST
+    - cron: '50 23 * * *'  # Daily at 6:50 PM ET
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  risk-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Download IBKR positions from artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ibkr-positions
+          path: projects/
+        continue-on-error: true
+      
+      - name: Create .env file
+        run: |
+          cd projects
+          echo "TELEGRAM_TOKEN_VAR_CVAR=${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}" >> .env
+          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> .env
+          echo "✅ Created .env file in projects directory"
+          cd ..
+      
+      - name: Run Portfolio Risk Analysis
+        id: risk_analysis
+        run: |
+          echo "🔍 Checking .env file..."
+          ls -la projects/.env || echo "⚠️  .env not found"
+          echo "📊 Checking IBKR positions file..."
+          ls -la projects/fetch-ibkr-positions.xlsx || echo "⚠️  Excel file not found"
+          echo "🐍 Python version:"
+          python --version
+          echo "📦 Running VaR/CVaR analysis..."
+          cd projects
+          python portfolio-risk-var-cvar.py > var_cvar_output.log 2>&1
+          EXIT_CODE=$?
+          cat var_cvar_output.log
+          
+          # Extract key metrics for summary
+          VAR_95=$(grep -oP "VaR:.*?\K\$\s*[\d,.]+" var_cvar_output.log | head -1 || echo "N/A")
+          CVAR_95=$(grep -oP "CVaR:.*?\K\$\s*[\d,.]+" var_cvar_output.log | head -1 || echo "N/A")
+          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S ET')
+          
+          echo "var_95=$VAR_95" >> $GITHUB_OUTPUT
+          echo "cvar_95=$CVAR_95" >> $GITHUB_OUTPUT
+          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          exit $EXIT_CODE
+        env:
+          TZ: 'America/New_York'
+      
+      - name: Upload risk analysis JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: var-cvar-report-${{ github.run_number }}
+          path: projects/portfolio_risk_*.json
+          retention-days: 30
+      
+      - name: Commit risk JSON back to repo
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions Bot"
+          git add projects/portfolio_risk_*.json
+          git diff --staged --quiet || git commit -m "Update portfolio risk analysis [$(date +'%Y-%m-%d %H:%M')]"
+          git push
+        continue-on-error: true
+      
+      - name: Send success summary to Telegram
+        if: success()
+        run: |
+          MESSAGE="📊 *Portfolio Risk Analysis Complete*%0A%0A"
+          MESSAGE="${MESSAGE}95%% Confidence (1-Day):%0A"
+          MESSAGE="${MESSAGE}• VaR: ${{ steps.risk_analysis.outputs.var_95 }}%0A"
+          MESSAGE="${MESSAGE}• CVaR: ${{ steps.risk_analysis.outputs.cvar_95 }}%0A%0A"
+          MESSAGE="${MESSAGE}🕐 Analyzed: ${{ steps.risk_analysis.outputs.timestamp }}%0A"
+          MESSAGE="${MESSAGE}📁 JSON: portfolio_risk_$(date +'%Y%m%d').json%0A%0A"
+          MESSAGE="${MESSAGE}_Check Telegram for full risk report_"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}/sendMessage" \
+            -d "chat_id=${{ secrets.CHAT_ID }}" \
+            -d "text=${MESSAGE}" \
+            -d "parse_mode=Markdown"
+      
+      - name: Send error notification to Telegram
+        if: failure()
+        run: |
+          MESSAGE="❌ *Portfolio Risk Analysis Failed*%0A%0A"
+          MESSAGE="${MESSAGE}⚠️ Error during VaR/CVaR calculation%0A"
+          MESSAGE="${MESSAGE}🕐 Time: $(date +'%Y-%m-%d %H:%M:%S ET')%0A%0A"
+          MESSAGE="${MESSAGE}Possible causes:%0A"
+          MESSAGE="${MESSAGE}• Missing IBKR positions Excel file%0A"
+          MESSAGE="${MESSAGE}• Insufficient historical data%0A"
+          MESSAGE="${MESSAGE}• API rate limits (yfinance)%0A%0A"
+          MESSAGE="${MESSAGE}Please check GitHub Actions logs.%0A%0A"
+          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}/sendMessage" \
+            -d "chat_id=${{ secrets.CHAT_ID }}" \
+            -d "text=${MESSAGE}" \
+            -d "parse_mode=Markdown"

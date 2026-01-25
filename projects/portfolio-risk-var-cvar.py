@@ -511,7 +511,7 @@ class PortfolioRiskAnalyzer:
         print("\n📱 Sending Telegram alert...")
         
         # Build message
-        message = f"📊 *DAILY PORTFOLIO RISK REPORT*\n"
+        message = f"📊 *DAILY PORTFOLIO VaR\CVaR RISK REPORT*\n"
         message += f"_{datetime.now().strftime('%B %d, %Y')}_\n\n"
         message += f"📈 *Positions:* {len(self.positions)} stocks/ETFs\n\n"
         
