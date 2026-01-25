@@ -1,0 +1,317 @@
+{
+  "timestamp": "2026-01-25T19:03:35.631444",
+  "portfolio_value": 799043.5476,
+  "var": {
+    "95": {
+      "historical": 3062.972970428292,
+      "parametric": 3783.015292506344,
+      "monte_carlo": null
+    },
+    "99": {
+      "historical": 8401.337677228452,
+      "parametric": 5476.5382735699395,
+      "monte_carlo": null
+    }
+  },
+  "cvar": {
+    "95": {
+      "historical": 5951.322474888624,
+      "parametric": 4821.401350998065,
+      "monte_carlo": null
+    },
+    "99": {
+      "historical": 10744.518383630942,
+      "parametric": 6318.626005678495,
+      "monte_carlo": null
+    }
+  },
+  "position_risk": [
+    {
+      "symbol": "VWRA",
+      "description": "VANG FTSE AW USDA",
+      "value": 243236.0,
+      "weight": 0.30440894082754494,
+      "var_95_pct": -0.004257799080381375,
+      "var_95_dollar": 1035.650017115644,
+      "cvar_95_pct": -0.010807722308621974,
+      "cvar_95_dollar": 2628.8271434599746,
+      "volatility": 0.009665661891542715
+    },
+    {
+      "symbol": "GOOGL",
+      "description": "ALPHABET INC-CL A",
+      "value": 65586.0,
+      "weight": 0.08208063277276127,
+      "var_95_pct": -0.009303709928440984,
+      "var_95_dollar": 610.1931193667303,
+      "cvar_95_pct": -0.020494605681048963,
+      "cvar_95_dollar": 1344.1592081972772,
+      "volatility": 0.019558845934428377
+    },
+    {
+      "symbol": "NVDA",
+      "description": "NVIDIA CORP",
+      "value": 37534.0,
+      "weight": 0.04697366008740923,
+      "var_95_pct": -0.012124062212741427,
+      "var_95_dollar": 455.0645510930367,
+      "cvar_95_pct": -0.031575903776350916,
+      "cvar_95_dollar": 1185.1699723415552,
+      "volatility": 0.026389442655435254
+    },
+    {
+      "symbol": "DHL",
+      "description": "DHL GROUP",
+      "value": 54408.8,
+      "weight": 0.0680924089349345,
+      "var_95_pct": -0.009228321229011183,
+      "var_95_dollar": 502.10188408502364,
+      "cvar_95_pct": -0.01927445846540071,
+      "cvar_95_dollar": 1048.7001557522942,
+      "volatility": 0.015929364255760813
+    },
+    {
+      "symbol": "VWCE",
+      "description": "VANG FTSE AW USDA",
+      "value": 69889.2864,
+      "weight": 0.08746617954668282,
+      "var_95_pct": -0.004493115548153015,
+      "var_95_dollar": 314.02063937315904,
+      "cvar_95_pct": -0.012422302121878538,
+      "cvar_95_dollar": 868.1858307432968,
+      "volatility": 0.010437363722406003
+    },
+    {
+      "symbol": "ORCL",
+      "description": "ORACLE CORP",
+      "value": 17716.0,
+      "weight": 0.022171507489437362,
+      "var_95_pct": -0.019432803537977272,
+      "var_95_dollar": 344.27154747880536,
+      "cvar_95_pct": -0.042665815847741234,
+      "cvar_95_dollar": 755.8675935585837,
+      "volatility": 0.039786004428939994
+    },
+    {
+      "symbol": "CSNDX",
+      "description": "ISHARES NASDAQ 100 USD ACC",
+      "value": 44124.0,
+      "weight": 0.05522102034680143,
+      "var_95_pct": -0.004331995097399566,
+      "var_95_dollar": 191.14495167765844,
+      "cvar_95_pct": -0.01442004480466095,
+      "cvar_95_dollar": 636.2700569608597,
+      "volatility": 0.012846702782757603
+    },
+    {
+      "symbol": "AMZN",
+      "description": "AMAZON.COM INC",
+      "value": 23916.0,
+      "weight": 0.029930784212992997,
+      "var_95_pct": -0.013891933050343641,
+      "var_95_dollar": 332.2394708320185,
+      "cvar_95_pct": -0.026586897234684555,
+      "cvar_95_dollar": 635.8522342647158,
+      "volatility": 0.02243995369545858
+    },
+    {
+      "symbol": "JPM",
+      "description": "JPMORGAN CHASE & CO",
+      "value": 29772.0,
+      "weight": 0.03725954622801587,
+      "var_95_pct": -0.007698821015227453,
+      "var_95_dollar": 229.20929926535172,
+      "cvar_95_pct": -0.02069923800720807,
+      "cvar_95_dollar": 616.2577139505986,
+      "volatility": 0.01595792227696285
+    },
+    {
+      "symbol": "CTEC",
+      "description": "ISHARES CHINA TECH USD ACC",
+      "value": 27630.0,
+      "weight": 0.03457884126965197,
+      "var_95_pct": -0.01088622685233065,
+      "var_95_dollar": 300.7864479298958,
+      "cvar_95_pct": -0.02137594563606416,
+      "cvar_95_dollar": 590.6173779244527,
+      "volatility": 0.01721750413566988
+    },
+    {
+      "symbol": "ES3",
+      "description": "SPDR STRAITS TIMES INDEX ETF",
+      "value": 58610.464499999995,
+      "weight": 0.0733507762825216,
+      "var_95_pct": -0.002751050883728401,
+      "var_95_dollar": 161.24037015845704,
+      "cvar_95_pct": -0.00909386676269691,
+      "cvar_95_dollar": 532.9957550627771,
+      "volatility": 0.008937991609933043
+    },
+    {
+      "symbol": "GSD",
+      "description": "SPDR GOLD SHARES",
+      "value": 27241.483500000002,
+      "weight": 0.03409261432849595,
+      "var_95_pct": -0.005527517349650846,
+      "var_95_dollar": 150.57777267647725,
+      "cvar_95_pct": -0.018800382929355364,
+      "cvar_95_dollar": 512.1503213637159,
+      "volatility": 0.028671344806682493
+    },
+    {
+      "symbol": "INRA",
+      "description": "ISHAR GL CL EN TR UCI ETF-US",
+      "value": 20797.08,
+      "weight": 0.02602746754224588,
+      "var_95_pct": -0.009037093706085186,
+      "var_95_dollar": 187.94516077295012,
+      "cvar_95_pct": -0.017909179188061668,
+      "cvar_95_dollar": 372.45863230845356,
+      "volatility": 0.014829322138130438
+    },
+    {
+      "symbol": "RMS",
+      "description": "HERMES INTL",
+      "value": 15116.184000000001,
+      "weight": 0.01891784752583615,
+      "var_95_pct": -0.013390722142515576,
+      "var_95_dollar": 202.41661979913968,
+      "cvar_95_pct": -0.02390948288878291,
+      "cvar_95_dollar": 361.420142691694,
+      "volatility": 0.016805570855927134
+    },
+    {
+      "symbol": "LOCK",
+      "description": "ISHARES DIGITAL SCRTY USD-A",
+      "value": 20040.0,
+      "weight": 0.02507998476452499,
+      "var_95_pct": -0.006565684189706489,
+      "var_95_dollar": 131.57631116171802,
+      "cvar_95_pct": -0.016583613669607894,
+      "cvar_95_dollar": 332.3356179389422,
+      "volatility": 0.012579403065529056
+    },
+    {
+      "symbol": "HEAL",
+      "description": "ISHR HEALTHCARE INNOVATION",
+      "value": 18990.0,
+      "weight": 0.02376591370650347,
+      "var_95_pct": -0.006120377630386864,
+      "var_95_dollar": 116.22597120104655,
+      "cvar_95_pct": -0.014986365372370152,
+      "cvar_95_dollar": 284.5910784213092,
+      "volatility": 0.012056278583205546
+    },
+    {
+      "symbol": "BITO",
+      "description": "PROSHARES BITCOIN ETF-USD",
+      "value": 3720.0,
+      "weight": 0.004655566034133382,
+      "var_95_pct": -0.020256870838184282,
+      "var_95_dollar": 75.35555951804552,
+      "cvar_95_pct": -0.03525336856818516,
+      "cvar_95_dollar": 131.1425310736488,
+      "volatility": 0.025477624739094814
+    },
+    {
+      "symbol": "CELH",
+      "description": "CELSIUS HOLDINGS INC",
+      "value": 2797.0,
+      "weight": 0.0035004349993201793,
+      "var_95_pct": -0.016291628736716635,
+      "var_95_dollar": 45.567685576596425,
+      "cvar_95_pct": -0.038034803451085626,
+      "cvar_95_dollar": 106.3833452526865,
+      "volatility": 0.03394844047755907
+    },
+    {
+      "symbol": "MC",
+      "description": "LVMH MOET HENNESSY LOUIS VUI",
+      "value": 3497.5396,
+      "weight": 0.004377157678708724,
+      "var_95_pct": -0.014059471581703287,
+      "var_95_dollar": 49.173558612081884,
+      "cvar_95_pct": -0.0254633966612663,
+      "cvar_95_dollar": 89.05923817328667,
+      "volatility": 0.020612698935502476
+    },
+    {
+      "symbol": "GRAB",
+      "description": "GRAB HOLDINGS LTD - CL A",
+      "value": 2290.0,
+      "weight": 0.0028659264027326463,
+      "var_95_pct": -0.019305001534071664,
+      "var_95_dollar": 44.20845351302411,
+      "cvar_95_pct": -0.03864477302676259,
+      "cvar_95_dollar": 88.49653023128634,
+      "volatility": 0.02955566455727743
+    },
+    {
+      "symbol": "MELI",
+      "description": "MERCADOLIBRE INC",
+      "value": 2137.29,
+      "weight": 0.0026748104110464878,
+      "var_95_pct": -0.011733371176725793,
+      "var_95_dollar": 25.07761688230427,
+      "cvar_95_pct": -0.03230018368435285,
+      "cvar_95_dollar": 69.0348595867305,
+      "volatility": 0.02387479377544289
+    },
+    {
+      "symbol": "CHA",
+      "description": "CHAGEE HOLDINGS LTD-ADR",
+      "value": 1227.0,
+      "weight": 0.001535585893516575,
+      "var_95_pct": -0.027355694759192084,
+      "var_95_dollar": 33.56543746952869,
+      "cvar_95_pct": -0.051284845731313734,
+      "cvar_95_dollar": 62.926505712321955,
+      "volatility": 0.03678298419997636
+    },
+    {
+      "symbol": "LKNCY",
+      "description": "LUCKIN COFFEE INC - ADR",
+      "value": 1671.0,
+      "weight": 0.002091250226622817,
+      "var_95_pct": -0.019899178225719405,
+      "var_95_dollar": 33.25152681517712,
+      "cvar_95_pct": -0.03679293534531722,
+      "cvar_95_dollar": 61.48099496202507,
+      "volatility": 0.029644055168772554
+    },
+    {
+      "symbol": "SE",
+      "description": "SEA LTD-ADR",
+      "value": 1247.8,
+      "weight": 0.0015616170154278584,
+      "var_95_pct": -0.016957443123645555,
+      "var_95_dollar": 21.159497529684923,
+      "cvar_95_pct": -0.04065466826237941,
+      "cvar_95_dollar": 50.728895057797025,
+      "volatility": 0.03141883478774258
+    },
+    {
+      "symbol": "IBKR",
+      "description": "INTERACTIVE BROKERS GRO-CL A",
+      "value": 1306.82,
+      "weight": 0.001635480323851125,
+      "var_95_pct": -0.012087959682470673,
+      "var_95_dollar": 15.796787472246324,
+      "cvar_95_pct": -0.032222855548226945,
+      "cvar_95_dollar": 42.10947208753393,
+      "volatility": 0.026994540633895257
+    },
+    {
+      "symbol": "82846",
+      "description": "ISHARES CORE CSI 300 ETF",
+      "value": 4541.7996,
+      "weight": 0.005684045148279726,
+      "var_95_pct": -0.001933033876329593,
+      "var_95_dollar": 8.779452486300196,
+      "cvar_95_pct": -0.008162523179081551,
+      "cvar_95_dollar": 37.072544509743324,
+      "volatility": 0.009876342280190275
+    }
+  ],
+  "correlations": {}
+}

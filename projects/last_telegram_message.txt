@@ -1,0 +1,54 @@
+🎯 *DAILY OPTIONS DIGEST*
+_January 23, 2026_
+
+*📊 MARKET SENTIMENT*
+🟢 NVDA: 1.99 (BULLISH)
+🟢 AMD: 1.67 (BULLISH)
+⚪ TSLA: 1.42 (NEUTRAL)
+⚪ AAPL: 1.13 (NEUTRAL)
+⚪ SPY: 0.85 (NEUTRAL)
+
+*🚨 TOP ACTIONABLE TRADES*
+
+*AAPL* $247.04
+  🔴 BEARISH PUT $270 exp 2026-01-23
+    Vol: 29,990 | Ratio: 1666.1x | $21.75
+    Δ -0.96 | IV 154%
+  🔴 BEARISH PUT $272 exp 2026-01-23
+    Vol: 826 | Ratio: 826.0x | $28.95
+    Δ -0.97 | IV 160%
+
+*AMD* $263.90
+  ⚪ MODERATE CALL $265 exp 2026-01-23
+    Vol: 49,853 | Ratio: 5.9x | $1.89
+    Δ 0.39 | IV 45%
+  🔴 BEARISH PUT $265 exp 2026-01-23
+    Vol: 8,006 | Ratio: 78.5x | $3.25
+    Δ -0.61 | IV 46%
+  🔴 BEARISH PUT $265 exp 2026-01-30
+    Vol: 1,721 | Ratio: 8.9x | $9.70
+    Δ -0.50 | IV 59%
+
+*NVDA* $187.67
+  🔴 BEARISH PUT $215 exp 2026-01-23
+    Vol: 277 | Ratio: 5.5x | $31.05
+    Δ -0.99 | IV 193%
+
+*SPY* $689.38
+  🟢 BULLISH CALL $688 exp 2026-01-26
+    Vol: 12,124 | Ratio: 10.5x | $2.87
+    Δ 0.66 | IV 7%
+  🟢 BULLISH CALL $689 exp 2026-01-23
+    Vol: 79,896 | Ratio: 7.2x | $1.19
+    Δ 0.61 | IV 7%
+  🔴 BEARISH PUT $708 exp 2026-01-23
+    Vol: 274 | Ratio: 274.0x | $16.42
+    Δ -0.93 | IV 57%
+  🔴 BEARISH PUT $703 exp 2026-01-23
+    Vol: 113 | Ratio: 113.0x | $25.88
+    Δ -0.90 | IV 48%
+
+━━━━━━━━━━━━━━━
+📊 10 actionable trades
+🔍 5 symbols scanned
+⚡ Filters: Vol/OI>5.0x, Premium>$0.5, |Δ|>0.2
