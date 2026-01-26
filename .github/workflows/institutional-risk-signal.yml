@@ -57,11 +57,6 @@ jobs:
       
       - name: Run Risk Assessment
         run: |
-          echo "🔍 Checking .env file..."
-          ls -la projects/.env || echo "⚠️  .env not found"
-          echo "🐍 Python version:"
-          python --version
-          echo "📦 Running script..."
           python projects/instituitional-risk-signal.py
         env:
           TZ: 'America/New_York'

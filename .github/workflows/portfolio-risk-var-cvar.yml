@@ -56,8 +56,6 @@ jobs:
       
       - name: Run Portfolio Risk Analysis
         run: |
-          echo "🔍 Checking .env file..."
-          ls -la projects/.env || echo "⚠️  .env not found"
           echo "📊 Checking IBKR positions file..."
           ls -la projects/fetch-ibkr-positions.xlsx || echo "⚠️  Excel file not found"
           echo "📦 Running VaR/CVaR analysis..."

@@ -1,9 +1,27 @@
+# Decision Matrix Alert - Daily automated trading decision synthesis
+# 
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   - TELEGRAM_TOKEN_DECISION_MATRIX: Your Telegram bot token from @BotFather (dedicated for decision matrix)
+#   - CHAT_ID: Your Telegram channel/chat ID
+#
+# Schedule: Daily at 6:55 PM US Eastern Time (5 min after VaR/CVaR)
+# This adjusts automatically for US DST (EST/EDT)
+# 6:55 PM ET = ~6:55-7:55 AM Malaysia time next day (depending on DST)
+#
+# Execution Order:
+#   1. 6:30 PM ET - fetch-ibkr-positions.yml (updates Excel)
+#   2. 6:45 PM ET - institutional-risk-signal.yml (market regime analysis)
+#   3. 6:50 PM ET - portfolio-risk-var-cvar.yml (portfolio risk quantification)
+#   4. 6:55 PM ET - decision-matrix-alert.yml (this workflow - synthesizes all data into actionable decisions)
+
 name: Decision Matrix Alert
 
 on:
   schedule:
-    # Runs at 23:55 UTC = 6:55 PM US Eastern (5 mins after VaR/CVaR)
-    - cron: '55 23 * * *'
+    # 6:55 PM US Eastern Time (EST UTC-5 / EDT UTC-4)
+    # Using 23:55 UTC (6:55 PM EST) / 22:55 UTC (6:55 PM EDT)
+    # GitHub Actions uses UTC, so we use 23:55 UTC which equals 6:55 PM EST
+    - cron: '55 23 * * *'  # Daily at 6:55 PM ET
   workflow_dispatch:  # Allow manual triggers
 
 jobs:
@@ -27,7 +45,7 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: Verify required files exist
