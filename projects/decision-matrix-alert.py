@@ -537,7 +537,6 @@ class DecisionMatrixAnalyzer:
         
         # Timestamp
         msg_parts.append(f"⏰ Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S ET')}")
-        msg_parts.append("═══════════════════════════")
         
         return "\n".join(msg_parts)
     
