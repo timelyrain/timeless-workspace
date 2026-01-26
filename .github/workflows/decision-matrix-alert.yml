@@ -30,20 +30,6 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Download IBKR positions artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ibkr-positions
-          path: ./projects/
-        continue-on-error: true
-      
-      - name: Download VaR/CVaR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: var-cvar-report-${{ github.run_number }}
-          path: ./projects/
-        continue-on-error: true
-      
       - name: Verify required files exist
         run: |
           echo "Checking for required data files..."
