@@ -58,7 +58,6 @@ POSITIONS_FILE = os.path.join(SCRIPT_DIR, 'fetch-ibkr-positions.xlsx')
 CONFIDENCE_LEVELS = [0.95, 0.99]  # 95% and 99% confidence
 TIME_HORIZON = 1  # 1-day VaR
 HISTORICAL_DAYS = 252  # 1 year of trading days
-MONTE_CARLO_SIMS = 10000
 
 # IBKR Exchange to yfinance suffix mapping
 EXCHANGE_SUFFIX_MAP = {
@@ -298,84 +297,6 @@ class PortfolioRiskAnalyzer:
             'std_return': sigma
         }
     
-    def calculate_monte_carlo_var_cvar(self, confidence=0.95, num_sims=MONTE_CARLO_SIMS):
-        """Calculate Monte Carlo VaR/CVaR through simulation"""
-        print(f"\n🎲 Running Monte Carlo simulation ({num_sims:,} scenarios)...")
-        
-        # Calculate covariance matrix
-        cov_matrix = self.returns.cov()
-        
-        # Add small regularization to diagonal for numerical stability
-        cov_matrix += np.eye(len(cov_matrix)) * 1e-8
-        
-        # Get weights aligned with returns
-        weights = self.positions.set_index('Symbol')['Weight']
-        aligned_weights = weights.reindex(self.returns.columns).fillna(0).values
-        
-        # Mean returns
-        mean_returns = self.returns.mean().values
-        
-        # Simulate returns
-        simulated_portfolio_returns = []
-        
-        try:
-            for i in range(num_sims):
-                # Generate correlated random returns
-                random_returns = np.random.multivariate_normal(mean_returns, cov_matrix)
-                # Calculate portfolio return
-                portfolio_return = np.dot(aligned_weights, random_returns)
-                simulated_portfolio_returns.append(portfolio_return)
-        except np.linalg.LinAlgError:
-            print("  ⚠️  Covariance matrix issue, using Cholesky decomposition...")
-            # Alternative: Use Cholesky decomposition
-            try:
-                L = np.linalg.cholesky(cov_matrix)
-                for i in range(num_sims):
-                    z = np.random.standard_normal(len(mean_returns))
-                    random_returns = mean_returns + L @ z
-                    portfolio_return = np.dot(aligned_weights, random_returns)
-                    simulated_portfolio_returns.append(portfolio_return)
-            except:
-                print("  ✗ Monte Carlo simulation failed - skipping")
-                return None
-        
-        # Convert to array and sort
-        sim_returns = np.array(simulated_portfolio_returns)
-        sim_returns_sorted = np.sort(sim_returns)
-        
-        # VaR: Find percentile
-        var_percentile = 1 - confidence
-        var_index = int(num_sims * var_percentile)
-        
-        # Ensure we have at least 1 sample for CVaR calculation
-        if var_index == 0:
-            var_index = 1
-        
-        var_return = sim_returns_sorted[var_index]
-        
-        # CVaR: Average of worse scenarios
-        cvar_return = sim_returns_sorted[:var_index].mean()
-        
-        # Check for nan values
-        if np.isnan(var_return) or np.isnan(cvar_return):
-            print("  ✗ Monte Carlo simulation produced NaN values - skipping")
-            return None
-        
-        # Convert to dollars
-        var_dollar = abs(var_return * self.portfolio_value)
-        cvar_dollar = abs(cvar_return * self.portfolio_value)
-        
-        print(f"  ✓ Simulation complete")
-        
-        return {
-            'var_return': var_return,
-            'var_dollar': var_dollar,
-            'cvar_return': cvar_return,
-            'cvar_dollar': cvar_dollar,
-            'worst_sim': sim_returns_sorted[0],
-            'worst_sim_dollar': abs(sim_returns_sorted[0] * self.portfolio_value)
-        }
-    
     def calculate_position_risk(self):
         """Calculate individual position contributions to portfolio risk"""
         print("\n📈 Calculating position-level risk...")
@@ -454,39 +375,16 @@ class PortfolioRiskAnalyzer:
             print(f"    VaR:  ${param_result['var_dollar']:>10,.2f} ({param_result['var_return']:>6.2%})")
             print(f"    CVaR: ${param_result['cvar_dollar']:>10,.2f} ({param_result['cvar_return']:>6.2%})")
             
-            # Monte Carlo VaR/CVaR
-            mc_result = self.calculate_monte_carlo_var_cvar(confidence)
-            if mc_result:
-                print(f"\n  Monte Carlo Method ({MONTE_CARLO_SIMS:,} simulations):")
-                print(f"    VaR:  ${mc_result['var_dollar']:>10,.2f} ({mc_result['var_return']:>6.2%})")
-                print(f"    CVaR: ${mc_result['cvar_dollar']:>10,.2f} ({mc_result['cvar_return']:>6.2%})")
-                print(f"    Worst sim: ${mc_result['worst_sim_dollar']:>10,.2f} ({mc_result['worst_sim']:>6.2%})")
-                
-                # Store results
-                conf_key = f"{confidence*100:.0f}"
-                self.results['var'][conf_key] = {
-                    'historical': hist_result['var_dollar'],
-                    'parametric': param_result['var_dollar'],
-                    'monte_carlo': mc_result['var_dollar']
-                }
-                self.results['cvar'][conf_key] = {
-                    'historical': hist_result['cvar_dollar'],
-                    'parametric': param_result['cvar_dollar'],
-                    'monte_carlo': mc_result['cvar_dollar']
-                }
-            else:
-                # Store results without Monte Carlo
-                conf_key = f"{confidence*100:.0f}"
-                self.results['var'][conf_key] = {
-                    'historical': hist_result['var_dollar'],
-                    'parametric': param_result['var_dollar'],
-                    'monte_carlo': None
-                }
-                self.results['cvar'][conf_key] = {
-                    'historical': hist_result['cvar_dollar'],
-                    'parametric': param_result['cvar_dollar'],
-                    'monte_carlo': None
-                }
+            # Store results (Historical + Parametric only)
+            conf_key = f"{confidence*100:.0f}"
+            self.results['var'][conf_key] = {
+                'historical': hist_result['var_dollar'],
+                'parametric': param_result['var_dollar']
+            }
+            self.results['cvar'][conf_key] = {
+                'historical': hist_result['cvar_dollar'],
+                'parametric': param_result['cvar_dollar']
+            }
         
         # Position-level risk
         position_risks = self.calculate_position_risk()
@@ -529,17 +427,11 @@ class PortfolioRiskAnalyzer:
         # 95% Confidence metrics
         var_95_hist = self.results['var']['95']['historical']
         cvar_95_hist = self.results['cvar']['95']['historical']
-        var_95_mc = self.results['var']['95'].get('monte_carlo')
-        cvar_95_mc = self.results['cvar']['95'].get('monte_carlo')
         
         message += f"*🎯 95% CONFIDENCE (1-DAY)*\n"
         message += f"VaR (Historical): ${var_95_hist:,.2f} ({var_95_hist/self.portfolio_value:.2%})\n"
         message += f"CVaR (Historical): ${cvar_95_hist:,.2f} ({cvar_95_hist/self.portfolio_value:.2%})\n"
-        if var_95_mc and not np.isnan(var_95_mc):
-            message += f"VaR (Monte Carlo): ${var_95_mc:,.2f}\n"
-            message += f"CVaR (Monte Carlo): ${cvar_95_mc:,.2f}\n\n"
-        else:
-            message += f"\n"
+        message += f"\n"
         
         message += f"*💡 Interpretation:*\n"
         message += f"• 95% of days, loss won't exceed ${var_95_hist:,.0f}\n"
