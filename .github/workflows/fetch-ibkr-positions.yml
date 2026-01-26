@@ -58,6 +58,17 @@ jobs:
           CHAT_ID=${{ secrets.CHAT_ID }}
           EOF
           echo "✅ Created .env file in projects directory"
+          echo "🔍 Verifying cash query IDs are set..."
+          if [ -z "${{ secrets.IBKR_CASH_QUERY_ID_HK }}" ]; then
+            echo "❌ ERROR: IBKR_CASH_QUERY_ID_HK is empty!"
+          else
+            echo "✅ IBKR_CASH_QUERY_ID_HK is set (length: ${#IBKR_CASH_QUERY_ID_HK})"
+          fi
+          if [ -z "${{ secrets.IBKR_CASH_QUERY_ID_AL }}" ]; then
+            echo "❌ ERROR: IBKR_CASH_QUERY_ID_AL is empty!"
+          else
+            echo "✅ IBKR_CASH_QUERY_ID_AL is set (length: ${#IBKR_CASH_QUERY_ID_AL})"
+          fi
       
       - name: Fetch IBKR positions
         run: |
