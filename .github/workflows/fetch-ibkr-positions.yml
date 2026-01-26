@@ -77,33 +77,6 @@ jobs:
           
           exit $EXIT_CODE
       
-      - name: Send success notification to Telegram
-        if: success()
-        run: |
-          MESSAGE="✅ *IBKR Positions Updated*%0A%0A"
-          MESSAGE="${MESSAGE}📊 Total Positions: ${{ steps.fetch.outputs.position_count }}%0A"
-          MESSAGE="${MESSAGE}🕐 Updated: ${{ steps.fetch.outputs.timestamp }}%0A"
-          MESSAGE="${MESSAGE}📁 File: fetch-ibkr-positions.xlsx%0A%0A"
-          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
-          
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.CHAT_ID }}" \
-            -d "text=${MESSAGE}" \
-            -d "parse_mode=Markdown"
-      
-      - name: Send error notification to Telegram
-        if: failure()
-        run: |
-          MESSAGE="❌ *IBKR Position Update Failed*%0A%0A"
-          MESSAGE="${MESSAGE}⚠️ Error occurred while fetching positions%0A"
-          MESSAGE="${MESSAGE}🕐 Time: $(date +'%Y-%m-%d %H:%M:%S MYT')%0A%0A"
-          MESSAGE="${MESSAGE}Please check GitHub Actions logs for details.%0A%0A"
-          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
-          
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.CHAT_ID }}" \
-            -d "text=${MESSAGE}" \
-            -d "parse_mode=Markdown"
       
       - name: Upload Excel file as artifact
         if: success()
