@@ -1,0 +1,26 @@
+[
+  {
+    "date": "2026-01-25",
+    "timestamp": "2026-01-25T21:38:07.377547",
+    "risk_score": 62.175324675324674,
+    "risk_tier": "ELEVATED RISK",
+    "var_95": 3062.972970428292,
+    "cvar_95": 5951.3218968367255,
+    "var_level": "MEDIUM",
+    "quadrant": "\ud83d\udfe1 HOLD STEADY",
+    "action": "No changes recommended",
+    "recommendations_count": 0
+  },
+  {
+    "date": "2026-01-25",
+    "timestamp": "2026-01-25T21:48:02.065060",
+    "risk_score": 62.175324675324674,
+    "risk_tier": "ELEVATED RISK",
+    "var_95": 3062.972970428292,
+    "cvar_95": 5951.3218968367255,
+    "var_level": "MEDIUM",
+    "quadrant": "\ud83d\udfe1 HOLD STEADY",
+    "action": "No changes recommended",
+    "recommendations_count": 0
+  }
+]

@@ -1,0 +1,183 @@
+name: Decision Matrix Alert
+
+on:
+  schedule:
+    # Runs at 23:55 UTC = 6:55 PM US Eastern (5 mins after VaR/CVaR)
+    - cron: '55 23 * * *'
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  decision-matrix:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for risk_history.json
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Download IBKR positions artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ibkr-positions
+          path: ./projects/
+        continue-on-error: true
+      
+      - name: Download VaR/CVaR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: var-cvar-report-${{ github.run_number }}
+          path: ./projects/
+        continue-on-error: true
+      
+      - name: Verify required files exist
+        run: |
+          echo "Checking for required data files..."
+          
+          # Check Excel file (from fetch-ibkr-positions)
+          if [ ! -f "./projects/fetch-ibkr-positions.xlsx" ]; then
+            echo "ERROR: fetch-ibkr-positions.xlsx not found"
+            echo "This file should be created by fetch-ibkr-positions.yml workflow"
+            exit 1
+          fi
+          
+          # Check risk history (from institutional-risk-signal)
+          if [ ! -f "./risk_history.json" ]; then
+            echo "ERROR: risk_history.json not found"
+            echo "This file should be created by institutional-risk-signal.yml workflow"
+            exit 1
+          fi
+          
+          # Check VaR/CVaR file (from portfolio-risk-var-cvar)
+          VAR_FILE=$(ls -t ./projects/portfolio_risk_*.json 2>/dev/null | head -1)
+          if [ -z "$VAR_FILE" ]; then
+            echo "ERROR: No portfolio_risk_*.json file found"
+            echo "This file should be created by portfolio-risk-var-cvar.yml workflow"
+            exit 1
+          fi
+          
+          echo "✅ All required files found"
+          echo "  - Excel: fetch-ibkr-positions.xlsx"
+          echo "  - Risk: risk_history.json"
+          echo "  - VaR: $VAR_FILE"
+      
+      - name: Create .env file
+        run: |
+          cat > ./projects/.env << EOF
+          TELEGRAM_TOKEN_DECISION_MATRIX=${{ secrets.TELEGRAM_TOKEN_DECISION_MATRIX }}
+          CHAT_ID=${{ secrets.CHAT_ID }}
+          EOF
+      
+      - name: Run decision matrix analysis
+        id: analysis
+        run: |
+          cd projects
+          python decision-matrix-alert.py
+        continue-on-error: true
+      
+      - name: Extract decision matrix summary
+        if: success()
+        id: extract
+        run: |
+          # Get latest decision history entry
+          LATEST=$(python3 -c "
+          import json
+          with open('decision_history.json', 'r') as f:
+              history = json.load(f)
+              latest = history[-1]
+              print(f\"Score: {latest['risk_score']}/100\")
+              print(f\"VaR: \${latest['var_95']:,.0f}\")
+              print(f\"Quadrant: {latest['quadrant']}\")
+              print(f\"Action: {latest['action']}\")
+          ")
+          
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo "$LATEST" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Send success notification
+        if: success()
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_DECISION_MATRIX }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${{ secrets.CHAT_ID }}\",
+              \"text\": \"✅ Decision Matrix Alert Complete\n\n${{ steps.extract.outputs.summary }}\n\n⏰ Time: $(date +'%Y-%m-%d %H:%M:%S ET')\"
+            }"
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_DECISION_MATRIX }}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"chat_id\": \"${{ secrets.CHAT_ID }}\",
+              \"text\": \"❌ Decision Matrix Alert Failed\n\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_number }}\nTime: $(date +'%Y-%m-%d %H:%M:%S ET')\n\nCheck: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+            }"
+      
+      - name: Upload decision history artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: decision-matrix-report-${{ github.run_number }}
+          path: |
+            decision_history.json
+          retention-days: 30
+      
+      - name: Commit decision history
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Add decision history
+          if [ -f "decision_history.json" ]; then
+            git add decision_history.json
+            git commit -m "Update decision history: $(date +'%Y-%m-%d')" || echo "No changes to commit"
+            git push || echo "Nothing to push"
+          fi
+      
+      - name: Workflow summary
+        if: always()
+        run: |
+          echo "## Decision Matrix Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "decision_history.json" ]; then
+            echo "✅ Analysis completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Show latest decision
+            python3 << 'PYTHON' >> $GITHUB_STEP_SUMMARY
+          import json
+          from datetime import datetime
+          
+          with open('decision_history.json', 'r') as f:
+              history = json.load(f)
+              latest = history[-1]
+              
+              print("### Latest Decision")
+              print("")
+              print(f"- **Date**: {latest['date']}")
+              print(f"- **Risk Score**: {latest['risk_score']}/100 ({latest['risk_tier']})")
+              print(f"- **VaR Level**: {latest['var_level']}")
+              print(f"- **VaR 95%**: ${latest['var_95']:,.0f}")
+              print(f"- **CVaR 95%**: ${latest['cvar_95']:,.0f}")
+              print(f"- **Quadrant**: {latest['quadrant']}")
+              print(f"- **Action**: {latest['action']}")
+              print(f"- **Recommendations**: {latest['recommendations_count']} actions")
+          PYTHON
+          else
+            echo "❌ Analysis failed" >> $GITHUB_STEP_SUMMARY
+          fi
