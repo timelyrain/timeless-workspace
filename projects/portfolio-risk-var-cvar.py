@@ -53,7 +53,8 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_VAR_CVAR")
 CHAT_ID = os.environ.get("CHAT_ID")
 
 # Configuration
-POSITIONS_FILE = 'fetch-ibkr-positions.xlsx'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+POSITIONS_FILE = os.path.join(SCRIPT_DIR, 'fetch-ibkr-positions.xlsx')
 CONFIDENCE_LEVELS = [0.95, 0.99]  # 95% and 99% confidence
 TIME_HORIZON = 1  # 1-day VaR
 HISTORICAL_DAYS = 252  # 1 year of trading days
