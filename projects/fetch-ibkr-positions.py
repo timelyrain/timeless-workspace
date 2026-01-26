@@ -433,6 +433,11 @@ def main():
                 if csv_data:
                     df_hk = parse_csv_to_dataframe(csv_data, "HK")
         
+        # Add delay before next account query to avoid rate limiting
+        if df_hk is not None:
+            print("\n⏳ Waiting 5 seconds before next query to avoid rate limiting...")
+            time.sleep(5)
+        
         # Fetch AL positions
         print("\n" + "=" * 70)
         print("FETCHING AL ACCOUNT POSITIONS")
@@ -446,6 +451,11 @@ def main():
                     df_al = parse_csv_to_dataframe(csv_data, "AL")
         
         # ===== STEP 2: Now fetch cash balances =====
+        # Add delay before cash queries to avoid rate limiting
+        if df_hk is not None or df_al is not None:
+            print("\n⏳ Waiting 5 seconds before cash queries to avoid rate limiting...")
+            time.sleep(5)
+        
         print("\n" + "=" * 70)
         print("FETCHING CASH BALANCES")
         print("=" * 70)
