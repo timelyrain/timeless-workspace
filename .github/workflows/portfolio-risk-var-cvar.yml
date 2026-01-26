@@ -107,37 +107,3 @@ jobs:
           git diff --staged --quiet || git commit -m "Update portfolio risk analysis [$(date +'%Y-%m-%d %H:%M')]"
           git push
         continue-on-error: true
-      
-      - name: Send success summary to Telegram
-        if: success()
-        run: |
-          MESSAGE="📊 *Portfolio Risk Analysis Complete*%0A%0A"
-          MESSAGE="${MESSAGE}95%% Confidence (1-Day):%0A"
-          MESSAGE="${MESSAGE}• VaR: ${{ steps.risk_analysis.outputs.var_95 }}%0A"
-          MESSAGE="${MESSAGE}• CVaR: ${{ steps.risk_analysis.outputs.cvar_95 }}%0A%0A"
-          MESSAGE="${MESSAGE}🕐 Analyzed: ${{ steps.risk_analysis.outputs.timestamp }}%0A"
-          MESSAGE="${MESSAGE}📁 JSON: portfolio_risk_$(date +'%Y%m%d').json%0A%0A"
-          MESSAGE="${MESSAGE}_Check Telegram for full risk report_"
-          
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}/sendMessage" \
-            -d "chat_id=${{ secrets.CHAT_ID }}" \
-            -d "text=${MESSAGE}" \
-            -d "parse_mode=Markdown"
-      
-      - name: Send error notification to Telegram
-        if: failure()
-        run: |
-          MESSAGE="❌ *Portfolio Risk Analysis Failed*%0A%0A"
-          MESSAGE="${MESSAGE}⚠️ Error during VaR/CVaR calculation%0A"
-          MESSAGE="${MESSAGE}🕐 Time: $(date +'%Y-%m-%d %H:%M:%S ET')%0A%0A"
-          MESSAGE="${MESSAGE}Possible causes:%0A"
-          MESSAGE="${MESSAGE}• Missing IBKR positions Excel file%0A"
-          MESSAGE="${MESSAGE}• Insufficient historical data%0A"
-          MESSAGE="${MESSAGE}• API rate limits (yfinance)%0A%0A"
-          MESSAGE="${MESSAGE}Please check GitHub Actions logs.%0A%0A"
-          MESSAGE="${MESSAGE}_Automated by GitHub Actions_"
-          
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}/sendMessage" \
-            -d "chat_id=${{ secrets.CHAT_ID }}" \
-            -d "text=${MESSAGE}" \
-            -d "parse_mode=Markdown"
