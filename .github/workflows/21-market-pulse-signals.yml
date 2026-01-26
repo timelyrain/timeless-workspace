@@ -1,31 +1,51 @@
+# Market Pulse Scanner - Intraday market sentiment and news analysis
+# 
+# Required GitHub Secrets (Settings → Secrets and variables → Actions):
+#   - TELEGRAM_TOKEN_MARKET: Your Telegram bot token from @BotFather (dedicated for market pulse)
+#   - CHAT_ID: Your Telegram channel/chat ID
+#   - GEMINI_API_KEY: Get from https://aistudio.google.com/app/apikey
+#
+# Schedule: Twice daily at 11:00 AM and 6:00 PM Malaysia Time (UTC+8)
+# 11:00 AM MYT = 03:00 UTC (pre-market US / Asian afternoon)
+# 6:00 PM MYT = 10:00 UTC (mid-day US trading session)
+
 name: Market Pulse Scanner
 
 on:
   schedule:
     # Malaysia Time (UTC+8): 11:00 AM, 6:00 PM
     # Converted to UTC: 03:00, 10:00
-    - cron: '0 3,10 * * *'
-  workflow_dispatch:      # Allows manual run button
+    - cron: '0 3,10 * * *'  # Twice daily market pulse
+  workflow_dispatch:  # Allow manual triggers
 
 jobs:
   analyze_market:
     runs-on: ubuntu-latest
-
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install libraries
-        run: pip install -r requirements.txt
-
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Create .env file
+        run: |
+          cat > projects/.env << EOF
+          TELEGRAM_TOKEN_MARKET=${{ secrets.TELEGRAM_TOKEN_MARKET }}
+          CHAT_ID=${{ secrets.CHAT_ID }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          EOF
+          echo "✅ Created .env file in projects directory"
+      
       - name: Run Market Pulse Scanner
-        env:
-          TELEGRAM_TOKEN_MARKET: ${{ secrets.TELEGRAM_TOKEN_MARKET }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python projects/21-market-pulse-signals.py
+        run: |
+          python projects/21-market-pulse-signals.py
