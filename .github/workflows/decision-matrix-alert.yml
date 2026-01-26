@@ -95,26 +95,6 @@ jobs:
           echo "$LATEST" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
       
-      - name: Send success notification
-        if: success()
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_DECISION_MATRIX }}/sendMessage" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"chat_id\": \"${{ secrets.CHAT_ID }}\",
-              \"text\": \"✅ Decision Matrix Alert Complete\n\n${{ steps.extract.outputs.summary }}\n\n⏰ Time: $(date +'%Y-%m-%d %H:%M:%S ET')\"
-            }"
-      
-      - name: Send failure notification
-        if: failure()
-        run: |
-          curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN_DECISION_MATRIX }}/sendMessage" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"chat_id\": \"${{ secrets.CHAT_ID }}\",
-              \"text\": \"❌ Decision Matrix Alert Failed\n\nWorkflow: ${{ github.workflow }}\nRun: ${{ github.run_number }}\nTime: $(date +'%Y-%m-%d %H:%M:%S ET')\n\nCheck: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
-            }"
-      
       - name: Upload decision history artifact
         if: always()
         uses: actions/upload-artifact@v4
