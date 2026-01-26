@@ -48,48 +48,22 @@ jobs:
       
       - name: Create .env file
         run: |
-          cd projects
-          echo "TELEGRAM_TOKEN_VAR_CVAR=${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}" >> .env
-          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> .env
+          cat > projects/.env << EOF
+          TELEGRAM_TOKEN_VAR_CVAR=${{ secrets.TELEGRAM_TOKEN_VAR_CVAR }}
+          CHAT_ID=${{ secrets.CHAT_ID }}
+          EOF
           echo "✅ Created .env file in projects directory"
-          cd ..
       
       - name: Run Portfolio Risk Analysis
-        id: risk_analysis
         run: |
           echo "🔍 Checking .env file..."
           ls -la projects/.env || echo "⚠️  .env not found"
           echo "📊 Checking IBKR positions file..."
           ls -la projects/fetch-ibkr-positions.xlsx || echo "⚠️  Excel file not found"
-          echo "🐍 Python version:"
-          python --version
           echo "📦 Running VaR/CVaR analysis..."
-          cd projects
-          python portfolio-risk-var-cvar.py > var_cvar_output.log 2>&1
-          EXIT_CODE=$?
-          cat var_cvar_output.log
-          
-          # Extract key metrics for summary
-          VAR_95=$(grep -oP "VaR:.*?\K\$\s*[\d,.]+" var_cvar_output.log | head -1 || echo "N/A")
-          CVAR_95=$(grep -oP "CVaR:.*?\K\$\s*[\d,.]+" var_cvar_output.log | head -1 || echo "N/A")
-          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S ET')
-          
-          echo "var_95=$VAR_95" >> $GITHUB_OUTPUT
-          echo "cvar_95=$CVAR_95" >> $GITHUB_OUTPUT
-          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          
-          exit $EXIT_CODE
+          python projects/portfolio-risk-var-cvar.py
         env:
           TZ: 'America/New_York'
-      
-      - name: Upload risk analysis JSON
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: var-cvar-report-${{ github.run_number }}
-          path: projects/portfolio_risk_*.json
-          retention-days: 30
       
       - name: Commit risk JSON back to repo
         if: success()

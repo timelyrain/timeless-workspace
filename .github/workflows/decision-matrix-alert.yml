@@ -69,31 +69,8 @@ jobs:
           EOF
       
       - name: Run decision matrix analysis
-        id: analysis
         run: |
-          cd projects
-          python decision-matrix-alert.py
-        continue-on-error: true
-      
-      - name: Extract decision matrix summary
-        if: success()
-        id: extract
-        run: |
-          # Get latest decision history entry
-          LATEST=$(python3 -c "
-          import json
-          with open('decision_history.json', 'r') as f:
-              history = json.load(f)
-              latest = history[-1]
-              print(f\"Score: {latest['risk_score']}/100\")
-              print(f\"VaR: \${latest['var_95']:,.0f}\")
-              print(f\"Quadrant: {latest['quadrant']}\")
-              print(f\"Action: {latest['action']}\")
-          ")
-          
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$LATEST" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          python projects/decision-matrix-alert.py
       
       - name: Upload decision history artifact
         if: always()

@@ -47,44 +47,22 @@ jobs:
       
       - name: Create .env file
         run: |
-          cd projects
-          echo "IBKR_FLEX_TOKEN_HK=${{ secrets.IBKR_FLEX_TOKEN_HK }}" >> .env
-          echo "IBKR_QUERY_ID_HK=${{ secrets.IBKR_QUERY_ID_HK }}" >> .env
-          echo "IBKR_FLEX_TOKEN_AL=${{ secrets.IBKR_FLEX_TOKEN_AL }}" >> .env
-          echo "IBKR_QUERY_ID_AL=${{ secrets.IBKR_QUERY_ID_AL }}" >> .env
-          echo "IBKR_CASH_QUERY_ID_HK=${{ secrets.IBKR_CASH_QUERY_ID_HK }}" >> .env
-          echo "IBKR_CASH_QUERY_ID_AL=${{ secrets.IBKR_CASH_QUERY_ID_AL }}" >> .env
-          echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" >> .env
-          echo "CHAT_ID=${{ secrets.CHAT_ID }}" >> .env
+          cat > projects/.env << EOF
+          IBKR_FLEX_TOKEN_HK=${{ secrets.IBKR_FLEX_TOKEN_HK }}
+          IBKR_QUERY_ID_HK=${{ secrets.IBKR_QUERY_ID_HK }}
+          IBKR_FLEX_TOKEN_AL=${{ secrets.IBKR_FLEX_TOKEN_AL }}
+          IBKR_QUERY_ID_AL=${{ secrets.IBKR_QUERY_ID_AL }}
+          IBKR_CASH_QUERY_ID_HK=${{ secrets.IBKR_CASH_QUERY_ID_HK }}
+          IBKR_CASH_QUERY_ID_AL=${{ secrets.IBKR_CASH_QUERY_ID_AL }}
+          TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID=${{ secrets.CHAT_ID }}
+          EOF
           echo "✅ Created .env file in projects directory"
-          cd ..
       
       - name: Fetch IBKR positions
-        id: fetch
         run: |
-          cd projects
-          python fetch-ibkr-positions.py > output.log 2>&1
-          EXIT_CODE=$?
-          cat output.log
-          
-          # Extract summary info for Telegram
-          POSITION_COUNT=$(grep -oP "Total Positions: \K\d+" output.log || echo "Unknown")
-          TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S MYT')
-          
-          echo "position_count=$POSITION_COUNT" >> $GITHUB_OUTPUT
-          echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          
-          exit $EXIT_CODE
+          python projects/fetch-ibkr-positions.py
       
-      
-      - name: Upload Excel file as artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ibkr-positions
-          path: projects/fetch-ibkr-positions.xlsx
-          retention-days: 7
       
       - name: Commit Excel file to repository
         if: success()
