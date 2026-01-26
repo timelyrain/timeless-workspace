@@ -452,6 +452,12 @@ def main():
         
         # Fetch cash balances (function handles missing query IDs gracefully)
         cash_hk = fetch_cash_balance("HK", IBKR_FLEX_TOKEN_HK, IBKR_CASH_QUERY_ID_HK) if df_hk is not None else 0.0
+        
+        # Add delay between cash queries to avoid IBKR rate limiting (Error 1018)
+        if df_hk is not None and df_al is not None:
+            print("\n⏳ Waiting 5 seconds before next cash query to avoid rate limiting...")
+            time.sleep(5)
+        
         cash_al = fetch_cash_balance("AL", IBKR_FLEX_TOKEN_AL, IBKR_CASH_QUERY_ID_AL) if df_al is not None else 0.0
         
         # ===== Update Excel File =====
