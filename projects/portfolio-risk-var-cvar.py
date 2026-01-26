@@ -346,10 +346,20 @@ class PortfolioRiskAnalyzer:
         # VaR: Find percentile
         var_percentile = 1 - confidence
         var_index = int(num_sims * var_percentile)
+        
+        # Ensure we have at least 1 sample for CVaR calculation
+        if var_index == 0:
+            var_index = 1
+        
         var_return = sim_returns_sorted[var_index]
         
         # CVaR: Average of worse scenarios
         cvar_return = sim_returns_sorted[:var_index].mean()
+        
+        # Check for nan values
+        if np.isnan(var_return) or np.isnan(cvar_return):
+            print("  ✗ Monte Carlo simulation produced NaN values - skipping")
+            return None
         
         # Convert to dollars
         var_dollar = abs(var_return * self.portfolio_value)
@@ -525,7 +535,7 @@ class PortfolioRiskAnalyzer:
         message += f"*🎯 95% CONFIDENCE (1-DAY)*\n"
         message += f"VaR (Historical): ${var_95_hist:,.2f} ({var_95_hist/self.portfolio_value:.2%})\n"
         message += f"CVaR (Historical): ${cvar_95_hist:,.2f} ({cvar_95_hist/self.portfolio_value:.2%})\n"
-        if var_95_mc:
+        if var_95_mc and not np.isnan(var_95_mc):
             message += f"VaR (Monte Carlo): ${var_95_mc:,.2f}\n"
             message += f"CVaR (Monte Carlo): ${cvar_95_mc:,.2f}\n\n"
         else:
