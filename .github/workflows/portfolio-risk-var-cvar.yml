@@ -46,13 +46,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Download IBKR positions from artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ibkr-positions
-          path: projects/
-        continue-on-error: true
-      
       - name: Create .env file
         run: |
           cd projects
@@ -102,7 +95,7 @@ jobs:
         if: success()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "GitHub Actions Bot"
+          git config --local user.name "github-actions[bot]"
           git add projects/portfolio_risk_*.json
           git diff --staged --quiet || git commit -m "Update portfolio risk analysis [$(date +'%Y-%m-%d %H:%M')]"
           git push

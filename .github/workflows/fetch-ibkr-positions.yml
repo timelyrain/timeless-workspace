@@ -90,7 +90,7 @@ jobs:
         if: success()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "GitHub Actions Bot"
+          git config --local user.name "github-actions[bot]"
           git add projects/fetch-ibkr-positions.xlsx
           git diff --staged --quiet || git commit -m "Update IBKR positions Excel (automated)"
           git push
