@@ -5,17 +5,16 @@
 #   - CHAT_ID: Your Telegram channel/chat ID
 #   - GEMINI_API_KEY: Get from https://aistudio.google.com/app/apikey
 #
-# Schedule: Twice daily at 11:00 AM and 6:00 PM Malaysia Time (UTC+8)
-# 11:00 AM MYT = 03:00 UTC (pre-market US / Asian afternoon)
-# 6:00 PM MYT = 10:00 UTC (mid-day US trading session)
+# Schedule: Daily at 8:00 AM Malaysia Time (UTC+8)
+# 8:00 AM MYT = 00:00 UTC (midnight UTC / early morning market prep)
 
 name: Market Pulse Scanner
 
 on:
   schedule:
-    # Malaysia Time (UTC+8): 11:00 AM, 6:00 PM
-    # Converted to UTC: 03:00, 10:00
-    - cron: '0 3,10 * * *'  # Twice daily market pulse
+    # Malaysia Time (UTC+8): 8:00 AM
+    # Converted to UTC: 00:00
+    - cron: '0 0 * * *'  # Daily at 8:00 AM MYT
   workflow_dispatch:  # Allow manual triggers
 
 jobs:
