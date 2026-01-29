@@ -328,7 +328,7 @@ def analyze_with_gemini(headlines):
     print("🤖 Phase 3: AI-powered semantic analysis & consolidation...\n")
     
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('models/gemini-2.0-flash-001')
     
     prompt = (
         f"You are an elite financial analyst creating an actionable market briefing. "
@@ -366,7 +366,7 @@ def analyze_structured_with_gemini(headlines):
     print("🤖 Getting structured summary from Gemini...\n")
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('models/gemini-2.0-flash-001')
 
     prompt = (
         "Summarize these headlines for trading decisions. Return ONLY JSON with this schema:\n"
