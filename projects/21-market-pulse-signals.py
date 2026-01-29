@@ -328,7 +328,7 @@ def analyze_with_gemini(headlines):
     print("🤖 Phase 3: AI-powered semantic analysis & consolidation...\n")
     
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = (
         f"You are an elite financial analyst creating an actionable market briefing. "
@@ -366,7 +366,7 @@ def analyze_structured_with_gemini(headlines):
     print("🤖 Getting structured summary from Gemini...\n")
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-pro')
 
     prompt = (
         "Summarize these headlines for trading decisions. Return ONLY JSON with this schema:\n"
@@ -543,3 +543,5 @@ if __name__ == "__main__":
         print(error_msg)
         if TELEGRAM_TOKEN and CHAT_ID:
             send_telegram_message(f"⚠️ Bot Error: {str(e)}")
+        import sys
+        sys.exit(1)  # Exit with error code to fail the GitHub Actions workflow
