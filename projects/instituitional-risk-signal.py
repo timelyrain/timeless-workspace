@@ -1605,6 +1605,19 @@ class RiskDashboard:
     # v2.0: 2026 PORTFOLIO ALLOCATION LOGIC (score normalized to /100)
     # =============================================================================
     
+    def _normalize_allocation(self, alloc):
+        """Normalize allocation percentages to sum to exactly 100%."""
+        # Extract allocation percentages
+        categories = ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']
+        total = sum(alloc[cat] for cat in categories)
+        
+        # Normalize to 100%
+        if total > 0 and abs(total - 1.0) > 0.0001:  # Only normalize if off by more than 0.01%
+            for cat in categories:
+                alloc[cat] = alloc[cat] / total
+        
+        return alloc
+    
     def get_portfolio_allocation(self):
         """
         Map risk score to specific portfolio adjustments
@@ -1628,6 +1641,7 @@ class RiskDashboard:
                 'options_guidance': 'Sell CSPs at 30-45 DTE, 15-20 delta on GOOGL, PEP, V',
                 'action': 'FULL DEPLOYMENT - Run base allocation'
             }
+            base_allocation = self._normalize_allocation(base_allocation)
         
         elif score >= 75:  # NORMAL
             base_allocation = {
@@ -1643,6 +1657,7 @@ class RiskDashboard:
                 'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE',
                 'action': 'STAY COURSE - Tighten stops, be selective on new CSPs'
             }
+            base_allocation = self._normalize_allocation(base_allocation)
         
         elif score >= 60:  # ELEVATED
             base_allocation = {
@@ -1658,6 +1673,7 @@ class RiskDashboard:
                 'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions',
                 'action': 'REDUCE RISK - Cut growth/income, raise reserves and hedge'
             }
+            base_allocation = self._normalize_allocation(base_allocation)
         
         elif score >= 40:  # HIGH RISK
             base_allocation = {
@@ -1673,6 +1689,7 @@ class RiskDashboard:
                 'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit',
                 'action': 'GO DEFENSIVE - Major risk reduction, protect capital'
             }
+            base_allocation = self._normalize_allocation(base_allocation)
         
         else:  # EXTREME (<40)
             base_allocation = {
@@ -1688,6 +1705,7 @@ class RiskDashboard:
                 'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price, stop selling premium',
                 'action': 'MAX DEFENSE - Capital preservation mode'
             }
+            base_allocation = self._normalize_allocation(base_allocation)
         
         # Apply V-Recovery override if active
         if self.v_recovery_active and base_allocation:
@@ -1705,7 +1723,7 @@ class RiskDashboard:
         
         if total_active > 0:
             boost_factor = 1 + (freed_capital / total_active)
-            return {
+            v_alloc = {
                 **base_alloc,
                 'regime': base_alloc['regime'] + ' + V-RECOVERY',
                 'global_core': base_alloc['global_core'] * boost_factor,
@@ -1716,6 +1734,7 @@ class RiskDashboard:
                 'cash_pct': base_alloc['cash_pct'] * 0.5,  # Cut cash proportion
                 'action': base_alloc['action'] + ' | V-RECOVERY: Reserves cut 50%, redeployed to core/growth/income'
             }
+            return self._normalize_allocation(v_alloc)
         else:
             return base_alloc
     

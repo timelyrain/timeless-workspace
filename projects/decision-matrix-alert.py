@@ -139,13 +139,8 @@ class DecisionMatrixAnalyzer:
         var_99 = var_data['var']['99'].get('historical') or var_data['var']['99'].get('parametric', 0)
         cvar_99 = var_data['cvar']['99'].get('historical') or var_data['cvar']['99'].get('parametric', 0)
         
-        # Find worst single-day loss from position risks
-        worst_loss = 0
-        if 'position_risk' in var_data:
-            for pos in var_data['position_risk']:
-                cvar_dollar = abs(pos.get('cvar_95_dollar', 0))
-                if cvar_dollar > worst_loss:
-                    worst_loss = cvar_dollar
+        # Get worst single-day portfolio loss from historical data
+        worst_loss = var_data.get('worst_loss', 0)
         
         return {
             'var_95': var_95,

@@ -390,6 +390,9 @@ class PortfolioRiskAnalyzer:
         position_risks = self.calculate_position_risk()
         self.results['position_risk'] = position_risks
         
+        # Add worst loss (single worst day from historical data)
+        self.results['worst_loss'] = hist_result['worst_dollar']
+        
         print("\n" + "=" * 80)
         print("🎯 TOP 10 RISKIEST POSITIONS (by CVaR)")
         print("=" * 80)

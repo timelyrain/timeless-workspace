@@ -58,5 +58,29 @@
     "quadrant": "\ud83d\udfe1 HOLD STEADY",
     "action": "No changes recommended",
     "recommendations_count": 0
+  },
+  {
+    "date": "2026-01-29",
+    "timestamp": "2026-01-29T09:12:09.002628",
+    "risk_score": 66.3961038961039,
+    "risk_tier": "ELEVATED RISK",
+    "var_95": 3262.825798018287,
+    "cvar_95": 6145.383893144341,
+    "var_level": "MEDIUM",
+    "quadrant": "\ud83d\udfe1 HOLD STEADY",
+    "action": "No changes recommended",
+    "recommendations_count": 0
+  },
+  {
+    "date": "2026-01-29",
+    "timestamp": "2026-01-29T09:12:17.323369",
+    "risk_score": 66.3961038961039,
+    "risk_tier": "ELEVATED RISK",
+    "var_95": 3262.825798018287,
+    "cvar_95": 6145.383893144341,
+    "var_level": "MEDIUM",
+    "quadrant": "\ud83d\udfe1 HOLD STEADY",
+    "action": "No changes recommended",
+    "recommendations_count": 0
   }
 ]

@@ -328,7 +328,7 @@ def analyze_with_gemini(headlines):
     print("🤖 Phase 3: AI-powered semantic analysis & consolidation...\n")
     
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = (
         f"You are an elite financial analyst creating an actionable market briefing. "
