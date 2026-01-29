@@ -190,10 +190,16 @@ class DecisionMatrixAnalyzer:
         # Calculate concentration (use PositionValueUSD column)
         all_positions['weight'] = all_positions['PositionValueUSD'] / portfolio_value * 100
         
+        # Combine duplicate symbols across both accounts for top holdings
+        combined_holdings = all_positions.groupby('Symbol').agg({
+            'PositionValueUSD': 'sum',
+            'weight': 'sum'
+        }).reset_index()
+        
         return {
             'total_value': portfolio_value,
             'positions': all_positions.to_dict('records'),
-            'top_holdings': all_positions.nlargest(5, 'weight')[['Symbol', 'weight']].to_dict('records'),
+            'top_holdings': combined_holdings.nlargest(5, 'weight')[['Symbol', 'weight']].to_dict('records'),
             'count': len(all_positions)
         }
     
