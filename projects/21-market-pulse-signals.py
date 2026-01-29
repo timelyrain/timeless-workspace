@@ -366,7 +366,7 @@ def analyze_structured_with_gemini(headlines):
     print("🤖 Getting structured summary from Gemini...\n")
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
     prompt = (
         "Summarize these headlines for trading decisions. Return ONLY JSON with this schema:\n"
