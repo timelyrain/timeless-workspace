@@ -13,7 +13,7 @@ Lightweight walk-forward validation that analyzes your risk signal performance u
 
 ### Run Monthly Validation
 ```bash
-cd /Users/hongkiatkoh/Desktop/timeless-workspace/timeless-workspace
+cd /Users/hongkiatkoh/Developer/timeless-workspace/timeless-workspace
 .venv/bin/python projects/instituitional-risk-signal-validation-report-monthly.py
 ```
 

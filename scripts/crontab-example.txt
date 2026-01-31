@@ -5,7 +5,7 @@
 # For ET (Eastern Time), if you're in EST/EDT:
 
 # Sunday 8 PM ET
-0 20 * * 0 /Users/hongkiatkoh/Desktop/timeless-workspace/scripts/update-watchlist.sh
+0 20 * * 0 /Users/hongkiatkoh/Developer/timeless-workspace/scripts/update-watchlist.sh
 
 # Alternative schedules:
 # Every Monday 6 AM: 0 6 * * 1 /path/to/update-watchlist.sh

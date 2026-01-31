@@ -1,0 +1,47 @@
+🎯 RISK DASHBOARD v2.0
+📅 Jan 31, 2026 @ 11:08
+
+✅ DATA: 22/22 signals (100%)
+
+📊 SCORE: 65.1/100
+🎚️ ★★★☆☆ ELEVATED
+
+💼 PORTFOLIO ALLOCATION (Actual → Target)
+Global Trades: 31% → 30%
+Four Horsemen: 13% → 21% (+9% ⚠️)
+Cash Cow: 22% → 13% (-10% ⚠️)
+The Alpha: 34% → 1% (-33% ⚠️)
+The Omega: 0% → 10% (+10% ⚠️)
+Gold: 0% → 10% (+10% ⚠️)
+Cash: 0% → 15% (+15% ⚠️)
+
+⚠️ DRIFT: 87% total 📈 (+22% from 3d ago)
+📋 Four Horsemen: underweight by 9%, Cash Cow: overweight by 10%
+
+🛡️ Stops: 10-12%
+📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions
+
+💡 ACTION: REDUCE RISK - Cut growth/income, raise reserves and hedge
+
+🔄 REBALANCING RECOMMENDATIONS
+SELL (Overweight):
+  • Cash Cow: $71k (10% over)
+  • Alpha: $242k (33% over)
+BUY (Underweight):
+  • Four Horsemen: $62k (9% under)
+  • Omega: $73k (10% under)
+  • Reserve Gold: $73k (10% under)
+
+📈 TIER SCORES
+T1: 34.2/45 Credit+Macro (76%)
+T2: 45.0/60 Positioning+InstFlows (75%)
+T3: 21.0/49 Options+Structure (43%)
+
+📊 RISK TREND (4 days)
+↘️ Score: 68 → 65 (-3 pts)
+
+📊 KEY SIGNALS
+HY Spread: 2.77%
+VIX: 17.4
+% >50MA: 65%
+F&G: N/A

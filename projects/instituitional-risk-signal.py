@@ -12,11 +12,13 @@ WHAT'S NEW IN v2.0 (Jan 2026):
 ✅ All v1.8 features preserved (2026 Portfolio Mapping, V-Recovery, Kill-Switch, Dual AI CIO)
 
 YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
-- 30% Global Core (VWRA, ES3, DHL, 82846 - diversified value)
-- 30% Growth Engine (CSNDX, CTEC, HEAL, INRA, LOCK - high growth)
-- 25% Income Strategy (Wheel on GOOGL, PEP, V - premium collection)
-- 5% Hedge (QQQ puts 15% OTM - downside protection)
-- 10% Reserves (Cash + Gold split dynamically by risk score)
+- 30% Global Triads (82846, DHL, ES3, VWRA, VT, XMNE - strategic core)
+- 30% Four Horsemen (CSNDX, CTEC, HEAL, INRA, GRID - growth engine)
+- 25% Cash Cow (Wheel on GOOGL, PEP, V - income strategy)
+- 2% The Alpha (Theme stocks + call options - offensive plays)
+- 2.5% The Omega (QQQ puts + bear spreads - insurance)
+- 5% The Vault (Gold - store of value)
+- 5% The War Chest (Cash - dry powder)
 
 ALLOCATION PHILOSOPHY:
 Score 90+: FULL DEPLOYMENT - Run your base allocation
@@ -88,11 +90,13 @@ CONFIG = {
 PORTFOLIO_2026 = {
     'TOTAL_CAPITAL': 1_000_000,  # $1M active trading capital
     'BASE_ALLOCATION': {
-        'global_core': 0.30,      # VWRA, ES3, DHL, 82846
-        'growth_engine': 0.30,    # CSNDX, CTEC, HEAL, INRA, LOCK
-        'income_strategy': 0.25,  # Wheel on GOOGL, PEP, V
-        'alpha_insurance': 0.05,  # Theme stocks (Sniper) + QQQ puts (Hedge)
-        'reserves': 0.10          # Cash + Gold (split dynamically by risk score)
+        'global_triads': 0.30,      # 82846, DHL, ES3, VWRA, VT, XMNE
+        'four_horsemen': 0.30,      # CSNDX, CTEC, HEAL, INRA, GRID
+        'cash_cow': 0.25,           # Wheel on GOOGL, PEP, V
+        'alpha': 0.02,              # Theme stocks + call options
+        'omega': 0.025,             # QQQ puts + bear spreads
+        'vault': 0.05,              # Gold (GLD/IAU)
+        'war_chest': 0.05           # Cash holdings
     }
 }
 
@@ -459,16 +463,17 @@ class HistoricalDataManager:
 class RiskDashboard:
     # Symbol to category mapping for IBKR positions (from fetch-ibkr-positions-dashboard.xlsx)
     SYMBOL_MAPPING = {
-        'global_core': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS'],
-        'growth_engine': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'LOCK'],
-        'income_strategy': [
+        'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
+        'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
+        'cash_cow': [
             'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
             'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
             'NVDA', 'TSLA'
         ],
-        'alpha_sniper': [],  # Theme stocks - anything not in above categories
-        'alpha_hedge': [],  # QQQ puts - detected from options
-        'gold': ['GSD', 'GLD', 'IAU'],
+        'alpha': ['LCID'],  # Theme stocks + call options (offensive)
+        'omega': [],  # QQQ puts + bear spreads (defensive) - detected from options
+        'vault': ['GLD', 'IAU'],
+        'war_chest': [],  # Cash balance
     }
     
     def __init__(self):
@@ -1277,13 +1282,13 @@ class RiskDashboard:
             
             # Categorize positions
             positions = {
-                'global_core': 0,
-                'growth_engine': 0,
-                'income_strategy': 0,
-                'alpha_sniper': 0,
-                'alpha_hedge': 0,
-                'gold': 0,
-                'cash': 0,
+                'global_triads': 0,
+                'four_horsemen': 0,
+                'cash_cow': 0,
+                'alpha': 0,
+                'omega': 0,
+                'vault': 0,
+                'war_chest': 0,
                 'other': 0,
                 'total': total_value
             }
@@ -1335,40 +1340,40 @@ class RiskDashboard:
                     if not categorized and asset_class in ['OPT', 'FOP']:
                         underlying = symbol.split()[0] if ' ' in symbol else symbol[:6]
                         
-                        # Rule 1: Multi-leg spreads with shorts = Income Strategy (all legs)
+                        # Rule 1: Multi-leg spreads with shorts = Cash Cow (all legs)
                         if underlying in spread_underlyings:
-                            positions['income_strategy'] += value
+                            positions['cash_cow'] += value
                             categorized = True
                         
-                        # Rule 2: Single-leg short options (CSPs/covered calls) = Income Strategy
+                        # Rule 2: Single-leg short options (CSPs/covered calls) = Cash Cow
                         elif side == 'Short':
-                            positions['income_strategy'] += value
+                            positions['cash_cow'] += value
                             categorized = True
                         
-                        # Rule 3: Single-leg long puts (not part of spread) = Alpha Hedge
+                        # Rule 3: Single-leg long puts (not part of spread) = Omega
                         elif side == 'Long' and put_call == 'P':
-                            positions['alpha_hedge'] += value
+                            positions['omega'] += value
                             categorized = True
                         
-                        # Rule 4: Long calls on income tickers = Income Strategy (e.g., LEAPS)
+                        # Rule 4: Long calls on cash_cow tickers = Cash Cow (e.g., LEAPS)
                         elif side == 'Long' and put_call == 'C':
-                            for income_ticker in self.SYMBOL_MAPPING['income_strategy']:
+                            for income_ticker in self.SYMBOL_MAPPING['cash_cow']:
                                 if income_ticker in symbol:
-                                    positions['income_strategy'] += value
+                                    positions['cash_cow'] += value
                                     categorized = True
                                     break
                             
-                            # If not income ticker, treat as Alpha Sniper (speculative)
+                            # If not income ticker, treat as Alpha (speculative)
                             if not categorized:
-                                positions['alpha_sniper'] += value
+                                positions['alpha'] += value
                                 categorized = True
                     
                     # Check for cash
                     if not categorized and asset_class == 'CASH':
-                        positions['cash'] += value
+                        positions['war_chest'] += value
                         categorized = True
                     if not categorized and asset_class == 'STK':
-                        positions['alpha_sniper'] += value
+                        positions['alpha'] += value
                         categorized = True
                     
                     # Everything else goes to 'other'
@@ -1377,7 +1382,7 @@ class RiskDashboard:
                         print(f"   ⚠️  UNCATEGORIZED: {symbol} (${value:,.0f}) - {asset_class}")
             
             # Add cash from dashboard
-            positions['cash'] += cash_hk + cash_al
+            positions['war_chest'] += cash_hk + cash_al
             
             # Store raw position details for rebalancing recommendations
             positions['position_details'] = {
@@ -1404,24 +1409,16 @@ class RiskDashboard:
                 if key != 'total' and key != 'position_details':
                     positions[key] = positions[key] / total_value
             
-            # Combine alpha categories (should be ~5% total per dashboard)
-            positions['alpha_insurance'] = positions['alpha_sniper'] + positions['alpha_hedge']
-            
-            # Combine gold + cash into reserves
-            positions['reserves'] = positions['gold'] + positions['cash']
-            
             # Debug output
             print(f"\n📊 IBKR POSITIONS LOADED:")
             print(f"   Total Portfolio Value: ${total_value:,.0f}")
-            print(f"   Global Core: {positions['global_core']*100:.1f}%")
-            print(f"   Growth Engine: {positions['growth_engine']*100:.1f}%")
-            print(f"   Income Strategy: {positions['income_strategy']*100:.1f}%")
-            print(f"   Alpha & Insurance: {positions['alpha_insurance']*100:.1f}%")
-            print(f"     ├─ Sniper (themes): {positions['alpha_sniper']*100:.1f}%")
-            print(f"     └─ Hedge (QQQ puts): {positions['alpha_hedge']*100:.1f}%")
-            print(f"   Reserves: {positions['reserves']*100:.1f}%")
-            print(f"     ├─ Gold: {positions['gold']*100:.1f}%")
-            print(f"     └─ Cash: {positions['cash']*100:.1f}%")
+            print(f"   Global Triads: {positions['global_triads']*100:.1f}%")
+            print(f"   Four Horsemen: {positions['four_horsemen']*100:.1f}%")
+            print(f"   Cash Cow: {positions['cash_cow']*100:.1f}%")
+            print(f"   The Alpha: {positions['alpha']*100:.1f}%")
+            print(f"   The Omega: {positions['omega']*100:.1f}%")
+            print(f"   The Vault (Gold): {positions['vault']*100:.1f}%")
+            print(f"   The War Chest (Cash): {positions['war_chest']*100:.1f}%")
             print(f"   Other (uncategorized): {positions['other']*100:.1f}%\n")
             
             return positions
@@ -1442,7 +1439,7 @@ class RiskDashboard:
         
         # Calculate drift for each category
         print(f"🎯 DRIFT CALCULATION:")
-        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
+        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
             target_pct = target_allocation.get(category, 0)
             actual_pct = actual.get(category, 0)
             diff = actual_pct - target_pct
@@ -1490,7 +1487,7 @@ class RiskDashboard:
         }
         
         # Identify what to sell (overweight categories)
-        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
+        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
             drift = drift_analysis['drift'].get(category, 0)
             
             if drift > 0.03:  # Overweight by >3%
@@ -1505,7 +1502,7 @@ class RiskDashboard:
                 recommendations['total_to_sell'] += amount
         
         # Identify what to buy (underweight categories)
-        for category in ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']:
+        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
             drift = drift_analysis['drift'].get(category, 0)
             
             if drift < -0.03:  # Underweight by >3%
@@ -1608,7 +1605,7 @@ class RiskDashboard:
     def _normalize_allocation(self, alloc):
         """Normalize allocation percentages to sum to exactly 100%."""
         # Extract allocation percentages
-        categories = ['global_core', 'growth_engine', 'income_strategy', 'alpha_insurance', 'reserves']
+        categories = ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']
         total = sum(alloc[cat] for cat in categories)
         
         # Normalize to 100%
@@ -1630,13 +1627,13 @@ class RiskDashboard:
         if score >= 90:  # ALL CLEAR
             base_allocation = {
                 'regime': '★★★★★ ALL CLEAR',
-                'global_core': base['global_core'],
-                'growth_engine': base['growth_engine'],
-                'income_strategy': base['income_strategy'],
-                'alpha_insurance': base['alpha_insurance'],
-                'reserves': base['reserves'],
-                'gold_pct': 0.03,  # 3% of reserves in gold
-                'cash_pct': 0.07,  # 7% in cash
+                'global_triads': base['global_triads'],
+                'four_horsemen': base['four_horsemen'],
+                'cash_cow': base['cash_cow'],
+                'alpha': base['alpha'],
+                'omega': base['omega'],
+                'vault': base['vault'],
+                'war_chest': base['war_chest'],
                 'stops': '15-20%',
                 'options_guidance': 'Sell CSPs at 30-45 DTE, 15-20 delta on GOOGL, PEP, V',
                 'action': 'FULL DEPLOYMENT - Run base allocation'
@@ -1646,13 +1643,13 @@ class RiskDashboard:
         elif score >= 75:  # NORMAL
             base_allocation = {
                 'regime': '★★★★☆ NORMAL',
-                'global_core': base['global_core'],
-                'growth_engine': base['growth_engine'] * 0.9,  # Slightly reduce growth
-                'income_strategy': base['income_strategy'] * 0.9,  # More conservative
-                'alpha_insurance': base['alpha_insurance'],
-                'reserves': base['reserves'] + 0.06,  # Raise reserves to 16%
-                'gold_pct': 0.04,  # 4% in gold
-                'cash_pct': 0.12,  # 12% in cash
+                'global_triads': base['global_triads'],
+                'four_horsemen': base['four_horsemen'] * 0.9,  # Slightly reduce growth
+                'cash_cow': base['cash_cow'] * 0.9,  # More conservative
+                'alpha': base['alpha'] * 0.8,  # Reduce offensive plays
+                'omega': base['omega'] * 1.2,  # Increase insurance
+                'vault': base['vault'] + 0.02,  # 7% gold
+                'war_chest': base['war_chest'] + 0.04,  # 9% cash
                 'stops': '12-15%',
                 'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE',
                 'action': 'STAY COURSE - Tighten stops, be selective on new CSPs'
@@ -1662,13 +1659,13 @@ class RiskDashboard:
         elif score >= 60:  # ELEVATED
             base_allocation = {
                 'regime': '★★★☆☆ ELEVATED',
-                'global_core': base['global_core'],
-                'growth_engine': base['growth_engine'] * 0.7,  # Cut growth significantly
-                'income_strategy': base['income_strategy'] * 0.5,  # Very defensive options
-                'alpha_insurance': base['alpha_insurance'] * 2,  # Double alpha/hedge (10%)
-                'reserves': 0.25,  # Raise reserves to 25%
-                'gold_pct': 0.10,  # 10% in gold
-                'cash_pct': 0.15,  # 15% in cash
+                'global_triads': base['global_triads'],
+                'four_horsemen': base['four_horsemen'] * 0.7,  # Cut growth significantly
+                'cash_cow': base['cash_cow'] * 0.5,  # Very defensive options
+                'alpha': base['alpha'] * 0.5,  # Cut offensive plays
+                'omega': base['omega'] * 4,  # Quadruple insurance (10%)
+                'vault': 0.10,  # 10% gold
+                'war_chest': 0.15,  # 15% cash
                 'stops': '10-12%',
                 'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions',
                 'action': 'REDUCE RISK - Cut growth/income, raise reserves and hedge'
@@ -1678,13 +1675,13 @@ class RiskDashboard:
         elif score >= 40:  # HIGH RISK
             base_allocation = {
                 'regime': '★★☆☆☆ HIGH RISK',
-                'global_core': base['global_core'] * 0.8,  # Trim core slightly
-                'growth_engine': base['growth_engine'] * 0.3,  # Skeleton growth
-                'income_strategy': 0,  # Exit all income strategies
-                'alpha_insurance': base['alpha_insurance'] * 3,  # 15% alpha/hedge
-                'reserves': 0.40,  # 40% reserves
-                'gold_pct': 0.15,  # 15% in gold
-                'cash_pct': 0.25,  # 25% in cash
+                'global_triads': base['global_triads'] * 0.8,  # Trim core slightly
+                'four_horsemen': base['four_horsemen'] * 0.3,  # Skeleton growth
+                'cash_cow': 0,  # Exit all income strategies
+                'alpha': 0,  # Exit all offensive plays
+                'omega': base['omega'] * 6,  # 6x insurance (15%)
+                'vault': 0.15,  # 15% gold
+                'war_chest': 0.25,  # 25% cash
                 'stops': '8-10%',
                 'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit',
                 'action': 'GO DEFENSIVE - Major risk reduction, protect capital'
@@ -1694,13 +1691,13 @@ class RiskDashboard:
         else:  # EXTREME (<40)
             base_allocation = {
                 'regime': '★☆☆☆☆ EXTREME RISK',
-                'global_core': base['global_core'] * 0.5,  # Cut core in half
-                'growth_engine': 0,  # Exit all growth
-                'income_strategy': 0,  # No options
-                'alpha_insurance': base['alpha_insurance'] * 5,  # 25% alpha/hedge
-                'reserves': 0.55,  # 55% reserves
-                'gold_pct': 0.20,  # 20% in gold
-                'cash_pct': 0.35,  # 35% in cash
+                'global_triads': base['global_triads'] * 0.5,  # Cut core in half
+                'four_horsemen': 0,  # Exit all growth
+                'cash_cow': 0,  # No options
+                'alpha': 0,  # Exit all offensive plays
+                'omega': base['omega'] * 10,  # 10x insurance (25%)
+                'vault': 0.20,  # 20% gold
+                'war_chest': 0.35,  # 35% cash
                 'stops': '5-8%',
                 'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price, stop selling premium',
                 'action': 'MAX DEFENSE - Capital preservation mode'
@@ -1714,24 +1711,25 @@ class RiskDashboard:
     
     def _apply_v_recovery_to_portfolio(self, base_alloc):
         """Apply V-Recovery override - cut reserves by 50% and redeploy"""
-        old_reserves = base_alloc['reserves']
-        new_reserves = old_reserves * 0.5
-        freed_capital = old_reserves - new_reserves
+        old_gold = base_alloc['vault']
+        old_cash = base_alloc['war_chest']
+        total_reserves = old_gold + old_cash
+        new_reserves = total_reserves * 0.5
+        freed_capital = total_reserves - new_reserves
         
         # Redistribute freed capital proportionally to core/growth/income
-        total_active = base_alloc['global_core'] + base_alloc['growth_engine'] + base_alloc['income_strategy']
+        total_active = base_alloc['global_triads'] + base_alloc['four_horsemen'] + base_alloc['cash_cow']
         
         if total_active > 0:
             boost_factor = 1 + (freed_capital / total_active)
             v_alloc = {
                 **base_alloc,
                 'regime': base_alloc['regime'] + ' + V-RECOVERY',
-                'global_core': base_alloc['global_core'] * boost_factor,
-                'growth_engine': base_alloc['growth_engine'] * boost_factor,
-                'income_strategy': base_alloc['income_strategy'] * boost_factor,
-                'reserves': new_reserves,
-                'gold_pct': base_alloc['gold_pct'],  # Keep gold proportion
-                'cash_pct': base_alloc['cash_pct'] * 0.5,  # Cut cash proportion
+                'global_triads': base_alloc['global_triads'] * boost_factor,
+                'four_horsemen': base_alloc['four_horsemen'] * boost_factor,
+                'cash_cow': base_alloc['cash_cow'] * boost_factor,
+                'vault': old_gold * 0.5,  # Cut gold 50%
+                'war_chest': old_cash * 0.5,  # Cut cash 50%
                 'action': base_alloc['action'] + ' | V-RECOVERY: Reserves cut 50%, redeployed to core/growth/income'
             }
             return self._normalize_allocation(v_alloc)
@@ -1973,11 +1971,13 @@ class RiskDashboard:
             lines.extend(["💼 PORTFOLIO ALLOCATION (Actual → Target)"])
             
             categories = [
-                ('Global Core', 'global_core'),
-                ('Growth Engine', 'growth_engine'),
-                ('Income Strategy', 'income_strategy'),
-                ('Alpha & Insurance', 'alpha_insurance'),
-                ('Reserves', 'reserves')
+                ('Global Triads', 'global_triads'),
+                ('Four Horsemen', 'four_horsemen'),
+                ('Cash Cow', 'cash_cow'),
+                ('The Alpha', 'alpha'),
+                ('The Omega', 'omega'),
+                ('The Vault', 'vault'),
+                ('War Chest', 'war_chest')
             ]
             
             for label, key in categories:
@@ -2013,11 +2013,13 @@ class RiskDashboard:
             # Show target allocation only
             lines.extend([
                 "💼 PORTFOLIO ALLOCATION (Target)",
-                f"Global Core: {portfolio['global_core']*100:.0f}%",
-                f"Growth Engine: {portfolio['growth_engine']*100:.0f}%",
-                f"Income Strategy: {portfolio['income_strategy']*100:.0f}%",
-                f"Alpha & Insurance: {portfolio['alpha_insurance']*100:.0f}%",
-                f"Reserves: {portfolio['reserves']*100:.0f}% (Gold: {portfolio['gold_pct']*100:.0f}%, Cash: {portfolio['cash_pct']*100:.0f}%)",
+                f"Global Triads: {portfolio['global_triads']*100:.0f}%",
+                f"Four Horsemen: {portfolio['four_horsemen']*100:.0f}%",
+                f"Cash Cow: {portfolio['cash_cow']*100:.0f}%",
+                f"The Alpha: {portfolio['alpha']*100:.0f}%",
+                f"The Omega: {portfolio['omega']*100:.0f}%",
+                f"The Vault: {portfolio['vault']*100:.0f}%",
+                f"War Chest: {portfolio['war_chest']*100:.0f}%",
                 ""
             ])
         
@@ -2152,11 +2154,13 @@ TODAY'S DATA:
 Score: {self.scores['total']:.1f}/100
 Regime: {portfolio['regime']}
 Portfolio Allocation:
-- Global Core (VWRA/ES3/DHL/82846): {portfolio['global_core']*100:.0f}%
-- Growth Engine (CSNDX/CTEC/HEAL/INRA/LOCK): {portfolio['growth_engine']*100:.0f}%
-- Income Strategy (Wheel on GOOGL/PEP/V): {portfolio['income_strategy']*100:.0f}%
-- Alpha & Insurance (Sniper + QQQ Puts): {portfolio['alpha_insurance']*100:.0f}%
-- Reserves: {portfolio['reserves']*100:.0f}% (Gold: {portfolio['gold_pct']*100:.0f}%, Cash: {portfolio['cash_pct']*100:.0f}%)
+- Global Triads (82846/DHL/ES3/VWRA/VT/XMNE): {portfolio['global_triads']*100:.0f}%
+- Four Horsemen (CSNDX/CTEC/HEAL/INRA/GRID): {portfolio['four_horsemen']*100:.0f}%
+- Cash Cow (Wheel on GOOGL/PEP/V): {portfolio['cash_cow']*100:.0f}%
+- The Alpha (LCID calls): {portfolio['alpha']*100:.0f}%
+- The Omega (QQQ puts/spreads): {portfolio['omega']*100:.0f}%
+- The Vault (Gold): {portfolio['vault']*100:.0f}%
+- War Chest (Cash): {portfolio['war_chest']*100:.0f}%
 Action: {portfolio['action']}
 
 Key Indicators:
@@ -2204,11 +2208,13 @@ Risk Score: {self.scores['total']:.1f}/100
 Market Regime: {portfolio['regime']}
 
 Current Portfolio:
-- Global Core ETFs: {portfolio['global_core']*100:.0f}%
-- Growth Engine: {portfolio['growth_engine']*100:.0f}%
-- Income Strategy (Options): {portfolio['income_strategy']*100:.0f}%
-- Alpha & Insurance: {portfolio['alpha_insurance']*100:.0f}%
-- Reserves: {portfolio['reserves']*100:.0f}% (Gold {portfolio['gold_pct']*100:.0f}% | Cash {portfolio['cash_pct']*100:.0f}%)
+- Global Triads (ETFs/China): {portfolio['global_triads']*100:.0f}%
+- Four Horsemen (Growth): {portfolio['four_horsemen']*100:.0f}%
+- Cash Cow (Options Wheel): {portfolio['cash_cow']*100:.0f}%
+- The Alpha (Theme stocks): {portfolio['alpha']*100:.0f}%
+- The Omega (Hedges): {portfolio['omega']*100:.0f}%
+- The Vault (Gold): {portfolio['vault']*100:.0f}%
+- War Chest (Cash): {portfolio['war_chest']*100:.0f}%
 
 Recommended Action: {portfolio['action']}
 

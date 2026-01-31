@@ -14,8 +14,8 @@ launchctl load ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist
 launchctl start com.timeless.watchlist-updater
 
 # View logs
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-updates.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-errors.log
 
 # Remove completely
 launchctl unload ~/Library/LaunchAgents/com.timeless.watchlist-updater.plist

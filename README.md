@@ -644,7 +644,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 #### **Installation**
 ```bash
 # Navigate to workspace
-cd ~/Desktop/timeless-workspace
+cd ~/Developer/timeless-workspace
 
 # Create virtual environment
 python3 -m venv .venv
@@ -682,13 +682,13 @@ pip install -r requirements.txt
 launchctl list | grep timeless
 
 # View logs
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-updates.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-errors.log
 ```
 
 **Manual Run:**
 ```bash
-cd ~/Desktop/timeless-workspace
+cd ~/Developer/timeless-workspace
 source .venv/bin/activate
 python projects/watchlist-auto-updater.py
 ```
@@ -851,23 +851,23 @@ MAX_HEADLINES = 25  # Cap to avoid token limits
 #### **Log Locations**
 ```bash
 # Watchlist updater logs
-~/Desktop/timeless-workspace/logs/watchlist-updates.log
-~/Desktop/timeless-workspace/logs/watchlist-errors.log
+~/Developer/timeless-workspace/logs/watchlist-updates.log
+~/Developer/timeless-workspace/logs/watchlist-errors.log
 
 # Market Pulse Signal (if enabled with launchd)
-~/Desktop/timeless-workspace/logs/market-pulse.log
+~/Developer/timeless-workspace/logs/market-pulse.log
 ```
 
 #### **View Real-time Logs**
 ```bash
 # Watchlist updates
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-updates.log
 
 # Errors
-tail -f ~/Desktop/timeless-workspace/logs/watchlist-errors.log
+tail -f ~/Developer/timeless-workspace/logs/watchlist-errors.log
 
 # Count recent updates
-grep "✅" ~/Desktop/timeless-workspace/logs/watchlist-updates.log | wc -l
+grep "✅" ~/Developer/timeless-workspace/logs/watchlist-updates.log | wc -l
 ```
 
 #### **Troubleshooting**
@@ -951,7 +951,7 @@ cat > ~/Library/LaunchAgents/com.timeless.sector-rs-scanner.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/hongkiatkoh/Desktop/timeless-workspace/projects/01-sector-rs-momentum-signals.py</string>
+        <string>/Users/hongkiatkoh/Developer/timeless-workspace/projects/01-sector-rs-momentum-signals.py</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -961,9 +961,9 @@ cat > ~/Library/LaunchAgents/com.timeless.sector-rs-scanner.plist << 'EOF'
         <integer>0</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>/Users/hongkiatkoh/Desktop/timeless-workspace/logs/sector-rs.log</string>
+    <string>/Users/hongkiatkoh/Developer/timeless-workspace/logs/sector-rs.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/hongkiatkoh/Desktop/timeless-workspace/logs/sector-rs-errors.log</string>
+    <string>/Users/hongkiatkoh/Developer/timeless-workspace/logs/sector-rs-errors.log</string>
 </dict>
 </plist>
 EOF
@@ -990,13 +990,13 @@ python projects/watchlist-auto-updater.py
 launchctl list | grep timeless
 
 # View recent watchlist updates
-tail -20 ~/Desktop/timeless-workspace/logs/watchlist-updates.log
+tail -20 ~/Developer/timeless-workspace/logs/watchlist-updates.log
 
 # Manually trigger watchlist update
 launchctl start com.timeless.watchlist-updater
 
 # Edit .env
-nano ~/Desktop/timeless-workspace/projects/.env
+nano ~/Developer/timeless-workspace/projects/.env
 
 # Check Python environment
 source .venv/bin/activate

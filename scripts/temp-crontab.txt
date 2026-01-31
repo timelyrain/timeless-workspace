@@ -1,2 +1,2 @@
 # Watchlist Auto-Updater - Runs every Sunday at 8:00 PM
-0 20 * * 0 /Users/hongkiatkoh/Desktop/timeless-workspace/scripts/update-watchlist.sh >> /Users/hongkiatkoh/Desktop/timeless-workspace/logs/watchlist-updates.log 2>&1
+0 20 * * 0 /Users/hongkiatkoh/Developer/timeless-workspace/scripts/update-watchlist.sh >> /Users/hongkiatkoh/Developer/timeless-workspace/logs/watchlist-updates.log 2>&1

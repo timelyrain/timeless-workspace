@@ -3,7 +3,7 @@
 # Runs every Sunday at 8 PM ET with caffeinate to prevent Mac sleep
 
 # Navigate to project directory
-cd /Users/hongkiatkoh/Desktop/timeless-workspace
+cd /Users/hongkiatkoh/Developer/timeless-workspace
 
 # Activate virtual environment
 source .venv/bin/activate
