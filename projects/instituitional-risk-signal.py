@@ -14,9 +14,11 @@ WHAT'S NEW IN v2.0 (Jan 2026):
 YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
 - 30% Global Triads (82846, DHL, ES3, VWRA, VT, XMNE - strategic core)
 - 30% Four Horsemen (CSNDX, CTEC, HEAL, INRA, GRID - growth engine)
-- 25% Cash Cow (Wheel on GOOGL, PEP, V - income strategy)
-- 2% The Alpha (Theme stocks + call options - offensive plays)
-- 2.5% The Omega (QQQ puts + bear spreads - insurance)
+- 25% Cash Cow (Income Strategy: all options EXCEPT SPY/QQQ insurance)
+  * Multi-leg spreads, CSPs, covered calls, iron condors, LEAPS on income stocks
+  * Stock positions: SPY, QQQ, ADBE, AMD, CRM, CSCO, ORCL, COST, PEP, WMT, XOM, JPM, V, LLY, UNH, AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA
+- 2% The Alpha (Theme stocks + speculative long calls - offensive plays)
+- 2.5% The Omega (Insurance: SPY/QQQ options only - bear spreads, puts, protective hedges)
 - 5% The Vault (Gold - store of value)
 - 5% The War Chest (Cash - dry powder)
 
@@ -462,6 +464,10 @@ class HistoricalDataManager:
 
 class RiskDashboard:
     # Symbol to category mapping for IBKR positions (from fetch-ibkr-positions-dashboard.xlsx)
+    # NOTE: Stock positions categorized by underlying ticker. Options categorization logic:
+    # - Cash Cow: All options EXCEPT SPY/QQQ (spreads, CSPs, CCs, iron condors, LEAPS)
+    # - Omega: SPY/QQQ options ONLY (bear spreads, puts, protective hedges)
+    # - Alpha: Long calls on non-income stocks (speculative)
     SYMBOL_MAPPING = {
         'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
         'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
@@ -470,10 +476,10 @@ class RiskDashboard:
             'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
             'NVDA', 'TSLA'
         ],
-        'alpha': ['LCID'],  # Theme stocks + call options (offensive)
-        'omega': [],  # QQQ puts + bear spreads (defensive) - detected from options
-        'vault': ['GLD', 'IAU'],
-        'war_chest': [],  # Cash balance
+        'alpha': ['LCID'],  # Theme stocks only (options categorized separately below)
+        'omega': [],  # SPY/QQQ options only (detected from option symbol, not stock positions)
+        'vault': ['GSD'],  # Gold/precious metals (GSD = WisdomTree Gold)
+        'war_chest': [],  # Cash balance (read from Summary sheet C2)
     }
     
     def __init__(self):
@@ -1252,175 +1258,55 @@ class RiskDashboard:
     # =============================================================================
     
     def load_actual_positions(self):
-        """Load actual positions from IBKR fetch-ibkr-positions.xlsx"""
+        """Load actual positions from IBKR Dashboard (Column K has combined HK+AL totals)"""
         try:
-            import pandas as pd
+            import openpyxl
             from pathlib import Path
             
-            excel_path = Path(__file__).parent / 'fetch-ibkr-positions.xlsx'
             dashboard_path = Path(__file__).parent / 'fetch-ibkr-positions-dashboard.xlsx'
             
-            if not excel_path.exists():
+            if not dashboard_path.exists():
                 return None
             
-            # Read both accounts
-            df_hk = pd.read_excel(excel_path, sheet_name='PositionsHK')
-            df_al = pd.read_excel(excel_path, sheet_name='PositionsAL')
+            # Read values directly from Dashboard sheet Column K (HK + AL combined)
+            wb = openpyxl.load_workbook(dashboard_path, data_only=True)
+            ws = wb['Dashboard']
             
-            # Extract cash from IBKR positions (auto-detected from fetch-ibkr-positions.py)
-            cash_hk = df_hk[df_hk['AssetClass'] == 'CASH']['PositionValueUSD'].sum() if 'CASH' in df_hk['AssetClass'].values else 0
-            cash_al = df_al[df_al['AssetClass'] == 'CASH']['PositionValueUSD'].sum() if 'CASH' in df_al['AssetClass'].values else 0
+            # Column K contains the combined totals (F + I columns)
+            positions = {
+                'global_triads': ws['K4'].value or 0,      # Global Triads
+                'four_horsemen': ws['K11'].value or 0,     # Four Horsemen
+                'cash_cow': ws['K19'].value or 0,          # Cash Cow
+                'alpha': ws['K20'].value or 0,             # The Alpha
+                'omega': ws['K21'].value or 0,             # The Omega
+                'vault': ws['K22'].value or 0,             # The Vault
+                'war_chest': ws['K23'].value or 0,         # The War Chest
+                'total': ws['G42'].value or 0,             # Combined Total
+            }
             
-            if cash_hk > 0 or cash_al > 0:
-                print(f"   📊 Cash auto-detected from IBKR: HK ${cash_hk:,.0f}, AL ${cash_al:,.0f}")
+            wb.close()
             
-            # Combine and calculate total portfolio value (including cash)
-            total_value = df_hk['PositionValueUSD'].sum() + df_al['PositionValueUSD'].sum()
-            
+            total_value = positions['total']
             if total_value == 0:
                 return None
             
-            # Categorize positions
-            positions = {
-                'global_triads': 0,
-                'four_horsemen': 0,
-                'cash_cow': 0,
-                'alpha': 0,
-                'omega': 0,
-                'vault': 0,
-                'war_chest': 0,
-                'other': 0,
-                'total': total_value
-            }
+            print(f"   📊 Portfolio loaded from Dashboard: ${total_value:,.0f}")
             
-            # First pass: Identify multi-leg option strategies (spreads/iron condors)
-            # Group options by underlying + expiry to detect spreads
-            multi_leg_strategies = {}
-            for df in [df_hk, df_al]:
-                for _, row in df.iterrows():
-                    symbol = str(row['Symbol']).strip()
-                    asset_class = row.get('AssetClass', '')
-                    
-                    if asset_class in ['OPT', 'FOP']:
-                        # Extract underlying (e.g., EW2G6 from "EW2G6 P6525")
-                        underlying = symbol.split()[0] if ' ' in symbol else symbol[:6]
-                        expiry = row.get('Expiry', '')
-                        key = f"{underlying}_{expiry}"
-                        
-                        if key not in multi_leg_strategies:
-                            multi_leg_strategies[key] = {'legs': [], 'has_short': False}
-                        
-                        multi_leg_strategies[key]['legs'].append(symbol)
-                        if row.get('Side', '') == 'Short':
-                            multi_leg_strategies[key]['has_short'] = True
-            
-            # Identify spread strategies (2+ legs on same underlying)
-            spread_underlyings = {k.split('_')[0] for k, v in multi_leg_strategies.items() if len(v['legs']) >= 2 and v['has_short']}
-            
-            # Second pass: Categorize positions
-            for df in [df_hk, df_al]:
-                for _, row in df.iterrows():
-                    symbol = str(row['Symbol']).strip()
-                    value = row['PositionValueUSD']
-                    asset_class = row.get('AssetClass', '')
-                    
-                    # Get option metadata
-                    side = row.get('Side', '')
-                    put_call = row.get('Put/Call', '')
-                    
-                    # Categorize stocks by symbol mapping first
-                    categorized = False
-                    for category, symbols in self.SYMBOL_MAPPING.items():
-                        if symbol in symbols:
-                            positions[category] += value
-                            categorized = True
-                            break
-                    
-                    # Options categorization logic
-                    if not categorized and asset_class in ['OPT', 'FOP']:
-                        underlying = symbol.split()[0] if ' ' in symbol else symbol[:6]
-                        
-                        # Rule 1: Multi-leg spreads with shorts = Cash Cow (all legs)
-                        if underlying in spread_underlyings:
-                            positions['cash_cow'] += value
-                            categorized = True
-                        
-                        # Rule 2: Single-leg short options (CSPs/covered calls) = Cash Cow
-                        elif side == 'Short':
-                            positions['cash_cow'] += value
-                            categorized = True
-                        
-                        # Rule 3: Single-leg long puts (not part of spread) = Omega
-                        elif side == 'Long' and put_call == 'P':
-                            positions['omega'] += value
-                            categorized = True
-                        
-                        # Rule 4: Long calls on cash_cow tickers = Cash Cow (e.g., LEAPS)
-                        elif side == 'Long' and put_call == 'C':
-                            for income_ticker in self.SYMBOL_MAPPING['cash_cow']:
-                                if income_ticker in symbol:
-                                    positions['cash_cow'] += value
-                                    categorized = True
-                                    break
-                            
-                            # If not income ticker, treat as Alpha (speculative)
-                            if not categorized:
-                                positions['alpha'] += value
-                                categorized = True
-                    
-                    # Check for cash
-                    if not categorized and asset_class == 'CASH':
-                        positions['war_chest'] += value
-                        categorized = True
-                    if not categorized and asset_class == 'STK':
-                        positions['alpha'] += value
-                        categorized = True
-                    
-                    # Everything else goes to 'other'
-                    if not categorized:
-                        positions['other'] += value
-                        print(f"   ⚠️  UNCATEGORIZED: {symbol} (${value:,.0f}) - {asset_class}")
-            
-            # Add cash from dashboard
-            positions['war_chest'] += cash_hk + cash_al
-            
-            # Store raw position details for rebalancing recommendations
-            positions['position_details'] = {
+            # Convert to percentages for compatibility with rest of code
+            position_details = {
                 'total_value': total_value,
                 'by_category': {},
                 'by_symbol': {}
             }
             
-            # Recalculate to capture position details by symbol
-            for df in [df_hk, df_al]:
-                for _, row in df.iterrows():
-                    symbol = str(row['Symbol']).strip()
-                    value = row['PositionValueUSD']
-                    asset_class = row.get('AssetClass', '')
-                    
-                    if asset_class == 'STK' and abs(value) > 1:
-                        positions['position_details']['by_symbol'][symbol] = {
-                            'value': value,
-                            'asset_class': asset_class
-                        }
+            positions['position_details'] = position_details
             
-            # Convert to percentages
+            # Convert dollar values to percentages
             for key in positions:
-                if key != 'total' and key != 'position_details':
+                if key not in ['total', 'position_details']:
                     positions[key] = positions[key] / total_value
             
-            # Debug output
-            print(f"\n📊 IBKR POSITIONS LOADED:")
-            print(f"   Total Portfolio Value: ${total_value:,.0f}")
-            print(f"   Global Triads: {positions['global_triads']*100:.1f}%")
-            print(f"   Four Horsemen: {positions['four_horsemen']*100:.1f}%")
-            print(f"   Cash Cow: {positions['cash_cow']*100:.1f}%")
-            print(f"   The Alpha: {positions['alpha']*100:.1f}%")
-            print(f"   The Omega: {positions['omega']*100:.1f}%")
-            print(f"   The Vault (Gold): {positions['vault']*100:.1f}%")
-            print(f"   The War Chest (Cash): {positions['war_chest']*100:.1f}%")
-            print(f"   Other (uncategorized): {positions['other']*100:.1f}%\n")
-            
+            self.actual_positions = positions
             return positions
             
         except Exception as e:
@@ -1988,20 +1874,36 @@ class RiskDashboard:
                 if abs(diff) > 3:
                     indicator = "⚠️" if abs(diff) > 5 else "⚡"
                     # Show action needed: negative diff means underweight (need to add +), positive means overweight (need to reduce -)
-                    action = f"{-diff:+.0f}%"
-                    lines.append(f"{label}: {actual:.0f}% → {target:.0f}% ({action} {indicator})")
+                    action = f"{-diff:+.1f}%"
+                    lines.append(f"{label}: {actual:.1f}% → {target:.1f}% ({action} {indicator})")
                 else:
-                    lines.append(f"{label}: {actual:.0f}% → {target:.0f}%")
+                    lines.append(f"{label}: {actual:.1f}% → {target:.1f}%")
             
-            # Show drift with trend if available
-            drift_line = f"⚠️ DRIFT: {drift_analysis['total_drift']*100:.0f}% total"
+            # Show drift with actionable guidance
+            current_drift = drift_analysis['total_drift'] * 100
+            drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total"
+            
             if drift_trend:
+                days = drift_trend['days']
+                velocity = abs(drift_trend['change'] * 100) / days if days > 0 else 0
+                
                 if drift_trend['improving']:
-                    trend_icon = "📉" if abs(drift_trend['change']) > 0.02 else "↘️"
-                    drift_line += f" {trend_icon} ({abs(drift_trend['change']*100):.0f}% from {drift_trend['days']}d ago)"
+                    if current_drift < 10:
+                        # Almost aligned - celebrate progress
+                        drift_line = f"✅ DRIFT: {current_drift:.0f}% (target: <5%) - Nearly aligned!"
+                    elif velocity > 5:
+                        # Improving fast - encourage continuation
+                        drift_line = f"📉 Rebalancing working - keep deploying cash ({current_drift:.0f}% from {drift_analysis['total_drift']*100 + drift_trend['change']*100:.0f}%)"
+                    else:
+                        # Improving slowly - maintain course
+                        drift_line = f"↘️ Drift improving but still high {current_drift:.0f}% (target: <5%)"
                 else:
-                    trend_icon = "📈" if drift_trend['change'] > 0.02 else "↗️"
-                    drift_line += f" {trend_icon} (+{drift_trend['change']*100:.0f}% from {drift_trend['days']}d ago)"
+                    if velocity > 3:
+                        # Worsening fast - urgent action
+                        drift_line = f"🚨 URGENT: Drift increasing to {current_drift:.0f}% (+{drift_trend['change']*100:.0f}% in {days}d)"
+                    else:
+                        # Worsening slowly - warning
+                        drift_line = f"⚠️ Drift worsening to {current_drift:.0f}% - review positions"
             
             lines.extend([
                 "",

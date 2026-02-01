@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from dotenv import load_dotenv
 from pathlib import Path
+from difflib import SequenceMatcher
 
 # Load environment variables from .env file in the same directory as this script
 env_path = Path(__file__).parent / '.env'
@@ -277,34 +278,40 @@ def get_market_headlines():
     filtered = [h for h in all_headlines if h['impact_score'] > 0]
     print(f"   → Filtered out {len(all_headlines) - len(filtered)} low-quality items")
     
-    # Phase 2: Smart deduplication (case-insensitive title matching)
-    print(f"🔍 Phase 2: Basic deduplication...")
-    seen_titles = {}
+    # Phase 2: Smart deduplication (fuzzy matching for similar headlines)
+    print(f"🔍 Phase 2: Fuzzy deduplication...")
+    
+    SIMILARITY_THRESHOLD = 0.70  # 70% similarity = considered duplicate
     deduplicated = []
     
     for h in filtered:
-        title_key = h['title'].lower()
-        
-        # Check for exact or very similar match (first 50 chars)
-        title_prefix = title_key[:50]
+        title = h['title'].lower()
         is_duplicate = False
         
-        for seen_key in seen_titles.keys():
-            if title_prefix in seen_key or seen_key in title_prefix:
-                # Found duplicate - keep the higher tier source
-                existing = seen_titles[seen_key]
-                if h['tier'] < existing['tier'] or (h['tier'] == existing['tier'] and h['impact_score'] > existing['impact_score']):
-                    deduplicated.remove(existing)
-                    seen_titles[title_key] = h
-                    deduplicated.append(h)
+        # Compare with all existing deduplicated headlines
+        for existing in deduplicated:
+            existing_title = existing['title'].lower()
+            
+            # Calculate similarity ratio (0.0 to 1.0)
+            similarity = SequenceMatcher(None, title, existing_title).ratio()
+            
+            if similarity >= SIMILARITY_THRESHOLD:
+                # Found duplicate - keep the better one
                 is_duplicate = True
+                
+                # Replace if current headline is from better source or higher impact
+                if (h['tier'] < existing['tier'] or 
+                    (h['tier'] == existing['tier'] and h['impact_score'] > existing['impact_score'])):
+                    deduplicated.remove(existing)
+                    deduplicated.append(h)
+                    print(f"   🔄 Replaced: '{existing_title[:60]}...'")
+                    print(f"      With: '{title[:60]}...' (similarity: {similarity:.0%})")
                 break
         
         if not is_duplicate:
-            seen_titles[title_key] = h
             deduplicated.append(h)
     
-    print(f"   → Removed {len(filtered) - len(deduplicated)} duplicates")
+    print(f"   → Removed {len(filtered) - len(deduplicated)} similar headlines")
     
     # Sort by impact score (descending) and tier (ascending - tier 1 is best)
     deduplicated.sort(key=lambda x: (x['impact_score'], -x['tier']), reverse=True)

@@ -1,0 +1,45 @@
+🎯 RISK DASHBOARD v2.0
+📅 Feb 02, 2026 @ 01:43
+
+✅ DATA: 22/22 signals (100%)
+
+📊 SCORE: 65.1/100
+🎚️ ★★★☆☆ ELEVATED
+
+💼 PORTFOLIO ALLOCATION (Actual → Target)
+Global Triads: 29.2% → 30.2%
+Four Horsemen: 20.5% → 21.1%
+Cash Cow: 14.8% → 12.6%
+The Alpha: 1.4% → 1.0%
+The Omega: 1.3% → 10.1% (+8.8% ⚠️)
+The Vault: 1.2% → 10.1% (+8.9% ⚠️)
+War Chest: 31.7% → 15.1% (-16.6% ⚠️)
+
+⚠️ DRIFT: 38% total 📉 (27% from 4d ago)
+📋 Omega: underweight by 9%, Vault: underweight by 9%
+
+🛡️ Stops: 10-12%
+📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions
+
+💡 ACTION: REDUCE RISK - Cut growth/income, raise reserves and hedge
+
+🔄 REBALANCING RECOMMENDATIONS
+SELL (Overweight):
+  • War Chest: $168k (17% over)
+BUY (Underweight):
+  • Omega: $89k (9% under)
+  • Vault: $90k (9% under)
+
+📈 TIER SCORES
+T1: 34.2/45 Credit+Macro (76%)
+T2: 45.0/60 Positioning+InstFlows (75%)
+T3: 21.0/49 Options+Structure (43%)
+
+📊 RISK TREND (15 days)
+↘️ Score: 68 → 65 (-3 pts)
+
+📊 KEY SIGNALS
+HY Spread: 2.77%
+VIX: 17.4
+% >50MA: 65%
+F&G: N/A
