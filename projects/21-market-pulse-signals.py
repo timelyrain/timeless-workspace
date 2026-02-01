@@ -339,6 +339,10 @@ def analyze_with_gemini(headlines):
         f"3. **Extract key tickers** mentioned and their directional bias\n\n"
         f"HEADLINES:\n{headlines}\n\n"
         f"Write a streamlined daily briefing:\n\n"
+        f"**START WITH ONE-LINE HEADER:**\n"
+        f"Format: [📈/📉/➡️] Sentiment: [BULLISH/BEARISH/NEUTRAL] | 🌐 Driver: [key macro theme]\n"
+        f"Example: 📈 Sentiment: BULLISH | 🌐 Driver: Fed dovish pivot\n\n"
+        f"**THEN PROVIDE FULL BRIEFING:**\n\n"
         f"1. **🎯 Market Vibe Check**: Overall sentiment in ONE sentence (Bulls/Bears/Confused?)\n\n"
         f"2. **🔥 Top Market Movers** (3-5 consolidated topics, not 20 separate headlines):\n"
         f"   - Focus on what's ACTIONABLE for traders\n"
@@ -360,50 +364,6 @@ def analyze_with_gemini(headlines):
     response = model.generate_content(prompt)
     return response.text
 
-
-def analyze_structured_with_gemini(headlines):
-    """Ask Gemini for structured sentiment, impact, and directional cues."""
-    print("🤖 Getting structured summary from Gemini...\n")
-
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('models/gemini-2.0-flash-001')
-
-    prompt = (
-        "Summarize these headlines for trading decisions. Return ONLY JSON with this schema:\n"
-        "{\n"
-        "  \"overall_sentiment\": \"bullish|bearish|neutral\",\n"
-        "  \"macro_driver\": \"string\",\n"
-        "  \"high_impact_items\": [\n"
-        "    {\"title\": \"string\", \"direction\": \"up|down|mixed\", \"impact\": \"high|medium|low\", \"why\": \"string\"}\n"
-        "  ],\n"
-        "  \"top_tickers\": [\n"
-        "    {\"ticker\": \"string\", \"sentiment\": \"bullish|bearish|neutral\", \"why\": \"string\"}\n"
-        "  ]\n"
-        "}\n"
-        "Rules: be concise; limit high_impact_items to 5; limit top_tickers to 6; omit markdown; no extra text.\n"
-        f"Headlines:\n{headlines}"
-    )
-
-    response = model.generate_content(prompt)
-    return response.text or ""
-
-
-def _clean_structured_json(raw: str) -> str:
-    """Strip fences/markdown and extract the first JSON object if present."""
-    if not raw:
-        return ""
-    s = raw.strip()
-    # Remove Markdown fences/backticks if present
-    if s.startswith("```json"):
-        s = s[len("```json"):]
-    s = s.strip('`').strip()
-    # Extract JSON object between first { and last }
-    if '{' in s and '}' in s:
-        start = s.find('{')
-        end = s.rfind('}')
-        if end > start:
-            s = s[start:end+1]
-    return s
 
 def send_telegram_message(message):
     """Sends the analysis to Telegram"""
@@ -434,50 +394,6 @@ def send_telegram_message(message):
         print(f"✗ Telegram error: {e}\n")
 
 
-def build_structured_section(structured_json: str) -> str:
-    """Format structured JSON (string) into a compact text block."""
-    if not structured_json:
-        return ""
-    try:
-        cleaned = _clean_structured_json(structured_json)
-        if not cleaned:
-            return ""
-        data = json.loads(cleaned)
-    except Exception as e:
-        print(f"✗ Failed to parse structured summary: {e}")
-        return ""
-
-    overall = data.get("overall_sentiment", "neutral").upper()
-    macro = data.get("macro_driver", "")
-    items = data.get("high_impact_items", []) or []
-    tickers = data.get("top_tickers", []) or []
-
-    lines = []
-    lines.append(f"📈 Structured read: {overall}")
-    if macro:
-        lines.append(f"🌐 Macro: {macro}")
-
-    if items:
-        lines.append("🔥 High-impact moves:")
-        for itm in items[:5]:
-            title = itm.get("title", "")
-            direction = itm.get("direction", "")
-            impact = itm.get("impact", "")
-            why = itm.get("why", "")
-            arrow = "🟢" if direction == "up" else "🔴" if direction == "down" else "↔️"
-            lines.append(f"- {arrow} ({impact}) {title} — {why}")
-
-    if tickers:
-        lines.append("🎯 Top tickers:")
-        for t in tickers[:6]:
-            tk = t.get("ticker", "").upper()
-            sent = t.get("sentiment", "")
-            why = t.get("why", "")
-            emoji = "🟢" if sent == "bullish" else "🔴" if sent == "bearish" else "⚪"
-            lines.append(f"- {emoji} {tk}: {why}")
-
-    return "\n".join(lines)
-
 if __name__ == "__main__":
     print("=" * 60)
     print("🤖 MARKET SENTIMENT BOT")
@@ -501,14 +417,12 @@ if __name__ == "__main__":
                 send_telegram_message(error_msg)
             exit()
 
-        # 2. Analyze with Gemini (Phase 3: semantic consolidation + narrative + structured)
+        # 2. Analyze with Gemini (single optimized call)
         analysis = analyze_with_gemini(headlines_text)
-        structured_json = analyze_structured_with_gemini(headlines_text)
-        structured_block = build_structured_section(structured_json)
         
         # 3. Format message with optimization stats
         timestamp = datetime.now().strftime('%B %d, %Y at %I:%M %p')
-        header = f"🚀 **Optimized Market Intel** 📊\n_{timestamp}_\n\n"
+        header = f"🚀 Market Intel 📊\n{timestamp}\n\n"
         
         # Count impact levels
         critical_count = sum(1 for h in headline_metadata if h['impact_level'] == 'CRITICAL')
@@ -516,15 +430,12 @@ if __name__ == "__main__":
         
         footer = (
             f"\n\n━━━━━━━━━━━━━━━━━\n"
-            f"📊 _Intelligence: {len(headline_metadata)} curated headlines ({critical_count} critical, {high_count} high-impact)_\n"
-            f"🔍 _Sources: Bloomberg, WSJ, FT, CNBC, Finviz, SEC & 13 premium feeds_\n"
-            f"🤖 _AI-optimized by KHK Intelligence (3-phase filtering)_"
+            f"📊 Intelligence: {len(headline_metadata)} curated headlines ({critical_count} critical, {high_count} high-impact)\n"
+            f"🔍 Sources: Bloomberg, WSJ, FT, CNBC, Finviz, SEC & 13 premium feeds\n"
+            f"🤖 AI-optimized by KHK Intelligence"
         )
         
-        full_message = header
-        if structured_block:
-            full_message += structured_block + "\n\n"
-        full_message += analysis + footer
+        full_message = header + analysis + footer
         
         # 4. Send or print
         if TELEGRAM_TOKEN and CHAT_ID:
