@@ -378,15 +378,9 @@ class PortfolioRiskAnalyzer:
                     
                     print(f" ✓ ({len(returns)} days)")
                 
-                # For options: Apply delta adjustment to returns
-                if asset_class in ['OPT', 'FOP'] and not pd.isna(row.get('OptionDelta')):
-                    delta = row['OptionDelta']
-                    # Option return = delta × underlying return
-                    returns = returns * delta
-                    returns_data[symbol] = returns
-                else:
-                    # Stocks/ETFs: Use returns as-is
-                    returns_data[symbol] = returns
+                # Store returns as-is (delta adjustment handled via weights)
+                # For options: we use underlying returns, but weight by delta-adjusted notional
+                returns_data[symbol] = returns
                 
             except Exception as e:
                 print(f" ✗ Error: {e}")
@@ -401,6 +395,9 @@ class PortfolioRiskAnalyzer:
         
         # Create returns DataFrame
         self.returns = pd.DataFrame(returns_data)
+        
+        # Don't fill NaN - we'll handle it in portfolio returns calculation
+        # NaN means the security didn't trade that day (different exchange/holiday)
         
         print(f"\n  ✓ Historical data ready: {len(self.returns)} days, {len(self.returns.columns)} positions")
         return True
@@ -432,8 +429,24 @@ class PortfolioRiskAnalyzer:
         # Align weights with returns columns
         aligned_weights = weights.reindex(self.returns.columns).fillna(0)
         
-        # Portfolio returns = weighted sum
-        portfolio_returns = (self.returns * aligned_weights.values).sum(axis=1)
+        # Portfolio returns = weighted sum, but only on days with actual trades
+        # For each day, renormalize weights to only the positions that traded
+        portfolio_returns_list = []
+        for idx, row in self.returns.iterrows():
+            # Get non-NaN positions for this day
+            valid_mask = row.notna()
+            if valid_mask.sum() == 0:
+                continue  # Skip days with no trades
+            
+            # Renormalize weights to sum to 1 for positions that traded
+            day_weights = aligned_weights[valid_mask]
+            day_weights = day_weights / day_weights.sum()
+            
+            # Calculate portfolio return for this day
+            day_return = (row[valid_mask] * day_weights).sum()
+            portfolio_returns_list.append(day_return)
+        
+        portfolio_returns = pd.Series(portfolio_returns_list)
         
         # Sort returns (losses are negative)
         sorted_returns = portfolio_returns.sort_values()
@@ -446,9 +459,10 @@ class PortfolioRiskAnalyzer:
         # CVaR: Average of returns worse than VaR
         cvar_return = sorted_returns.iloc[:var_index].mean()
         
-        # Convert to dollar amounts
-        var_dollar = abs(var_return * self.portfolio_value)
-        cvar_dollar = abs(cvar_return * self.portfolio_value)
+        # Convert to dollar amounts (use positions_value, not total portfolio)
+        # VaR measures risk of active positions, not cash holdings
+        var_dollar = abs(var_return * self.positions_value)
+        cvar_dollar = abs(cvar_return * self.positions_value)
         
         return {
             'var_return': var_return,
@@ -456,7 +470,7 @@ class PortfolioRiskAnalyzer:
             'cvar_return': cvar_return,
             'cvar_dollar': cvar_dollar,
             'worst_return': sorted_returns.iloc[0],
-            'worst_dollar': abs(sorted_returns.iloc[0] * self.portfolio_value)
+            'worst_dollar': abs(sorted_returns.iloc[0] * self.positions_value)
         }
     
     def calculate_parametric_var_cvar(self, confidence=0.95):
@@ -473,12 +487,12 @@ class PortfolioRiskAnalyzer:
         # VaR using normal distribution
         z_score = stats.norm.ppf(1 - confidence)
         var_return = mu + z_score * sigma
-        var_dollar = abs(var_return * self.portfolio_value)
+        var_dollar = abs(var_return * self.positions_value)
         
         # CVaR formula for normal distribution
         pdf_at_var = stats.norm.pdf(z_score)
         cvar_return = mu - sigma * (pdf_at_var / (1 - confidence))
-        cvar_dollar = abs(cvar_return * self.portfolio_value)
+        cvar_dollar = abs(cvar_return * self.positions_value)
         
         return {
             'var_return': var_return,
