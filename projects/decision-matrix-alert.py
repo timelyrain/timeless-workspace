@@ -1,42 +1,59 @@
 #!/usr/bin/env python3
 """
-Decision Matrix Alert System
+Decision Matrix Alert System (2026 Edition - Synced with v2.0 Architecture)
 Synthesizes institutional risk signal + VaR/CVaR analysis into actionable daily recommendations.
 
+WHAT'S NEW (Feb 2026):
+🎯 7-CATEGORY PORTFOLIO STRUCTURE - Aligned with institutional-risk-signal.py v2.0
+📊 CATEGORY-LEVEL RISK - Integrates category_risk from portfolio-risk-var-cvar.py
+💰 INSTITUTIONAL HEDGING - 1-3% Omega cap by regime (cost discipline)
+📈 DRIFT-AWARE - Tracks actual vs target allocation by category
+🎪 REGIME-SPECIFIC - Recommendations adapt to risk score regime
+
+PORTFOLIO STRUCTURE (2026):
+- Global Triads: Strategic core ETFs (30% target baseline)
+- Four Horsemen: Growth engine ETFs (30% target baseline)
+- Cash Cow: Income strategy stocks (25% target baseline)
+- The Alpha: Speculation (2% target baseline)
+- The Omega: Insurance - SPY/QQQ bear spreads (1-3% by regime, CAPPED)
+- The Vault: Gold (5-25% by regime)
+- War Chest: Cash reserves (5-40% by regime)
+
 Architecture:
-    1. Loads latest risk_history.json (institutional risk score 0-100)
-    2. Loads latest portfolio_risk_YYYYMMDD.json (VaR/CVaR metrics)
+    1. Loads latest risk_history.json (institutional risk score 0-100 + drift_history)
+    2. Loads latest portfolio_risk_YYYYMMDD.json (VaR/CVaR + category_risk)
     3. Loads fetch-ibkr-positions.xlsx (current portfolio composition)
     4. Applies 15-quadrant decision matrix (Risk Score × VaR Level)
-    5. Generates specific recommendations based on current holdings
-    6. Sends consolidated Telegram alert (summary + full details)
+    5. Generates category-specific recommendations based on drift
+    6. Sends consolidated Telegram alert with hedging cost analysis
 
 Decision Matrix:
-    Risk Score × VaR Level = 15 quadrants with specific guidance
+    Risk Score × VaR Level = 15 quadrants with category-specific guidance
     
     VaR Levels:
         LOW:    Daily VaR < 0.30% of portfolio
         MEDIUM: Daily VaR 0.30-0.60% of portfolio  
         HIGH:   Daily VaR > 0.60% of portfolio
     
-    Risk Score Tiers:
-        EXTREME:  0-40  (Crisis mode)
-        HIGH:     40-60 (Defensive positioning)
-        ELEVATED: 60-75 (Cautious but invested)
-        NORMAL:   75-90 (Full deployment)
-        ALL_CLEAR: 90+  (Aggressive growth)
+    Risk Score Tiers (with dynamic allocation):
+        EXTREME:  0-40  (40% cash, 25% gold, 3% omega max)
+        HIGH:     40-60 (33% cash, 15% gold, 2% omega)
+        ELEVATED: 60-75 (24% cash, 10% gold, 1% omega)
+        NORMAL:   75-90 (10% cash, 7% gold, 1% omega)
+        ALL_CLEAR: 90+  (5% cash, 5% gold, 2.5% omega base)
 
 Usage:
     python decision-matrix-alert.py
 
 Requirements:
-    - risk_history.json (from institutional-risk-signal.py)
+    - risk_history.json (from institutional-risk-signal.py v2.0)
     - portfolio_risk_YYYYMMDD.json (from portfolio-risk-var-cvar.py)
     - fetch-ibkr-positions.xlsx (from fetch-ibkr-positions.py)
     - TELEGRAM_TOKEN_DECISION_MATRIX in .env
 
 Author: timeless-workspace
 Created: 2026-01-25
+Updated: 2026-02-02 (v2.0 sync - 7-category + institutional hedging)
 """
 
 import os
@@ -50,6 +67,45 @@ from typing import Dict, List, Tuple, Optional
 
 # Load environment variables
 load_dotenv()
+
+# Portfolio Category Mapping (2026 Structure - Synced with institutional-risk-signal.py v2.0)
+SYMBOL_MAPPING = {
+    'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
+    'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
+    'cash_cow': [
+        'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
+        'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
+        'NVDA', 'TSLA'
+    ],
+    'alpha': ['LCID'],  # Theme stocks
+    'omega': [],  # SPY/QQQ options only (detected from option symbols)
+    'vault': ['GSD'],  # Gold (WisdomTree Gold)
+    'war_chest': [],  # Cash (not tracked in stock positions)
+}
+
+# Target allocations by regime (from institutional-risk-signal.py v2.0)
+TARGET_ALLOCATIONS = {
+    'ALL_CLEAR': {
+        'global_triads': 0.30, 'four_horsemen': 0.30, 'cash_cow': 0.25,
+        'alpha': 0.02, 'omega': 0.025, 'vault': 0.05, 'war_chest': 0.05
+    },
+    'NORMAL': {
+        'global_triads': 0.30, 'four_horsemen': 0.27, 'cash_cow': 0.225,
+        'alpha': 0.016, 'omega': 0.01, 'vault': 0.07, 'war_chest': 0.10
+    },
+    'ELEVATED': {
+        'global_triads': 0.30, 'four_horsemen': 0.21, 'cash_cow': 0.125,
+        'alpha': 0.01, 'omega': 0.01, 'vault': 0.10, 'war_chest': 0.24
+    },
+    'HIGH': {
+        'global_triads': 0.24, 'four_horsemen': 0.09, 'cash_cow': 0.0,
+        'alpha': 0.0, 'omega': 0.02, 'vault': 0.15, 'war_chest': 0.33
+    },
+    'EXTREME': {
+        'global_triads': 0.09, 'four_horsemen': 0.0, 'cash_cow': 0.0,
+        'alpha': 0.0, 'omega': 0.03, 'vault': 0.25, 'war_chest': 0.39
+    }
+}
 
 class DecisionMatrixAnalyzer:
     """Synthesizes risk signals into actionable recommendations."""
@@ -142,6 +198,9 @@ class DecisionMatrixAnalyzer:
         # Get worst single-day portfolio loss from historical data
         worst_loss = var_data.get('worst_loss', 0)
         
+        # Extract category-level risk (NEW in v2.0)
+        category_risk = var_data.get('category_risk', {})
+        
         return {
             'var_95': var_95,
             'cvar_95': cvar_95,
@@ -149,6 +208,7 @@ class DecisionMatrixAnalyzer:
             'cvar_99': cvar_99,
             'worst_loss': worst_loss,
             'position_risks': var_data.get('position_risk', []),
+            'category_risk': category_risk,  # NEW: Category-level VaR/CVaR
             'date': var_data.get('timestamp', '').split('T')[0],
             'file': portfolio_files[0].name,
             'portfolio_value': var_data.get('portfolio_value', 0)
@@ -197,6 +257,57 @@ class DecisionMatrixAnalyzer:
             'top_holdings': combined_holdings.nlargest(5, 'weight')[['Symbol', 'weight']].to_dict('records'),
             'count': len(all_positions)
         }
+    
+    def load_drift_history(self) -> Optional[Dict]:
+        """Load portfolio drift history from risk_history.json (v2.0)."""
+        risk_file = self.projects_dir.parent / "risk_history.json"
+        
+        if not risk_file.exists():
+            return None
+        
+        try:
+            with open(risk_file, 'r') as f:
+                history = json.load(f)
+            
+            # Get drift_history if available
+            drift_history = history.get('drift_history', [])
+            if not drift_history:
+                return None
+            
+            # Get most recent drift snapshot
+            latest_drift = sorted(drift_history, key=lambda x: x['date'])[-1]
+            
+            return {
+                'total_drift': latest_drift.get('total_drift', 0),
+                'categories': latest_drift.get('categories', {}),
+                'date': latest_drift.get('date', '')
+            }
+        except Exception as e:
+            print(f"  ⚠️  Could not load drift history: {e}")
+            return None
+    
+    def calculate_category_allocations(self, portfolio: Dict, total_value: float) -> Dict:
+        """Calculate actual category allocations from current positions (v2.0)."""
+        category_values = {cat: 0.0 for cat in SYMBOL_MAPPING.keys()}
+        
+        # Categorize each position
+        for position in portfolio['positions']:
+            symbol = position.get('Symbol', '')
+            value = position.get('PositionValueUSD', 0)
+            
+            # Find which category this symbol belongs to
+            for category, symbols in SYMBOL_MAPPING.items():
+                if symbol in symbols:
+                    category_values[category] += value
+                    break
+        
+        # Convert to percentages
+        category_allocations = {
+            cat: (val / total_value) if total_value > 0 else 0
+            for cat, val in category_values.items()
+        }
+        
+        return category_allocations
     
     def classify_var_level(self, var_pct: float) -> str:
         """Classify VaR as LOW/MEDIUM/HIGH based on percentage of portfolio."""
@@ -372,97 +483,139 @@ class DecisionMatrixAnalyzer:
             'options': 'Review all'
         })
     
-    def generate_specific_recommendations(self, quadrant: Dict, portfolio: Dict, var_data: Dict) -> List[str]:
-        """Generate specific actions based on current portfolio holdings."""
+    def generate_specific_recommendations(self, quadrant: Dict, portfolio: Dict, var_data: Dict, 
+                                         risk_tier: str) -> List[str]:
+        """
+        Generate category-specific actions based on actual vs target allocation (v2.0).
+        Uses institutional hedging philosophy: cash-raising > position reduction > limited put hedging.
+        """
         recommendations = []
         
-        # Extract action type from headline
+        # Get target allocations for current risk regime
+        target_alloc = TARGET_ALLOCATIONS.get(risk_tier, TARGET_ALLOCATIONS['NORMAL'])
+        
+        # Calculate actual category allocations
+        actual_alloc = self.calculate_category_allocations(portfolio, portfolio['total_value'])
+        
+        # Calculate drift by category
+        category_drifts = {}
+        for category in SYMBOL_MAPPING.keys():
+            actual = actual_alloc.get(category, 0)
+            target = target_alloc.get(category, 0)
+            drift = actual - target
+            category_drifts[category] = {
+                'actual': actual,
+                'target': target,
+                'drift': drift,
+                'drift_pct': abs(drift) * 100,
+                'dollar_diff': drift * portfolio['total_value']
+            }
+        
+        # Sort categories by drift magnitude (largest misalignment first)
+        sorted_drifts = sorted(category_drifts.items(), 
+                              key=lambda x: abs(x[1]['drift']), reverse=True)
+        
+        # Generate category-specific recommendations
         action_type = quadrant['action'].lower()
         
-        # Get top risk contributors (sorted by CVaR contribution)
-        position_risks = var_data.get('position_risks', [])
-        top_risks = sorted(position_risks, key=lambda x: abs(x.get('cvar_95_dollar', 0)), reverse=True)[:5]
-        
-        if 'reduce' in action_type or 'cut' in action_type or 'trim' in action_type:
-            # Specific reduction recommendations
-            for pos in top_risks[:3]:
-                symbol = pos['symbol']
-                current_value = pos['value']
-                cvar_contrib_pct = abs(pos.get('cvar_95_dollar', 0)) / var_data.get('portfolio_value', 1) * 100
+        # 1. CATEGORY REBALANCING (always show top 3 drifts if >5%)
+        for category, drift_data in sorted_drifts[:3]:
+            if drift_data['drift_pct'] > 5:  # Only show if drift > 5%
+                cat_name = category.replace('_', ' ').title()
+                actual_pct = drift_data['actual'] * 100
+                target_pct = drift_data['target'] * 100
+                dollar_diff = abs(drift_data['dollar_diff'])
                 
-                if 'emergency' in action_type:
-                    reduction_pct = 50
-                elif 'significant' in action_type:
-                    reduction_pct = 30
-                else:
-                    reduction_pct = 20
-                
-                target_sell = current_value * (reduction_pct / 100)
-                recommendations.append(
-                    f"Sell ${target_sell:,.0f} of {symbol} ({reduction_pct}% reduction, "
-                    f"currently {cvar_contrib_pct:.1f}% of risk)"
-                )
-        
-        elif 'add' in action_type or 'deploy' in action_type:
-            # Specific growth recommendations
-            total_value = portfolio['total_value']
-            
-            if 'aggressive' in action_type:
-                deploy_pct = 15
-            elif 'growth' in action_type:
-                deploy_pct = 10
-            else:
-                deploy_pct = 5
-            
-            deploy_amount = total_value * (deploy_pct / 100)
-            
-            # Find positions with lowest risk (good candidates to add)
-            low_risk_positions = sorted(position_risks, 
-                                       key=lambda x: abs(x.get('cvar_95_dollar', 0)))[:3]
-            
-            per_position = deploy_amount / 3
-            for pos in low_risk_positions:
-                cvar_contrib_pct = abs(pos.get('cvar_95_dollar', 0)) / var_data.get('portfolio_value', 1) * 100
-                recommendations.append(
-                    f"Add ${per_position:,.0f} to {pos['symbol']} "
-                    f"(low risk: {cvar_contrib_pct:.1f}% of portfolio risk)"
-                )
-        
-        elif 'rebalance' in action_type:
-            # Concentration recommendations
-            for holding in portfolio['top_holdings'][:3]:
-                if holding['weight'] > 25:
-                    target_weight = 20
-                    reduction = (holding['weight'] - target_weight) / holding['weight'] * 100
+                if drift_data['drift'] > 0:  # Overweight
                     recommendations.append(
-                        f"Reduce {holding['Symbol']} from {holding['weight']:.1f}% to {target_weight}% "
-                        f"(sell {reduction:.0f}% of position)"
+                        f"📉 {cat_name}: {actual_pct:.1f}% → {target_pct:.1f}% "
+                        f"(reduce ${dollar_diff:,.0f})"
+                    )
+                else:  # Underweight
+                    recommendations.append(
+                        f"📈 {cat_name}: {actual_pct:.1f}% → {target_pct:.1f}% "
+                        f"(add ${dollar_diff:,.0f})"
                     )
         
-        # Add concentration warning if any position > 25%
-        for holding in portfolio['top_holdings']:
-            if holding['weight'] > 25:
+        # 2. INSTITUTIONAL HEDGING GUIDANCE (Omega-specific)
+        omega_actual = actual_alloc.get('omega', 0) * 100
+        omega_target = target_alloc.get('omega', 0) * 100
+        omega_dollar = omega_actual * portfolio['total_value'] / 100
+        
+        if omega_actual < omega_target * 0.8:  # More than 20% under-hedged
+            recommendations.append(
+                f"🛡️ Omega (Insurance): {omega_actual:.1f}% → {omega_target:.1f}% "
+                f"(add ${(omega_target - omega_actual) * portfolio['total_value'] / 100:,.0f} in put spreads, NOT naked puts)"
+            )
+        elif omega_actual > omega_target * 1.2:  # More than 20% over-hedged
+            annual_cost = omega_dollar * 0.30  # Estimate 30% annual decay
+            recommendations.append(
+                f"💸 Omega (Insurance): {omega_actual:.1f}% → {omega_target:.1f}% "
+                f"(trim ${(omega_actual - omega_target) * portfolio['total_value'] / 100:,.0f}, "
+                f"saves ~${annual_cost:,.0f}/year theta)"
+            )
+        
+        # 3. CASH vs HEDGING TRADE-OFF
+        war_chest_actual = actual_alloc.get('war_chest', 0) * 100
+        war_chest_target = target_alloc.get('war_chest', 0) * 100
+        
+        if war_chest_actual > war_chest_target + 10:  # Excess cash (>10% over target)
+            excess_cash = (war_chest_actual - war_chest_target) * portfolio['total_value'] / 100
+            recommendations.append(
+                f"💰 War Chest: {war_chest_actual:.1f}% → {war_chest_target:.1f}% "
+                f"(deploy ${excess_cash:,.0f} to underweight categories)"
+            )
+        elif war_chest_actual < war_chest_target - 5:  # Insufficient cash (<5% under target)
+            cash_needed = (war_chest_target - war_chest_actual) * portfolio['total_value'] / 100
+            recommendations.append(
+                f"🔴 War Chest: {war_chest_actual:.1f}% → {war_chest_target:.1f}% "
+                f"(raise ${cash_needed:,.0f} by selling overweight positions)"
+            )
+        
+        # 4. CATEGORY RISK WARNINGS (from VaR data)
+        category_risk = var_data.get('category_risk', {})
+        for category, risk_data in category_risk.items():
+            cvar_dollar = risk_data.get('cvar_95_dollar', 0)
+            cvar_pct = risk_data.get('cvar_95_pct', 0) * 100
+            
+            # Warn if category CVaR > 2% (high risk)
+            if cvar_pct > 2:
+                cat_name = category.replace('_', ' ').title()
                 recommendations.append(
-                    f"⚠️ Concentration Alert: {holding['Symbol']} at {holding['weight']:.1f}% "
-                    f"(target: <25%)"
+                    f"⚠️ {cat_name} High Risk: CVaR ${cvar_dollar:,.0f} ({cvar_pct:.1f}% daily)"
                 )
         
-        return recommendations
+        # 5. REGIME-SPECIFIC GUIDANCE
+        if 'reduce' in action_type or 'cut' in action_type:
+            # Emergency mode - focus on cash raising, not hedging
+            recommendations.append(
+                f"🚨 Priority: Sell positions to raise cash to {target_alloc.get('war_chest', 0)*100:.0f}%, "
+                f"NOT buy expensive puts (theta will kill you)"
+            )
+        
+        return recommendations[:8]  # Limit to top 8 recommendations
     
     def format_telegram_message(self, risk_data: Dict, var_data: Dict, 
                                 portfolio: Dict, quadrant: Dict, 
-                                recommendations: List[str]) -> str:
-        """Format comprehensive Telegram message with summary + details."""
+                                recommendations: List[str], risk_tier: str) -> str:
+        """Format comprehensive Telegram message with category breakdown (v2.0)."""
         
         # Calculate VaR percentage
         var_pct = (var_data['var_95'] / portfolio['total_value']) * 100
         var_level = self.classify_var_level(var_pct)
         
+        # Get target allocations for regime
+        target_alloc = TARGET_ALLOCATIONS.get(risk_tier, TARGET_ALLOCATIONS['NORMAL'])
+        actual_alloc = self.calculate_category_allocations(portfolio, portfolio['total_value'])
+        
+        # Load drift history if available
+        drift_history = self.load_drift_history()
+        
         # Build message sections
         msg_parts = []
         
         # ===== SUMMARY SECTION =====
-        msg_parts.append("📊 DAILY DECISION MATRIX")
+        msg_parts.append("📊 DECISION MATRIX (v2.0 - 7-Category)")
         msg_parts.append("")
         msg_parts.append(f"{quadrant['headline']}")
         msg_parts.append(f"Action: {quadrant['action']}")
@@ -472,6 +625,12 @@ class DecisionMatrixAnalyzer:
         msg_parts.append(f"Portfolio: ${portfolio['total_value']:,.0f} ({portfolio['count']} positions)")
         msg_parts.append("")
         
+        # Portfolio drift status
+        if drift_history:
+            total_drift = drift_history['total_drift'] * 100
+            msg_parts.append(f"⚠️ Portfolio Drift: {total_drift:.0f}% (target: <5%)")
+            msg_parts.append("")
+        
         # Decision gates
         msg_parts.append("🚦 Decision Gates:")
         msg_parts.append(f"  • New Positions: {quadrant['new_positions']}")
@@ -479,11 +638,49 @@ class DecisionMatrixAnalyzer:
         msg_parts.append(f"  • Options: {quadrant['options']}")
         msg_parts.append("")
         
-        # Specific recommendations
+        # Category-specific recommendations
         if recommendations:
-            msg_parts.append("📋 Specific Actions:")
-            for i, rec in enumerate(recommendations[:5], 1):  # Top 5 recommendations
+            msg_parts.append("📋 Category Actions:")
+            for i, rec in enumerate(recommendations[:6], 1):  # Top 6 recommendations
                 msg_parts.append(f"  {i}. {rec}")
+            msg_parts.append("")
+        
+        # ===== CATEGORY BREAKDOWN SECTION =====
+        msg_parts.append("📂 CATEGORY ALLOCATION:")
+        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
+            actual = actual_alloc.get(category, 0) * 100
+            target = target_alloc.get(category, 0) * 100
+            drift = actual - target
+            
+            cat_name = category.replace('_', ' ').title()
+            drift_symbol = "✓" if abs(drift) < 5 else ("📈" if drift < 0 else "📉")
+            msg_parts.append(f"  {cat_name}: {actual:.1f}% → {target:.1f}% {drift_symbol}")
+        msg_parts.append("")
+        
+        # ===== INSTITUTIONAL HEDGING STATUS =====
+        omega_actual = actual_alloc.get('omega', 0) * 100
+        omega_target = target_alloc.get('omega', 0) * 100
+        omega_dollar = omega_actual * portfolio['total_value'] / 100
+        annual_cost = omega_dollar * 0.30  # Estimate 30% annual decay
+        
+        msg_parts.append("🛡️ HEDGING COST DISCIPLINE:")
+        msg_parts.append(f"  Omega: {omega_actual:.1f}% (target: {omega_target:.1f}%)")
+        msg_parts.append(f"  Capital: ${omega_dollar:,.0f}")
+        msg_parts.append(f"  Est. Annual Cost: ${annual_cost:,.0f} (theta decay)")
+        msg_parts.append("  ⚠️ Cap: 1% (ELEVATED), 2% (HIGH), 3% (EXTREME)")
+        msg_parts.append("")
+        
+        # ===== CATEGORY RISK BREAKDOWN =====
+        category_risk = var_data.get('category_risk', {})
+        if category_risk:
+            msg_parts.append("📊 CATEGORY RISK (CVaR @ 95%):")
+            for category, risk_data in sorted(category_risk.items(), 
+                                             key=lambda x: x[1].get('cvar_95_dollar', 0), 
+                                             reverse=True)[:5]:
+                cat_name = category.replace('_', ' ').title()
+                cvar = risk_data.get('cvar_95_dollar', 0)
+                cvar_pct = risk_data.get('cvar_95_pct', 0) * 100
+                msg_parts.append(f"  {cat_name}: ${cvar:,.0f} ({cvar_pct:.1f}%)")
             msg_parts.append("")
         
         # ===== FULL DETAILS SECTION =====
@@ -495,20 +692,12 @@ class DecisionMatrixAnalyzer:
         msg_parts.append(f"  Risk Score: {risk_data['score']:.2f}/100")
         msg_parts.append(f"  Tier: {risk_data['tier']}")
         msg_parts.append(f"  Date: {risk_data['date']}")
-        
-        if risk_data['allocation']:
-            msg_parts.append("  Target Allocation:")
-            for key, val in risk_data['allocation'].items():
-                if isinstance(val, (int, float)):
-                    msg_parts.append(f"    • {key}: {val}%")
         msg_parts.append("")
         
         # Portfolio risk metrics
         msg_parts.append("📊 Portfolio Risk Metrics:")
         msg_parts.append(f"  VaR (95%): ${var_data['var_95']:,.0f} ({var_pct:.2f}%)")
         msg_parts.append(f"  CVaR (95%): ${var_data['cvar_95']:,.0f}")
-        msg_parts.append(f"  VaR (99%): ${var_data['var_99']:,.0f}")
-        msg_parts.append(f"  CVaR (99%): ${var_data['cvar_99']:,.0f}")
         msg_parts.append(f"  Worst Loss: ${var_data['worst_loss']:,.0f}")
         msg_parts.append("")
         
@@ -636,14 +825,14 @@ class DecisionMatrixAnalyzer:
             print()
             
             # Generate specific recommendations
-            print("💡 Generating specific recommendations...")
-            recommendations = self.generate_specific_recommendations(quadrant, portfolio, var_data)
+            print("💡 Generating category-specific recommendations...")
+            recommendations = self.generate_specific_recommendations(quadrant, portfolio, var_data, risk_tier)
             print(f"  Generated {len(recommendations)} specific actions")
             print()
             
             # Format message
             message = self.format_telegram_message(risk_data, var_data, portfolio, 
-                                                   quadrant, recommendations)
+                                                   quadrant, recommendations, risk_tier)
             
             # Send alert
             print("📤 Sending Telegram alert...")
