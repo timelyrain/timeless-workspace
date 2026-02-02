@@ -65,19 +65,38 @@ load_dotenv(env_path)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_VAR_CVAR")
 CHAT_ID = os.environ.get("CHAT_ID")
 
-# Portfolio Category Mapping (2026 Structure - Synced with institutional-risk-signal.py)
+# Portfolio Category Mapping (2026 Structure - Synced with Dashboard K4-K23)
+# Source of truth: fetch-ibkr-positions-dashboard.xlsx
 SYMBOL_MAPPING = {
-    'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
-    'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
+    'global_triads': [
+        '82846',    # K5: China ETF
+        'DHL',      # K6: Dividend
+        'ES3',      # K7: Singapore banks
+        'VWRA',     # K8: VT USD
+        'WORLD',    # K9: VT, no EM, hedged
+        'XMME',     # K10: EM, unhedged
+    ],
+    'four_horsemen': [
+        'CSNDX',    # K12: Nasdaq
+        'EQCH',     # K13: Nasdaq, hedged
+        'CBUK',     # K14: China Tech, unhedged
+        'HEAL',     # K15: Biotic
+        'INRA',     # K16: Energy
+        'LOCK',     # K18: Security
+    ],
     'cash_cow': [
+        # K19: Mega-caps for options wheel (stocks + options)
         'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
         'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
         'NVDA', 'TSLA'
     ],
-    'alpha': ['LCID'],  # Theme stocks
-    'omega': [],  # SPY/QQQ options only (Phase 2)
-    'vault': ['GSD'],  # Gold (WisdomTree Gold)
-    'war_chest': [],  # Cash (not tracked in stock positions)
+    'alpha': [
+        # K20: Theme stocks, speculation
+        'BITO', 'CELH', 'CHA', 'IBKR', 'LKNCY', 'LCID', 'SE'
+    ],
+    'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
+    'vault': ['GSD'],  # K22: Gold (WisdomTree Gold)
+    'war_chest': [],  # K23: Cash (tracked in Dashboard, not in positions file)
 }
 
 # Configuration
@@ -288,10 +307,20 @@ class PortfolioRiskAnalyzer:
                 options_agg[options_cols]
             ], ignore_index=True)
             
-            # Calculate portfolio value
-            self.portfolio_value = self.positions['PositionValueUSD'].sum()
+            # Calculate portfolio value from positions (stocks + options)
+            positions_value = self.positions['PositionValueUSD'].sum()
             
-            # Calculate position weights
+            # Load War Chest (cash) from Dashboard - adds to total portfolio value
+            dashboard_file = os.path.join(os.path.dirname(self.positions_file), 'fetch-ibkr-positions-dashboard.xlsx')
+            df_dashboard = pd.read_excel(dashboard_file, sheet_name='Dashboard', header=None)
+            war_chest_value = df_dashboard.iloc[22, 10]  # K23 (row 22, col 10)
+            
+            # Total portfolio value = positions + cash
+            self.portfolio_value = positions_value + war_chest_value
+            self.war_chest_value = war_chest_value
+            self.positions_value = positions_value
+            
+            # Calculate position weights (based on TOTAL portfolio including cash)
             self.positions['Weight'] = self.positions['PositionValueUSD'] / self.portfolio_value
             
             # Count stocks vs options
@@ -299,7 +328,9 @@ class PortfolioRiskAnalyzer:
             num_options = len(self.positions[self.positions['AssetClass'].isin(['OPT', 'FOP'])])
             
             print(f"  ✓ Loaded {num_stocks} stock/ETF positions + {num_options} options positions")
-            print(f"  ✓ Portfolio value: ${self.portfolio_value:,.2f}")
+            print(f"  ✓ Positions value: ${positions_value:,.2f}")
+            print(f"  ✓ War Chest (cash): ${war_chest_value:,.2f}")
+            print(f"  ✓ Total portfolio: ${self.portfolio_value:,.2f}")
             
             # Show category breakdown
             category_summary = self.positions.groupby('Category').agg({
@@ -555,8 +586,15 @@ class PortfolioRiskAnalyzer:
         
         category_risks = {}
         
-        # Group positions by category
-        for category in SYMBOL_MAPPING.keys():
+        # Get all unique categories (including uncategorized if any)
+        all_categories = list(SYMBOL_MAPPING.keys())
+        
+        # Add uncategorized if we have any uncategorized positions
+        if len(self.positions[self.positions['Category'] == 'uncategorized']) > 0:
+            all_categories.append('uncategorized')
+        
+        # Calculate risk for each category
+        for category in all_categories:
             cat_positions = self.positions[self.positions['Category'] == category]
             
             if len(cat_positions) == 0:
@@ -576,11 +614,15 @@ class PortfolioRiskAnalyzer:
             cat_pos_subset = cat_positions[cat_positions['Symbol'].isin(cat_symbols)]
             cat_pos_subset['CatWeight'] = cat_pos_subset['PositionValueUSD'] / cat_value
             
-            # Weighted sum of returns within category
+            # Weighted sum of returns within category (handle NaN from different time periods)
             cat_returns = pd.Series(0.0, index=self.returns.index)
             for _, pos in cat_pos_subset.iterrows():
                 if pos['Symbol'] in self.returns.columns:
-                    cat_returns += self.returns[pos['Symbol']] * pos['CatWeight']
+                    pos_returns = self.returns[pos['Symbol']].fillna(0)  # Fill NaN with 0
+                    cat_returns += pos_returns * pos['CatWeight']
+            
+            # Remove any remaining NaN values
+            cat_returns = cat_returns.fillna(0)
             
             # Calculate 95% VaR/CVaR for category
             sorted_returns = cat_returns.sort_values()
@@ -591,14 +633,18 @@ class PortfolioRiskAnalyzer:
                 
             var_return = sorted_returns.iloc[var_idx]
             cvar_return = sorted_returns.iloc[:var_idx].mean()
+            volatility = cat_returns.std()
             
-            # Skip if returns are all zeros or invalid
-            if pd.isna(var_return) or pd.isna(cvar_return) or cat_returns.std() == 0:
+            # Skip if returns are all zeros or invalid (but allow small volatility)
+            if pd.isna(var_return) or pd.isna(cvar_return) or pd.isna(volatility):
+                continue
+            
+            # Skip if zero volatility (all returns are exactly same)
+            if volatility == 0:
                 continue
             
             var_dollar = abs(var_return * cat_value)
             cvar_dollar = abs(cvar_return * cat_value)
-            volatility = cat_returns.std()
             
             category_risks[category] = {
                 'value': cat_value,
@@ -673,7 +719,7 @@ class PortfolioRiskAnalyzer:
         
         # Display category risk breakdown
         print("\n" + "=" * 80)
-        print("📂 CATEGORY-LEVEL RISK (Aligned with institutional-risk-signal.py)")
+        print("📂 CATEGORY-LEVEL RISK (Aligned with Dashboard)")
         print("=" * 80)
         
         # Sort categories by CVaR (highest risk first)
@@ -685,6 +731,14 @@ class PortfolioRiskAnalyzer:
             print(f"   95% VaR:  ${risk['var_95_dollar']:>10,.2f} ({risk['var_95_pct']:>6.2%})")
             print(f"   95% CVaR: ${risk['cvar_95_dollar']:>10,.2f} ({risk['cvar_95_pct']:>6.2%})")
             print(f"   Volatility: {risk['volatility']:>6.2%} daily | Positions: {risk['positions']}")
+        
+        # Add War Chest (zero VaR since cash doesn't move)
+        if hasattr(self, 'war_chest_value') and self.war_chest_value > 0:
+            print(f"\n📊 WAR CHEST (CASH)")
+            print(f"   Value: ${self.war_chest_value:>12,.2f} ({self.war_chest_value/self.portfolio_value:>6.2%} of portfolio)")
+            print(f"   95% VaR:  ${0:>10,.2f} (0.00%)")
+            print(f"   95% CVaR: ${0:>10,.2f} (0.00%)")
+            print(f"   Volatility:  0.00% daily | Risk: None (cash)")
         
         print("\n" + "=" * 80)
         print("🎯 TOP 10 RISKIEST POSITIONS (by CVaR)")
