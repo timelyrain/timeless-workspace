@@ -1,42 +1,48 @@
 🎯 RISK DASHBOARD v2.0
-📅 Feb 02, 2026 @ 01:43
+📅 Feb 02, 2026 @ 16:17
 
 ✅ DATA: 22/22 signals (100%)
 
-📊 SCORE: 65.1/100
+📊 SCORE: 64.4/100
 🎚️ ★★★☆☆ ELEVATED
 
 💼 PORTFOLIO ALLOCATION (Actual → Target)
-Global Triads: 29.2% → 30.2%
-Four Horsemen: 20.5% → 21.1%
-Cash Cow: 14.8% → 12.6%
-The Alpha: 1.4% → 1.0%
-The Omega: 1.3% → 10.1% (+8.8% ⚠️)
-The Vault: 1.2% → 10.1% (+8.9% ⚠️)
-War Chest: 31.7% → 15.1% (-16.6% ⚠️)
+Global Triads: 29.2% → 32.1%
+Four Horsemen: 20.5% → 19.2%
+Cash Cow: 14.8% → 10.7% (-4.1% ⚡)
+The Alpha: 1.4% → 0.6%
+The Omega: 1.3% → 1.1%
+The Vault: 1.2% → 10.7% (+9.5% ⚠️)
+War Chest: 31.7% → 25.6% (-6.0% ⚠️)
 
-⚠️ DRIFT: 38% total 📉 (27% from 4d ago)
-📋 Omega: underweight by 9%, Vault: underweight by 9%
+⚠️ DRIFT: 25% total 📉 Rebalancing working - keep deploying cash (was -16%)
+📋 Cash Cow: overweight by 4%, Vault: underweight by 10%
 
 🛡️ Stops: 10-12%
-📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions
+📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging: 2-3 put spreads max
 
-💡 ACTION: REDUCE RISK - Cut growth/income, raise reserves and hedge
+💡 ACTION: REDUCE RISK - Cut positions, raise cash to 24%. Light hedging (1% only)
 
 🔄 REBALANCING RECOMMENDATIONS
 SELL (Overweight):
-  • War Chest: $168k (17% over)
+  • Cash Cow: $41k (4% over)
+  • War Chest: $61k (6% over)
 BUY (Underweight):
-  • Omega: $89k (9% under)
-  • Vault: $90k (9% under)
+  • Vault: $96k (10% under)
+
+📊 INCOME STRATEGY POSITIONS
+  • CSPs: 7 active
+  • Covered Calls: 6 active
+  • Stock Holdings: 5 positions ($153k)
+  • Nearest Expiry: 3 days 🔴 URGENT
 
 📈 TIER SCORES
-T1: 34.2/45 Credit+Macro (76%)
+T1: 33.2/45 Credit+Macro (74%)
 T2: 45.0/60 Positioning+InstFlows (75%)
 T3: 21.0/49 Options+Structure (43%)
 
-📊 RISK TREND (15 days)
-↘️ Score: 68 → 65 (-3 pts)
+📊 RISK TREND (18 days)
+↘️ Score: 68 → 64 (-4 pts)
 
 📊 KEY SIGNALS
 HY Spread: 2.77%

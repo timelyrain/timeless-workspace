@@ -261,6 +261,14 @@ class PortfolioRiskAnalyzer:
             # Calculate portfolio value from positions (stocks + options)
             positions_value = self.positions['PositionValueUSD'].sum()
             
+            # For VaR/CVaR: EXCLUDE options (only stocks from Global Triads, Four Horsemen, Alpha, Vault)
+            # Options have non-linear risk and no delta data - tracked separately via theta decay
+            var_positions = self.positions[
+                (self.positions['AssetClass'] == 'STK') & 
+                (self.positions['Category'].isin(['global_triads', 'four_horsemen', 'alpha', 'vault']))
+            ]
+            self.positions_value_for_var = var_positions['PositionValueUSD'].sum()
+            
             # Load War Chest (cash) from Dashboard - adds to total portfolio value
             dashboard_file = os.path.join(os.path.dirname(self.positions_file), 'fetch-ibkr-positions-dashboard.xlsx')
             df_dashboard = pd.read_excel(dashboard_file, sheet_name='Dashboard', header=None)
@@ -280,6 +288,7 @@ class PortfolioRiskAnalyzer:
             
             print(f"  ✓ Loaded {num_stocks} stock/ETF positions + {num_options} options positions")
             print(f"  ✓ Positions value: ${positions_value:,.2f}")
+            print(f"  ✓ VaR/CVaR calculation base: ${self.positions_value_for_var:,.2f}")
             print(f"  ✓ War Chest (cash): ${war_chest_value:,.2f}")
             print(f"  ✓ Total portfolio: ${self.portfolio_value:,.2f}")
             
@@ -293,23 +302,6 @@ class PortfolioRiskAnalyzer:
             print(f"\n  📊 Category Breakdown:")
             for category, row in category_summary.iterrows():
                 print(f"     {category:20s}: ${row['PositionValueUSD']:>12,.0f} ({row['Percentage']:>5.1f}%) - {int(row['Count'])} positions")
-            
-            # Show options theta summary for Cash Cow and Omega
-            options_pos = self.positions[self.positions['AssetClass'].isin(['OPT', 'FOP'])]
-            if len(options_pos) > 0:
-                total_theta = options_pos['ThetaDecayAnnual'].sum()
-                cash_cow_theta = options_pos[options_pos['Category'] == 'cash_cow']['ThetaDecayAnnual'].sum()
-                omega_theta = options_pos[options_pos['Category'] == 'omega']['ThetaDecayAnnual'].sum()
-                
-                print(f"\n  📊 Options Theta Decay (Annual Est.):")
-                if abs(cash_cow_theta) > 0:
-                    theta_sign = "📈" if cash_cow_theta > 0 else "📉"
-                    print(f"     Cash Cow   : {theta_sign} ${cash_cow_theta:>10,.0f} ({'income' if cash_cow_theta > 0 else 'cost'})")
-                if abs(omega_theta) > 0:
-                    theta_sign = "📈" if omega_theta > 0 else "📉"
-                    print(f"     Omega      : {theta_sign} ${omega_theta:>10,.0f} ({'income' if omega_theta > 0 else 'cost'})")
-                if abs(total_theta) > 0:
-                    print(f"     Total      : ${total_theta:>10,.0f} (net {'income' if total_theta > 0 else 'cost'})")
             
             # Show exchange mapping summary
             exchange_counts = self.positions['ListingExchange'].value_counts()
@@ -336,8 +328,20 @@ class PortfolioRiskAnalyzer:
         return f"{symbol}{suffix}" if suffix else symbol
     
     def fetch_historical_data(self):
-        """Fetch historical price data for all positions (stocks + options with delta adjustment)"""
+        """Fetch historical price data for VaR-eligible positions (stocks only - excludes options and cash)"""
         print(f"\n📊 Fetching {HISTORICAL_DAYS} days of historical data...")
+        
+        # Filter to VaR-eligible positions only (stocks from Global Triads, Four Horsemen, Alpha, Vault)
+        var_positions = self.positions[
+            (self.positions['AssetClass'] == 'STK') & 
+            (self.positions['Category'].isin(['global_triads', 'four_horsemen', 'alpha', 'vault']))
+        ].copy()
+        
+        if len(var_positions) == 0:
+            print("  ⚠️  No VaR-eligible positions found")
+            return False
+        
+        print(f"  ℹ️  VaR calculation: {len(var_positions)} stocks (excluding {len(self.positions) - len(var_positions)} options/other)")
         
         end_date = datetime.now()
         start_date = end_date - timedelta(days=HISTORICAL_DAYS + 50)  # Extra buffer for weekends
@@ -345,41 +349,29 @@ class PortfolioRiskAnalyzer:
         returns_data = {}
         failed_symbols = []
         
-        # Group options by underlying to avoid duplicate fetches
-        underlying_cache = {}
-        
-        for idx, row in self.positions.iterrows():
+        for idx, row in var_positions.iterrows():
             symbol = row['Symbol']
             yf_ticker = row['YFinanceTicker']
             exchange = row['ListingExchange']
             asset_class = row['AssetClass']
             
             try:
-                # Check if we already fetched this underlying
-                if yf_ticker in underlying_cache:
-                    print(f"  Using cached data for {symbol} (underlying: {yf_ticker})...")
-                    returns = underlying_cache[yf_ticker].copy()
-                else:
-                    print(f"  Fetching {symbol} ({yf_ticker} @ {exchange})...", end='')
-                    ticker = yf.Ticker(yf_ticker)
-                    hist = ticker.history(start=start_date, end=end_date)
-                    
-                    if len(hist) < 100:  # Need minimum data
-                        print(f" ⚠️  Insufficient data ({len(hist)} days)")
-                        failed_symbols.append(symbol)
-                        continue
-                    
-                    # Calculate daily returns
-                    returns = hist['Close'].pct_change(fill_method=None).dropna()
-                    returns = returns.tail(HISTORICAL_DAYS)
-                    
-                    # Cache for reuse by other options on same underlying
-                    underlying_cache[yf_ticker] = returns.copy()
-                    
-                    print(f" ✓ ({len(returns)} days)")
+                print(f"  Fetching {symbol} ({yf_ticker} @ {exchange})...", end='')
+                ticker = yf.Ticker(yf_ticker)
+                hist = ticker.history(start=start_date, end=end_date)
                 
-                # Store returns as-is (delta adjustment handled via weights)
-                # For options: we use underlying returns, but weight by delta-adjusted notional
+                if len(hist) < 100:  # Need minimum data
+                    print(f" ⚠️  Insufficient data ({len(hist)} days)")
+                    failed_symbols.append(symbol)
+                    continue
+                
+                # Calculate daily returns
+                returns = hist['Close'].pct_change(fill_method=None).dropna()
+                returns = returns.tail(HISTORICAL_DAYS)
+                
+                print(f" ✓ ({len(returns)} days)")
+                
+                # Stocks/ETFs: Use returns as-is
                 returns_data[symbol] = returns
                 
             except Exception as e:
@@ -388,10 +380,14 @@ class PortfolioRiskAnalyzer:
         
         if failed_symbols:
             print(f"\n  ⚠️  Failed to fetch: {', '.join(failed_symbols)}")
-            # Remove failed positions
-            self.positions = self.positions[~self.positions['Symbol'].isin(failed_symbols)]
-            # Recalculate weights
-            self.positions['Weight'] = self.positions['PositionValueUSD'] / self.positions['PositionValueUSD'].sum()
+            # Remove failed positions from var_positions
+            var_positions = var_positions[~var_positions['Symbol'].isin(failed_symbols)]
+        
+        # Store filtered positions for VaR calculation
+        self.var_positions = var_positions
+        
+        # Recalculate VaR positions value after removing failed fetches
+        self.positions_value_for_var = var_positions['PositionValueUSD'].sum()
         
         # Create returns DataFrame
         self.returns = pd.DataFrame(returns_data)
@@ -459,10 +455,10 @@ class PortfolioRiskAnalyzer:
         # CVaR: Average of returns worse than VaR
         cvar_return = sorted_returns.iloc[:var_index].mean()
         
-        # Convert to dollar amounts (use positions_value, not total portfolio)
-        # VaR measures risk of active positions, not cash holdings
-        var_dollar = abs(var_return * self.positions_value)
-        cvar_dollar = abs(cvar_return * self.positions_value)
+        # Convert to dollar amounts (use positions_value_for_var, not total portfolio)
+        # VaR measures risk of VaR-eligible positions only (stocks, excluding options and cash)
+        var_dollar = abs(var_return * self.positions_value_for_var)
+        cvar_dollar = abs(cvar_return * self.positions_value_for_var)
         
         return {
             'var_return': var_return,
@@ -470,7 +466,7 @@ class PortfolioRiskAnalyzer:
             'cvar_return': cvar_return,
             'cvar_dollar': cvar_dollar,
             'worst_return': sorted_returns.iloc[0],
-            'worst_dollar': abs(sorted_returns.iloc[0] * self.positions_value)
+            'worst_dollar': abs(sorted_returns.iloc[0] * self.positions_value_for_var)
         }
     
     def calculate_parametric_var_cvar(self, confidence=0.95):
@@ -487,12 +483,12 @@ class PortfolioRiskAnalyzer:
         # VaR using normal distribution
         z_score = stats.norm.ppf(1 - confidence)
         var_return = mu + z_score * sigma
-        var_dollar = abs(var_return * self.positions_value)
+        var_dollar = abs(var_return * self.positions_value_for_var)
         
         # CVaR formula for normal distribution
         pdf_at_var = stats.norm.pdf(z_score)
         cvar_return = mu - sigma * (pdf_at_var / (1 - confidence))
-        cvar_dollar = abs(cvar_return * self.positions_value)
+        cvar_dollar = abs(cvar_return * self.positions_value_for_var)
         
         return {
             'var_return': var_return,
@@ -504,12 +500,12 @@ class PortfolioRiskAnalyzer:
         }
     
     def calculate_position_risk(self):
-        """Calculate individual position contributions to portfolio risk"""
+        """Calculate individual position contributions to portfolio risk (VaR-eligible stocks only)"""
         print("\n📈 Calculating position-level risk...")
         
         position_risks = []
         
-        for _, pos in self.positions.iterrows():
+        for _, pos in self.var_positions.iterrows():
             symbol = pos['Symbol']
             
             if symbol not in self.returns.columns:
@@ -687,8 +683,16 @@ class PortfolioRiskAnalyzer:
         print("📂 CATEGORY-LEVEL RISK (Aligned with Dashboard)")
         print("=" * 80)
         
-        # Sort categories by CVaR (highest risk first)
-        sorted_categories = sorted(category_risks.items(), key=lambda x: x[1]['cvar_95_dollar'], reverse=True)
+        # Order: Global Triads, Four Horsemen, Alpha, Vault (then any others)
+        category_order = ['global_triads', 'four_horsemen', 'alpha', 'vault']
+        sorted_categories = []
+        for cat in category_order:
+            if cat in category_risks:
+                sorted_categories.append((cat, category_risks[cat]))
+        # Add any remaining categories not in the order list
+        for cat, risk in category_risks.items():
+            if cat not in category_order:
+                sorted_categories.append((cat, risk))
         
         for category, risk in sorted_categories:
             print(f"\n📊 {category.upper().replace('_', ' ')}")
@@ -716,8 +720,9 @@ class PortfolioRiskAnalyzer:
             print(f"   95% CVaR: ${pos['cvar_95_dollar']:>10,.2f} ({pos['cvar_95_pct']:>6.2%})")
             print(f"   Volatility: {pos['volatility']:>6.2%} daily")
         
-        # Store portfolio value
+        # Store portfolio values
         self.results['portfolio_value'] = self.portfolio_value
+        self.results['positions_value_for_var'] = self.positions_value_for_var
         
         return True
     
@@ -737,57 +742,47 @@ class PortfolioRiskAnalyzer:
         # Build message
         message = f"📊 *DAILY PORTFOLIO VaR\CVaR RISK REPORT*\n"
         message += f"_{datetime.now().strftime('%B %d, %Y')}_\n\n"
-        message += f"📈 *Positions:* {len(self.positions)} stocks/ETFs\n\n"
+        
+        # Count stock positions used for VaR
+        num_var_stocks = len(self.var_positions)
+        message += f"📈 *Positions:* {num_var_stocks} stocks (VaR-eligible)\n"
+        message += f"💰 *VaR Base:* ${self.positions_value_for_var:,.2f}\n\n"
         
         # 95% Confidence metrics
         var_95_hist = self.results['var']['95']['historical']
         cvar_95_hist = self.results['cvar']['95']['historical']
         
         message += f"*🎯 95% CONFIDENCE (1-DAY)*\n"
-        message += f"VaR (Historical): ${var_95_hist:,.2f} ({var_95_hist/self.portfolio_value:.2%})\n"
-        message += f"CVaR (Historical): ${cvar_95_hist:,.2f} ({cvar_95_hist/self.portfolio_value:.2%})\n"
-        message += f"\n"
+        message += f"VaR (Historical): ${var_95_hist:,.2f} ({var_95_hist/self.positions_value_for_var:.2%})\n"
+        message += f"CVaR (Historical): ${cvar_95_hist:,.2f} ({cvar_95_hist/self.positions_value_for_var:.2%})\n\n"
         
-        message += f"*💡 Interpretation:*\n"
-        message += f"• 95% of days, loss won't exceed ${var_95_hist:,.0f}\n"
-        message += f"• In worst 5% of days, avg loss is ${cvar_95_hist:,.0f}\n\n"
-        
-        # Category risk breakdown
+        # Category risk breakdown - ordered: Global Triads, Four Horsemen, Alpha, Vault
         message += f"*📂 CATEGORY RISK (CVaR @ 95%):*\n"
-        sorted_categories = sorted(self.results['category_risk'].items(), 
-                                  key=lambda x: x[1]['cvar_95_dollar'], reverse=True)
-        for category, risk in sorted_categories[:5]:  # Top 5 riskiest categories
-            cat_name = category.replace('_', ' ').title()
-            message += f"• {cat_name}: ${risk['cvar_95_dollar']:,.0f} ({risk['weight']:.1%})\n"
+        category_order = ['global_triads', 'four_horsemen', 'alpha', 'vault']
+        for category in category_order:
+            if category in self.results['category_risk']:
+                risk = self.results['category_risk'][category]
+                cat_name = category.replace('_', ' ').title()
+                # Show CVaR as % of category value (same logic as overall VaR)
+                cvar_pct = risk['cvar_95_pct']
+                message += f"• {cat_name}: ${risk['cvar_95_dollar']:,.0f} ({cvar_pct:.2%})\n"
         
-        message += f"\n*⚠️ TOP 3 RISKY POSITIONS:*\n"
+        # Get 99% VaR/CVaR for context
+        var_99_hist = self.results['var']['99']['historical']
+        cvar_99_hist = self.results['cvar']['99']['historical']
+        
+        message += f"\n*⚠️ TOP 3 RISKY POSITIONS (95% CVaR):*\n"
         for i, pos in enumerate(self.results['position_risk'][:3], 1):
-            message += f"{i}. {pos['symbol']}: CVaR ${pos['cvar_95_dollar']:,.0f}\n"
-        
-        # Add options summary
-        options_pos = self.positions[self.positions['AssetClass'].isin(['OPT', 'FOP'])]
-        if len(options_pos) > 0:
-            total_theta = options_pos['ThetaDecayAnnual'].sum()
-            cash_cow_theta = options_pos[options_pos['Category'] == 'cash_cow']['ThetaDecayAnnual'].sum()
-            omega_theta = options_pos[options_pos['Category'] == 'omega']['ThetaDecayAnnual'].sum()
-            
-            message += f"\n*📊 OPTIONS THETA (Annual):*\n"
-            if abs(cash_cow_theta) > 0:
-                message += f"• Cash Cow: ${cash_cow_theta:,.0f} ({'income' if cash_cow_theta > 0 else 'cost'})\n"
-            if abs(omega_theta) > 0:
-                message += f"• Omega: ${omega_theta:,.0f} ({'income' if omega_theta > 0 else 'cost'})\n"
-            message += f"• Net: ${total_theta:,.0f} ({abs(total_theta)/self.portfolio_value*100:.2f}% of portfolio)\n"
+            # Show CVaR as % of position value (same logic as overall VaR)
+            cvar_pct = abs(pos['cvar_95_pct'])
+            message += f"{i}. {pos['symbol']}: ${pos['cvar_95_dollar']:,.0f} ({cvar_pct:.2%})\n"
         
         message += f"\n━━━━━━━━━━━━━━━\n"
         
-        # Count positions
-        num_stocks = len(self.positions[self.positions['AssetClass'] == 'STK'])
-        num_options = len(options_pos)
-        
-        message += f"📊 Phase 2 Complete: Full Portfolio\n"
-        message += f"• {num_stocks} stocks/ETFs + {num_options} options\n"
-        message += f"• Delta-adjusted VaR for options\n"
-        message += f"• Synced with institutional-risk-signal.py v2.0"
+        message += f"📊 Stock Portfolio VaR/CVaR Analysis\n"
+        message += f"• {num_var_stocks} stocks across 4 core categories\n"
+        message += f"• Excludes options (non-linear risk) & cash\n"
+        message += f"• 99% VaR: ${var_99_hist:,.0f} | CVaR: ${cvar_99_hist:,.0f}"
         
         if send_telegram_alert(message, TELEGRAM_TOKEN, CHAT_ID):
             print("  ✓ Telegram alert sent")

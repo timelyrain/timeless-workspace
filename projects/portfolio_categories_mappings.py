@@ -5,7 +5,6 @@
 
 Single source of truth for portfolio structure across all scripts:
 - portfolio-risk-var-cvar.py
-- decision-matrix-alert.py
 - institutional-risk-signal.py
 
 Last updated: 2026-02-02
@@ -53,7 +52,7 @@ SYMBOL_MAPPING = {
 # =============================================================================
 # TARGET ALLOCATIONS BY REGIME
 # =============================================================================
-# Used by decision-matrix-alert.py for drift analysis
+# Used by institutional-risk-signal.py for regime-based allocation guidance
 # Aligned with institutional risk scoring
 
 TARGET_ALLOCATIONS = {
