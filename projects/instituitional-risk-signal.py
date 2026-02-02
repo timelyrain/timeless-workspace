@@ -73,6 +73,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import json
+from config import SYMBOL_MAPPING
 
 # =============================================================================
 # CONFIGURATION
@@ -476,19 +477,7 @@ class RiskDashboard:
     # - Cash Cow: All options EXCEPT SPY/QQQ (spreads, CSPs, CCs, iron condors, LEAPS)
     # - Omega: SPY/QQQ options ONLY (bear spreads, puts, protective hedges)
     # - Alpha: Long calls on non-income stocks (speculative)
-    SYMBOL_MAPPING = {
-        'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
-        'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
-        'cash_cow': [
-            'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
-            'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
-            'NVDA', 'TSLA'
-        ],
-        'alpha': ['LCID'],  # Theme stocks only (options categorized separately below)
-        'omega': [],  # SPY/QQQ options only (detected from option symbol, not stock positions)
-        'vault': ['GSD'],  # Gold/precious metals (GSD = WisdomTree Gold)
-        'war_chest': [],  # Cash balance (read from Summary sheet C2)
-    }
+    # SYMBOL_MAPPING imported from config.py
     
     def __init__(self):
         self.data = {}
@@ -1476,8 +1465,8 @@ class RiskDashboard:
                             })
                         analysis['total_premium'] += abs(value)
                 
-                # Get stocks in income strategy
-                income_tickers = self.SYMBOL_MAPPING['income_strategy']
+                # Get stocks in income strategy (Cash Cow)
+                income_tickers = SYMBOL_MAPPING['cash_cow']
                 stocks = df[(df['AssetClass'] == 'STK') & (df['Symbol'].isin(income_tickers))]
                 for _, row in stocks.iterrows():
                     analysis['stocks'].append({

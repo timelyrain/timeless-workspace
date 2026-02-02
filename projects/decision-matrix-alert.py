@@ -64,48 +64,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Dict, List, Tuple, Optional
+from config import SYMBOL_MAPPING, TARGET_ALLOCATIONS
 
 # Load environment variables
 load_dotenv()
 
-# Portfolio Category Mapping (2026 Structure - Synced with institutional-risk-signal.py v2.0)
-SYMBOL_MAPPING = {
-    'global_triads': ['82846', 'DHL', 'ES3', 'VWRA', 'VWCE', 'VT', 'VXUS', 'XMNE'],
-    'four_horsemen': ['CSNDX', 'CTEC', 'HEAL', 'INRA', 'GRID'],
-    'cash_cow': [
-        'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
-        'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
-        'NVDA', 'TSLA'
-    ],
-    'alpha': ['LCID'],  # Theme stocks
-    'omega': [],  # SPY/QQQ options only (detected from option symbols)
-    'vault': ['GSD'],  # Gold (WisdomTree Gold)
-    'war_chest': [],  # Cash (not tracked in stock positions)
-}
-
-# Target allocations by regime (from institutional-risk-signal.py v2.0)
-TARGET_ALLOCATIONS = {
-    'ALL_CLEAR': {
-        'global_triads': 0.30, 'four_horsemen': 0.30, 'cash_cow': 0.25,
-        'alpha': 0.02, 'omega': 0.025, 'vault': 0.05, 'war_chest': 0.05
-    },
-    'NORMAL': {
-        'global_triads': 0.30, 'four_horsemen': 0.27, 'cash_cow': 0.225,
-        'alpha': 0.016, 'omega': 0.01, 'vault': 0.07, 'war_chest': 0.10
-    },
-    'ELEVATED': {
-        'global_triads': 0.30, 'four_horsemen': 0.21, 'cash_cow': 0.125,
-        'alpha': 0.01, 'omega': 0.01, 'vault': 0.10, 'war_chest': 0.24
-    },
-    'HIGH': {
-        'global_triads': 0.24, 'four_horsemen': 0.09, 'cash_cow': 0.0,
-        'alpha': 0.0, 'omega': 0.02, 'vault': 0.15, 'war_chest': 0.33
-    },
-    'EXTREME': {
-        'global_triads': 0.09, 'four_horsemen': 0.0, 'cash_cow': 0.0,
-        'alpha': 0.0, 'omega': 0.03, 'vault': 0.25, 'war_chest': 0.39
-    }
-}
+# Portfolio configuration imported from config.py (SYMBOL_MAPPING, TARGET_ALLOCATIONS)
 
 class DecisionMatrixAnalyzer:
     """Synthesizes risk signals into actionable recommendations."""

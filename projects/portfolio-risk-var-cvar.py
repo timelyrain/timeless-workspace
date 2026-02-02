@@ -57,6 +57,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from scipy import stats
+from config import SYMBOL_MAPPING, EXCHANGE_SUFFIX_MAP
 
 # Load environment variables
 env_path = Path(__file__).parent / '.env'
@@ -65,64 +66,14 @@ load_dotenv(env_path)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN_VAR_CVAR")
 CHAT_ID = os.environ.get("CHAT_ID")
 
-# Portfolio Category Mapping (2026 Structure - Synced with Dashboard K4-K23)
-# Source of truth: fetch-ibkr-positions-dashboard.xlsx
-SYMBOL_MAPPING = {
-    'global_triads': [
-        '82846',    # K5: China ETF
-        'DHL',      # K6: Dividend
-        'ES3',      # K7: Singapore banks
-        'VWRA',     # K8: VT USD
-        'WORLD',    # K9: VT, no EM, hedged
-        'XMME',     # K10: EM, unhedged
-    ],
-    'four_horsemen': [
-        'CSNDX',    # K12: Nasdaq
-        'EQCH',     # K13: Nasdaq, hedged
-        'CBUK',     # K14: China Tech, unhedged
-        'HEAL',     # K15: Biotic
-        'INRA',     # K16: Energy
-        'LOCK',     # K18: Security
-    ],
-    'cash_cow': [
-        # K19: Mega-caps for options wheel (stocks + options)
-        'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
-        'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
-        'NVDA', 'TSLA'
-    ],
-    'alpha': [
-        # K20: Theme stocks, speculation
-        'BITO', 'CELH', 'CHA', 'IBKR', 'LKNCY', 'LCID', 'SE'
-    ],
-    'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
-    'vault': ['GSD'],  # K22: Gold (WisdomTree Gold)
-    'war_chest': [],  # K23: Cash (tracked in Dashboard, not in positions file)
-}
-
-# Configuration
+# Configuration (SYMBOL_MAPPING imported from config.py)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 POSITIONS_FILE = os.path.join(SCRIPT_DIR, 'fetch-ibkr-positions.xlsx')
 CONFIDENCE_LEVELS = [0.95, 0.99]  # 95% and 99% confidence
 TIME_HORIZON = 1  # 1-day VaR
 HISTORICAL_DAYS = 252  # 1 year of trading days
 
-# IBKR Exchange to yfinance suffix mapping
-EXCHANGE_SUFFIX_MAP = {
-    'SEHK': '.HK',      # Hong Kong Stock Exchange
-    'NASDAQ': '',       # US NASDAQ
-    'NYSE': '',         # US NYSE
-    'ARCA': '',         # NYSE Arca
-    'CBOE': '',         # CBOE Options
-    'CME': '',          # CME Options
-    'PINK': '',         # OTC Pink Sheets
-    'SGX': '.SI',       # Singapore Exchange
-    'LSEETF': '.L',     # London Stock Exchange ETF
-    'AEB': '.AS',       # Amsterdam (Euronext)
-    'IBIS': '.DE',      # Germany (Xetra) 
-    'IBIS2': '.DE',     # Germany (Xetra)
-    'SBF': '.PA',       # France (Euronext Paris)
-    'EBS': '.SW',       # Switzerland (SIX Swiss Exchange)
-}
+# EXCHANGE_SUFFIX_MAP imported from config.py
 
 def send_telegram_alert(message, token, chat_id):
     """Send alert to Telegram"""
