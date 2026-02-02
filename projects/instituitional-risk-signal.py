@@ -73,7 +73,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import json
-from config import SYMBOL_MAPPING
+from portfolio_categories_mappings import SYMBOL_MAPPING
 
 # =============================================================================
 # CONFIGURATION

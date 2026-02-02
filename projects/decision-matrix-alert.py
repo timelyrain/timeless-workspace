@@ -64,7 +64,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Dict, List, Tuple, Optional
-from config import SYMBOL_MAPPING, TARGET_ALLOCATIONS
+from portfolio_categories_mappings import SYMBOL_MAPPING, TARGET_ALLOCATIONS
 
 # Load environment variables
 load_dotenv()

@@ -57,7 +57,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from scipy import stats
-from config import SYMBOL_MAPPING, EXCHANGE_SUFFIX_MAP
+from portfolio_categories_mappings import SYMBOL_MAPPING, EXCHANGE_SUFFIX_MAP
 
 # Load environment variables
 env_path = Path(__file__).parent / '.env'
