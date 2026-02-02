@@ -22,12 +22,20 @@ YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
 - 5% The Vault (Gold - store of value)
 - 5% The War Chest (Cash - dry powder)
 
-ALLOCATION PHILOSOPHY:
-Score 90+: FULL DEPLOYMENT - Run your base allocation
-Score 75-90: NORMAL - Base allocation, tighter stops
-Score 60-75: ELEVATED - Reduce speculative, defensive options
-Score 40-60: HIGH RISK - Cut QQQ/spec, raise cash via options
-Score <40: EXTREME - Max defense, protect capital
+ALLOCATION PHILOSOPHY (Institutional Risk Management):
+Score 90+: FULL DEPLOYMENT - Run base allocation (2.5% base Omega)
+Score 75-90: NORMAL - Base allocation, tighter stops, 1% hedging
+Score 60-75: ELEVATED - Cut growth/income, raise cash to 24%, 1% hedging only
+Score 40-60: HIGH RISK - Sell positions aggressively, 33% cash, 2% hedging
+Score <40: EXTREME - Liquidate to 39% cash, 25% gold, 3% hedging max
+
+HEDGING COST DISCIPLINE (Annual insurance budget: 3% of portfolio max):
+- Omega allocation: 1% ELEVATED, 2% HIGH RISK, 3% EXTREME
+- Estimated annual cost: $3k → $6k → $10k (stays under 3% portfolio budget)
+- Primary defense: Sell positions → raise cash (War Chest) - ZERO cost
+- Secondary defense: Gold (Vault) for tail risk - NO decay
+- Tertiary defense: Put spreads/collars ONLY - limit theta burn
+- NEVER use naked puts in elevated regimes (theta decay bankrupts portfolios)
 
 22 INDICATORS + INSTITUTIONAL FLOWS + OPTIONS INTELLIGENCE | A+ GRADE
 
@@ -1533,12 +1541,12 @@ class RiskDashboard:
                 'four_horsemen': base['four_horsemen'] * 0.9,  # Slightly reduce growth
                 'cash_cow': base['cash_cow'] * 0.9,  # More conservative
                 'alpha': base['alpha'] * 0.8,  # Reduce offensive plays
-                'omega': base['omega'] * 1.2,  # Increase insurance
+                'omega': 0.01,  # 1% light hedging (minimal cost)
                 'vault': base['vault'] + 0.02,  # 7% gold
-                'war_chest': base['war_chest'] + 0.04,  # 9% cash
+                'war_chest': base['war_chest'] + 0.05,  # 10% cash
                 'stops': '12-15%',
-                'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE',
-                'action': 'STAY COURSE - Tighten stops, be selective on new CSPs'
+                'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE. Light put hedging: 1-2 contracts only',
+                'action': 'STAY COURSE - Tighten stops, minimal hedging (1%)'
             }
             base_allocation = self._normalize_allocation(base_allocation)
         
@@ -1546,47 +1554,47 @@ class RiskDashboard:
             base_allocation = {
                 'regime': '★★★☆☆ ELEVATED',
                 'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'] * 0.7,  # Cut growth significantly
-                'cash_cow': base['cash_cow'] * 0.5,  # Very defensive options
-                'alpha': base['alpha'] * 0.5,  # Cut offensive plays
-                'omega': base['omega'] * 4,  # Quadruple insurance (10%)
+                'four_horsemen': base['four_horsemen'] * 0.6,  # Cut growth more aggressively
+                'cash_cow': base['cash_cow'] * 0.4,  # Very defensive options
+                'alpha': base['alpha'] * 0.3,  # Cut offensive plays harder
+                'omega': 0.01,  # 1% only (annual cost ~$3k vs $10k at 5%)
                 'vault': 0.10,  # 10% gold
-                'war_chest': 0.15,  # 15% cash
+                'war_chest': 0.24,  # 24% cash (raise cash instead of buying puts)
                 'stops': '10-12%',
-                'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions',
-                'action': 'REDUCE RISK - Cut growth/income, raise reserves and hedge'
+                'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging: 2-3 put spreads max',
+                'action': 'REDUCE RISK - Cut positions, raise cash to 24%. Light hedging (1% only)'
             }
             base_allocation = self._normalize_allocation(base_allocation)
         
         elif score >= 40:  # HIGH RISK
             base_allocation = {
                 'regime': '★★☆☆☆ HIGH RISK',
-                'global_triads': base['global_triads'] * 0.8,  # Trim core slightly
-                'four_horsemen': base['four_horsemen'] * 0.3,  # Skeleton growth
+                'global_triads': base['global_triads'] * 0.7,  # Trim core more
+                'four_horsemen': base['four_horsemen'] * 0.2,  # Skeleton growth
                 'cash_cow': 0,  # Exit all income strategies
                 'alpha': 0,  # Exit all offensive plays
-                'omega': base['omega'] * 6,  # 6x insurance (15%)
+                'omega': 0.02,  # 2% hedging (annual cost ~$6k vs $15k at 5%)
                 'vault': 0.15,  # 15% gold
-                'war_chest': 0.25,  # 25% cash
+                'war_chest': 0.33,  # 33% cash (sell positions, don't buy puts)
                 'stops': '8-10%',
-                'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit',
-                'action': 'GO DEFENSIVE - Major risk reduction, protect capital'
+                'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit. Use collars (sell calls to fund puts) for cost-neutral hedging',
+                'action': 'GO DEFENSIVE - Sell positions aggressively, raise cash to 33%. Moderate hedging (2%)'
             }
             base_allocation = self._normalize_allocation(base_allocation)
         
         else:  # EXTREME (<40)
             base_allocation = {
                 'regime': '★☆☆☆☆ EXTREME RISK',
-                'global_triads': base['global_triads'] * 0.5,  # Cut core in half
+                'global_triads': base['global_triads'] * 0.3,  # Cut core drastically
                 'four_horsemen': 0,  # Exit all growth
                 'cash_cow': 0,  # No options
                 'alpha': 0,  # Exit all offensive plays
-                'omega': base['omega'] * 10,  # 10x insurance (25%)
-                'vault': 0.20,  # 20% gold
-                'war_chest': 0.35,  # 35% cash
+                'omega': 0.03,  # 3% MAX (annual cost ~$10k - at portfolio limit)
+                'vault': 0.25,  # 25% gold
+                'war_chest': 0.39,  # 39% cash (maximum liquidity)
                 'stops': '5-8%',
-                'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price, stop selling premium',
-                'action': 'MAX DEFENSE - Capital preservation mode'
+                'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price. ONLY use collars (sell calls to fund puts) - zero net cost. VIX >40 makes puts too expensive',
+                'action': 'MAX DEFENSE - Liquidate to 39% cash, 25% gold. Hedging at 3% max annual cost limit'
             }
             base_allocation = self._normalize_allocation(base_allocation)
         
@@ -1890,20 +1898,20 @@ class RiskDashboard:
                 if drift_trend['improving']:
                     if current_drift < 10:
                         # Almost aligned - celebrate progress
-                        drift_line = f"✅ DRIFT: {current_drift:.0f}% (target: <5%) - Nearly aligned!"
+                        drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total ✅ Nearly aligned (target: <5%)"
                     elif velocity > 5:
                         # Improving fast - encourage continuation
-                        drift_line = f"📉 Rebalancing working - keep deploying cash ({current_drift:.0f}% from {drift_analysis['total_drift']*100 + drift_trend['change']*100:.0f}%)"
+                        drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total 📉 Rebalancing working - keep deploying cash (was {drift_analysis['total_drift']*100 + drift_trend['change']*100:.0f}%)"
                     else:
                         # Improving slowly - maintain course
-                        drift_line = f"↘️ Drift improving but still high {current_drift:.0f}% (target: <5%)"
+                        drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total ↘️ Improving but still high (target: <5%)"
                 else:
                     if velocity > 3:
                         # Worsening fast - urgent action
-                        drift_line = f"🚨 URGENT: Drift increasing to {current_drift:.0f}% (+{drift_trend['change']*100:.0f}% in {days}d)"
+                        drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total 🚨 URGENT: Increasing fast (+{drift_trend['change']*100:.0f}% in {days}d)"
                     else:
                         # Worsening slowly - warning
-                        drift_line = f"⚠️ Drift worsening to {current_drift:.0f}% - review positions"
+                        drift_line = f"⚠️ DRIFT: {current_drift:.0f}% total ⚠️ Worsening - review positions"
             
             lines.extend([
                 "",
@@ -2056,14 +2064,16 @@ TODAY'S DATA:
 Score: {self.scores['total']:.1f}/100
 Regime: {portfolio['regime']}
 Portfolio Allocation:
-- Global Triads (82846/DHL/ES3/VWRA/VT/XMNE): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (CSNDX/CTEC/HEAL/INRA/GRID): {portfolio['four_horsemen']*100:.0f}%
-- Cash Cow (Wheel on GOOGL/PEP/V): {portfolio['cash_cow']*100:.0f}%
-- The Alpha (LCID calls): {portfolio['alpha']*100:.0f}%
-- The Omega (QQQ puts/spreads): {portfolio['omega']*100:.0f}%
-- The Vault (Gold): {portfolio['vault']*100:.0f}%
-- War Chest (Cash): {portfolio['war_chest']*100:.0f}%
+- Global Triads (Strategic Core - 82846/DHL/ES3/VWRA/VT/XMNE): {portfolio['global_triads']*100:.0f}%
+- Four Horsemen (Growth Engine - CSNDX/CTEC/HEAL/INRA/GRID): {portfolio['four_horsemen']*100:.0f}%
+- Cash Cow (Income Strategy - all options EXCEPT SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
+- The Alpha (Speculation - theme stocks + long calls): {portfolio['alpha']*100:.0f}%
+- The Omega (Insurance - SPY/QQQ bear spreads ONLY, capped 1-3% by regime): {portfolio['omega']*100:.0f}%
+- The Vault (Gold - tail risk protection): {portfolio['vault']*100:.0f}%
+- War Chest (Cash - primary defense mechanism): {portfolio['war_chest']*100:.0f}%
 Action: {portfolio['action']}
+
+HEDGING PHILOSOPHY: Omega capped at 1% (ELEVATED), 2% (HIGH RISK), 3% (EXTREME) to keep annual insurance cost under 3% of portfolio. Primary defense is selling positions and raising cash, not buying expensive puts.
 
 Key Indicators:
 - HY Spread: {self.data.get('hy_spread', 'N/A')}%
@@ -2109,16 +2119,18 @@ TODAY'S MARKET SNAPSHOT:
 Risk Score: {self.scores['total']:.1f}/100
 Market Regime: {portfolio['regime']}
 
-Current Portfolio:
-- Global Triads (ETFs/China): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (Growth): {portfolio['four_horsemen']*100:.0f}%
-- Cash Cow (Options Wheel): {portfolio['cash_cow']*100:.0f}%
-- The Alpha (Theme stocks): {portfolio['alpha']*100:.0f}%
-- The Omega (Hedges): {portfolio['omega']*100:.0f}%
-- The Vault (Gold): {portfolio['vault']*100:.0f}%
-- War Chest (Cash): {portfolio['war_chest']*100:.0f}%
+Current Portfolio Allocation:
+- Global Triads (Strategic Core - diversified ETFs): {portfolio['global_triads']*100:.0f}%
+- Four Horsemen (Growth Engine - thematic ETFs): {portfolio['four_horsemen']*100:.0f}%
+- Cash Cow (Income Strategy - multi-leg options on mega-caps, excludes SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
+- The Alpha (Speculation - theme stocks, long calls): {portfolio['alpha']*100:.0f}%
+- The Omega (Insurance - SPY/QQQ bear spreads, strictly capped by regime): {portfolio['omega']*100:.0f}%
+- The Vault (Gold - store of value, tail risk): {portfolio['vault']*100:.0f}%
+- War Chest (Cash - dry powder, primary defense): {portfolio['war_chest']*100:.0f}%
 
 Recommended Action: {portfolio['action']}
+
+RISK MANAGEMENT APPROACH: Institutional practice - hedge via position sizing (selling) not expensive options. Omega capped at 1-3% max depending on regime to keep annual insurance cost under 3% of portfolio. Cash raising is primary defense.
 
 Key Market Indicators:
 - High Yield Spread: {self.data.get('hy_spread', 'N/A')}% (credit stress)
