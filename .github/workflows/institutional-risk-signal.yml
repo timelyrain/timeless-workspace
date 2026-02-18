@@ -66,8 +66,15 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add risk_history.json
-          git diff --staged --quiet || git commit -m "Update risk history [$(date +'%Y-%m-%d %H:%M')]"
-          git push
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update risk history [$(date +'%Y-%m-%d %H:%M')]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && echo "✅ Push succeeded on attempt $i" && exit 0
+            echo "⚠️ Push attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "❌ All push attempts failed"
+          exit 1
         continue-on-error: true
       
       - name: Upload risk report
