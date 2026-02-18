@@ -81,13 +81,22 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add projects/fetch-ibkr-positions.xlsx
-          git diff --staged --quiet && echo "No changes to commit" && exit 0
-          git commit -m "Update IBKR positions Excel (automated)"
-          # Retry push up to 5 times to handle concurrent workflow pushes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          # Retry up to 5 times handling concurrent pushes from other workflows
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push origin main && echo "✅ Push succeeded on attempt $i" && exit 0
-            echo "⚠️ Push attempt $i failed, retrying in 10s..."
-            sleep 10
+            echo "Attempt $i: pulling latest then pushing..."
+            git pull --rebase origin main
+            git commit -m "Update IBKR positions Excel (automated)" 2>/dev/null || true
+            if git push origin main; then
+              echo "✅ Push succeeded on attempt $i"
+              exit 0
+            fi
+            echo "⚠️ Push failed on attempt $i, retrying in 15s..."
+            git rebase --abort 2>/dev/null || true
+            sleep 15
           done
           echo "❌ All push attempts failed"
           exit 1
