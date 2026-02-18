@@ -81,18 +81,26 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           # Check if file actually changed before doing anything
-          git diff --quiet projects/fetch-ibkr-positions.xlsx && echo "No changes to commit" && exit 0
+          if git diff --quiet projects/fetch-ibkr-positions.xlsx; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          # Stash the updated xlsx, pull latest, unstash, then commit+push
+          git stash push -m "ibkr-positions-update" projects/fetch-ibkr-positions.xlsx
           # Retry up to 5 times handling concurrent pushes from other workflows
           for i in 1 2 3 4 5; do
             echo "Attempt $i: pulling latest then committing and pushing..."
             git pull --rebase origin main
+            git stash pop
             git add projects/fetch-ibkr-positions.xlsx
             git commit -m "Update IBKR positions Excel (automated)"
             if git push origin main; then
               echo "✅ Push succeeded on attempt $i"
               exit 0
             fi
-            echo "⚠️ Push failed on attempt $i, retrying in 15s..."
+            echo "⚠️ Push failed on attempt $i, re-stashing and retrying in 15s..."
+            git stash push -m "ibkr-positions-update" projects/fetch-ibkr-positions.xlsx
+            git reset HEAD~1
             sleep 15
           done
           echo "❌ All push attempts failed"
