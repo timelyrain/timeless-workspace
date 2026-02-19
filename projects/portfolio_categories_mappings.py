@@ -50,7 +50,7 @@ SYMBOL_MAPPING = {
         'SE',    # Auto-added: SEA LTD-ADR
     ],
     'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
-    'vault': ['GSD'],  # K22: Gold (WisdomTree Gold)
+    'vault': ['GSD'],  # K22: Gold (Singapore Gold)
     'war_chest': [],  # K23: Cash (tracked in Dashboard, not in positions file)
 }
 
