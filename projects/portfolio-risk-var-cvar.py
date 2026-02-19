@@ -7,7 +7,7 @@ with 7-category breakdown aligned with institutional-risk-signal.py.
 
 PORTFOLIO STRUCTURE (2026):
 - Global Triads: Strategic core ETFs (82846, DHL, ES3, VWRA, VT, XMNE)
-- Four Horsemen: Growth engine ETFs (CSNDX, CTEC, HEAL, INRA, GRID)
+- Four Horsemen: Growth engine ETFs (CSNDX, CTEC, HEAL, INRA, GRDU)
 - Cash Cow: Income strategy stocks (mega-caps for options wheel)
 - The Alpha: Speculation (theme stocks, long calls)
 - The Omega: Insurance (SPY/QQQ bear spreads only)

@@ -13,7 +13,7 @@ WHAT'S NEW IN v2.0 (Jan 2026):
 
 YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
 - 30% Global Triads (82846, DHL, ES3, VWRA, VT, XMNE - strategic core)
-- 30% Four Horsemen (CSNDX, CTEC, HEAL, INRA, GRID - growth engine)
+- 30% Four Horsemen (CSNDX, CTEC, HEAL, INRA, GRDU - growth engine)
 - 25% Cash Cow (Income Strategy: all options EXCEPT SPY/QQQ insurance)
   * Multi-leg spreads, CSPs, covered calls, iron condors, LEAPS on income stocks
   * Stock positions: SPY, QQQ, ADBE, AMD, CRM, CSCO, ORCL, COST, PEP, WMT, XOM, JPM, V, LLY, UNH, AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA
@@ -102,7 +102,7 @@ PORTFOLIO_2026 = {
     'TOTAL_CAPITAL': 1_000_000,  # $1M active trading capital
     'BASE_ALLOCATION': {
         'global_triads': 0.30,      # 82846, DHL, ES3, VWRA, VT, XMNE
-        'four_horsemen': 0.30,      # CSNDX, CTEC, HEAL, INRA, GRID
+        'four_horsemen': 0.30,      # CSNDX, CTEC, HEAL, INRA, GRDU
         'cash_cow': 0.25,           # Wheel on GOOGL, PEP, V
         'alpha': 0.02,              # Theme stocks + call options
         'omega': 0.025,             # QQQ puts + bear spreads
@@ -2054,7 +2054,7 @@ Score: {self.scores['total']:.1f}/100
 Regime: {portfolio['regime']}
 Portfolio Allocation:
 - Global Triads (Strategic Core - 82846/DHL/ES3/VWRA/VT/XMNE): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (Growth Engine - CSNDX/CTEC/HEAL/INRA/GRID): {portfolio['four_horsemen']*100:.0f}%
+- Four Horsemen (Growth Engine - CSNDX/CTEC/HEAL/INRA/GRDU): {portfolio['four_horsemen']*100:.0f}%
 - Cash Cow (Income Strategy - all options EXCEPT SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
 - The Alpha (Speculation - theme stocks + long calls): {portfolio['alpha']*100:.0f}%
 - The Omega (Insurance - SPY/QQQ bear spreads ONLY, capped 1-3% by regime): {portfolio['omega']*100:.0f}%

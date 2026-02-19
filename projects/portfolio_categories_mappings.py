@@ -32,17 +32,22 @@ SYMBOL_MAPPING = {
         'CBUK',     # K14: China Tech, unhedged
         'HEAL',     # K15: Biotic
         'INRA',     # K16: Energy
+        'GRDU',     # K17: Clean energy / infrastructure
         'LOCK',     # K18: Security
     ],
     'cash_cow': [
-        # K19: Mega-caps for options wheel (stocks + options)
-        'SPY', 'QQQ', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL', 'COST', 'PEP', 'WMT', 
-        'XOM', 'JPM', 'V', 'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META', 'MSFT', 
-        'NVDA', 'TSLA'
+        # Source of truth: fetch-ibkr-positions-dashboard.xlsx → IncomeStrategy sheet
+        'SPY', 'ADBE', 'AMD', 'CRM', 'CSCO', 'ORCL',
+        'COST', 'PEP', 'WMT', 'XOM', 'JPM', 'V',
+        'LLY', 'UNH', 'AAPL', 'AMZN', 'GOOGL', 'META',
+        'MSFT', 'NVDA', 'TSLA', 'QQQ', 'CMG', 'NFLX',
+        'SMH',
     ],
     'alpha': [
         # K20: Theme stocks, speculation
-        'BITO', 'CELH', 'CHA', 'IBKR', 'LKNCY', 'LCID', 'SE'
+        'BITO', 'CELH', 'CHA', 'IBKR', 'LKNCY',
+        'SE',    # Auto-added: SEA LTD-ADR
+        'SE',    # Auto-added: SEA LTD-ADR
     ],
     'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
     'vault': ['GSD'],  # K22: Gold (WisdomTree Gold)

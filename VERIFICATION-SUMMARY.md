@@ -15,7 +15,7 @@ From `Dashboard` sheet in `fetch-ibkr-positions-dashboard.xlsx`:
 | Row | Category | Formula Logic |
 |-----|----------|--------------|
 | F4  | Global Triads | Strategic core ETFs (82846, DHL, ES3, VWRA, VT, XMNE) |
-| F11 | Four Horsemen | Growth engine (CSNDX, CTEC, HEAL, INRA, GRID) |
+| F11 | Four Horsemen | Growth engine (CSNDX, CTEC, HEAL, INRA, GRDU) |
 | F19 | Cash Cow | Income stocks + **ALL options EXCEPT SPY/QQQ** |
 | F20 | The Alpha | Theme stocks (uncategorized stocks only, no options) |
 | F21 | The Omega | **SPY/QQQ options ONLY** (insurance, bear spreads) |
