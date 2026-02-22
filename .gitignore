@@ -27,5 +27,4 @@ build/
 # Project specific
 *.log
 
-# Local-only Excel files (manually maintained, not used by GitHub Actions)
-projects/fetch-ibkr-positions-dashboard.xlsx
+
