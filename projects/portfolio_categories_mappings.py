@@ -45,7 +45,7 @@ SYMBOL_MAPPING = {
     ],
     'alpha': [
         # K20: Theme stocks, speculation
-        'BITO', 'CELH', 'CHA', 'IBKR', 'LKNCY',
+        'BITO',
         'SE',    # Auto-added: SEA LTD-ADR
         'SE',    # Auto-added: SEA LTD-ADR
     ],
