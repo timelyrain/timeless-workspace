@@ -48,6 +48,8 @@ SYMBOL_MAPPING = {
         'BITO',
         'SE',    # Auto-added: SEA LTD-ADR
         'SE',    # Auto-added: SEA LTD-ADR
+        '9807',    # Auto-added: GLOBAL X CHINA ROBOTICS
+        'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
     ],
     'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
     'vault': ['GSD'],  # K22: Gold (Singapore Gold)
