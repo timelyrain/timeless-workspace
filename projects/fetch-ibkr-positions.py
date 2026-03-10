@@ -110,6 +110,11 @@ Step 1: Request flex report generation
                 error_code = content.split('<ErrorCode>')[1].split('</ErrorCode>')[0] if '<ErrorCode>' in content else 'Unknown'
                 error_msg = content.split('<ErrorMessage>')[1].split('</ErrorMessage>')[0] if '<ErrorMessage>' in content else 'Unknown error'
                 print(f"❌ IBKR API Error {error_code}: {error_msg}")
+                # Distinguish token/auth errors from transient timing errors
+                if error_code in ('1001', '1002'):
+                    print(f"🔑 TOKEN/AUTH ERROR — check IBKR_FLEX_TOKEN in GitHub Secrets (Settings → Secrets → Actions)")
+                    print(f"   Token may have expired or been regenerated in IBKR Account Management → Settings → FlexWeb Service")
+                    return None
                 if error_code in RETRYABLE_CODES and attempt < max_request_retries:
                     print(f"⏳ Transient error — retrying in {request_retry_delay}s...")
                     time.sleep(request_retry_delay)
