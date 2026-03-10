@@ -82,44 +82,59 @@ def validate_config(account_name, flex_token, query_id):
 
 def request_flex_report(account_name, flex_token, query_id):
     """
-    Step 1: Request flex report generation
+Step 1: Request flex report generation
     Returns: Reference code for retrieving the report
     """
-    print(f"\n📊 Requesting Flex Query report from IBKR ({account_name})...")
-    
-    params = {
-        't': flex_token,
-        'q': query_id,
-        'v': '3'  # API version
-    }
-    
-    try:
-        response = requests.get(REQUEST_URL, params=params, timeout=30)
-        response.raise_for_status()
-        
-        # Parse XML response
-        content = response.text
-        
-        # Check for errors
-        if '<Status>Fail</Status>' in content:
-            error_code = content.split('<ErrorCode>')[1].split('</ErrorCode>')[0] if '<ErrorCode>' in content else 'Unknown'
-            error_msg = content.split('<ErrorMessage>')[1].split('</ErrorMessage>')[0] if '<ErrorMessage>' in content else 'Unknown error'
-            print(f"❌ IBKR API Error {error_code}: {error_msg}")
-            return None
-        
-        # Extract reference code
-        if '<ReferenceCode>' in content:
-            ref_code = content.split('<ReferenceCode>')[1].split('</ReferenceCode>')[0]
-            print(f"✅ Report requested successfully (Reference: {ref_code})")
-            return ref_code
-        else:
-            print(f"❌ Unexpected response format:")
-            print(content)
-            return None
-            
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Network error: {e}")
-        return None
+    # Transient IBKR errors that resolve with a retry
+    RETRYABLE_CODES = {'1003', '1004'}
+    max_request_retries = 5
+    request_retry_delay = 30  # seconds between retries
+
+    for attempt in range(1, max_request_retries + 1):
+        print(f"\n📊 Requesting Flex Query report from IBKR ({account_name})... (attempt {attempt}/{max_request_retries})")
+
+        params = {
+            't': flex_token,
+            'q': query_id,
+            'v': '3'  # API version
+        }
+
+        try:
+            response = requests.get(REQUEST_URL, params=params, timeout=30)
+            response.raise_for_status()
+
+            content = response.text
+
+            # Check for errors
+            if '<Status>Fail</Status>' in content:
+                error_code = content.split('<ErrorCode>')[1].split('</ErrorCode>')[0] if '<ErrorCode>' in content else 'Unknown'
+                error_msg = content.split('<ErrorMessage>')[1].split('</ErrorMessage>')[0] if '<ErrorMessage>' in content else 'Unknown error'
+                print(f"❌ IBKR API Error {error_code}: {error_msg}")
+                if error_code in RETRYABLE_CODES and attempt < max_request_retries:
+                    print(f"⏳ Transient error — retrying in {request_retry_delay}s...")
+                    time.sleep(request_retry_delay)
+                    continue
+                return None
+
+            # Extract reference code
+            if '<ReferenceCode>' in content:
+                ref_code = content.split('<ReferenceCode>')[1].split('</ReferenceCode>')[0]
+                print(f"✅ Report requested successfully (Reference: {ref_code})")
+                return ref_code
+            else:
+                print(f"❌ Unexpected response format:")
+                print(content)
+                return None
+
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Network error: {e}")
+            if attempt < max_request_retries:
+                print(f"⏳ Retrying in {request_retry_delay}s...")
+                time.sleep(request_retry_delay)
+            else:
+                return None
+
+    return None
 
 
 def fetch_flex_report(account_name, flex_token, reference_code, max_retries=20, retry_delay=5):
@@ -473,8 +488,9 @@ def main():
         # ===== Update Excel File =====
         if df_hk is None and df_al is None:
             print("\n❌ No position data available from either account")
+            print("⚠️  IBKR statements not available — skipping update (will retry tomorrow)")
             send_telegram_notification(success=False)
-            sys.exit(1)
+            sys.exit(0)  # Exit 0 so GitHub Action doesn't fail red on transient IBKR errors
         
         # Update Excel with both accounts and cash
         timestamp, total_positions, all_symbols = update_excel_file(df_hk, df_al, cash_hk, cash_al)
