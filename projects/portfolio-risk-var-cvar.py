@@ -11,7 +11,7 @@ PORTFOLIO STRUCTURE (2026):
 - Cash Cow: Income strategy stocks (mega-caps for options wheel)
 - The Alpha: Speculation (theme stocks, long calls)
 - The Omega: Insurance (SPY/QQQ bear spreads only)
-- The Vault: Gold (GSD - WisdomTree Gold)
+- The Vault: Gold (GSD - Singapore Gold ETF, AEM - Agnico Eagle Mines)
 - War Chest: Cash reserves
 
 PHASE 2 COMPLETE: Full portfolio coverage

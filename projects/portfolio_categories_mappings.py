@@ -52,7 +52,7 @@ SYMBOL_MAPPING = {
         'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
     ],
     'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
-    'vault': ['GSD'],  # K22: Gold (Singapore Gold)
+    'vault': ['GSD', 'AEM'],  # K22: Gold (GSD: Singapore Gold ETF, AEM: Agnico Eagle Mines)
     'war_chest': [],  # K23: Cash (tracked in Dashboard, not in positions file)
 }
 
