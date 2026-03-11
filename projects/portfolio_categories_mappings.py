@@ -50,6 +50,7 @@ SYMBOL_MAPPING = {
         'SE',    # Auto-added: SEA LTD-ADR
         '9807',    # Auto-added: GLOBAL X CHINA ROBOTICS
         'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
+        'HY9H',    # Auto-added: SK HYNIX INC-GDS
     ],
     'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
     'vault': ['GSD', 'AEM'],  # K22: Gold (GSD: Singapore Gold ETF, AEM: Agnico Eagle Mines)
