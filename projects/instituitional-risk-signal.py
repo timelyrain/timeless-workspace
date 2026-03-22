@@ -1223,20 +1223,21 @@ class RiskDashboard:
             s20 = 0
         
         # =====================================================================
-        # TIER 3: Options Intelligence + Structure (max 43.5 pts)
+        # TIER 3: Options Intelligence + Structure (max 46 pts)
         # =====================================================================
         
         # 16. VIX Term Structure: Contango = calm, Backwardation = stress
+        # Most predictive vol signal — ~35% of vol complex weight (15/46)
         vix_term = d.get('vix_term_slope')
         if vix_term is not None:
             if vix_term < -5:          # Backwardation = fear/stress
                 s11 = 0
             elif vix_term < 5:         # Flat = uncertainty
-                s11 = 4
+                s11 = 5
             elif vix_term < 15:        # Mild contango = healthy
-                s11 = 8
+                s11 = 10
             else:                       # Strong contango = calm/complacent
-                s11 = 12
+                s11 = 15
         else:
             s11 = 0
         
@@ -1245,23 +1246,24 @@ class RiskDashboard:
         s12 = self._score_range(d.get('yield_curve'), [(-0.5,0),(-0.2,1),(0.2,2),(0.5,2.5)], 3)
         
         # 18. VIX Level: Low = calm = bullish, High = fear = bearish
-        # Already correct: low VIX matches first threshold
-        s13 = self._score_range(d.get('vix'), [(15,1.5),(20,1),(25,0.5),(35,0)], 0, neutral_on_missing=True)
+        # Confirmatory signal — ~22% of vol complex weight (10/46)
+        s13 = self._score_range(d.get('vix'), [(15,10),(20,7),(25,4),(30,2),(35,1)], 0, neutral_on_missing=True)
         
         # 19. SKEW Index: Measures tail risk demand
+        # Secondary tail risk signal — ~11% of vol complex weight (5/46)
         # Normal range 120-140 = healthy. Very low = complacency, very high = fear
         skew = d.get('skew')
         if skew is not None:
             if skew < 110:         # Extreme complacency (no hedging)
-                s14 = 2
+                s14 = 1
             elif skew < 120:       # Low caution
-                s14 = 5
+                s14 = 3
             elif skew < 140:       # Normal/healthy hedging
-                s14 = 8
-            elif skew < 150:       # Elevated fear
                 s14 = 5
+            elif skew < 150:       # Elevated fear
+                s14 = 3
             else:                   # Extreme fear (tail risk panic)
-                s14 = 2
+                s14 = 1
         else:
             s14 = 0
         
@@ -1283,31 +1285,32 @@ class RiskDashboard:
             s15 = 0
         
         # 21. VIX9D/VIX Ratio: Short-term fear premium
-        # Positive = near-term fear elevated, Negative = near-term calm
+        # Event premium signal — ~7% of vol complex weight (3/46)
         vix9d_ratio = d.get('vix9d_ratio')
         if vix9d_ratio is not None:
             if vix9d_ratio > 15:       # Extreme near-term fear = stress
                 s16 = 0
             elif vix9d_ratio > 5:      # Elevated near-term risk
-                s16 = 3
+                s16 = 1
             elif vix9d_ratio > -5:     # Normal range
-                s16 = 6
+                s16 = 3
             else:                       # Near-term calm (complacency or post-event)
-                s16 = 4
+                s16 = 2
         else:
             s16 = 0
         
         # 22. VXN-VIX Spread: Tech fear premium over market
+        # Supplementary sector divergence — ~4% of vol complex weight (2/46)
         vxn_vix = d.get('vxn_vix_spread')
         if vxn_vix is not None:
             if vxn_vix > 6:            # Extreme tech fear (tech selling)
                 s17 = 0
             elif vxn_vix > 3:          # Elevated tech fear
-                s17 = 2
+                s17 = 0.5
             elif vxn_vix > -2:         # Balanced
-                s17 = 5
+                s17 = 2
             else:                       # Tech complacency (tech rally)
-                s17 = 3
+                s17 = 1
         else:
             s17 = 0
         
@@ -1316,9 +1319,11 @@ class RiskDashboard:
         # =====================================================================
         total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
         
-        # Normalize to /100 scale (max raw score is 143.75 pts)
-        # After scoring fix: Tier1=39.25, Tier2=61, Tier3=43.5 = 143.75 pts
-        SCORE_NORMALIZATION = 143.75 / 100
+        # Normalize to /100 scale (max raw score is 146.25 pts)
+        # T1=39.25, T2=61, T3=46 = 146.25 pts
+        # T3 rebalanced to institutional vol complex hierarchy:
+        #   VIX Term(15) > VIX Level(10) > VVIX(8) > SKEW(5) > Yield(3) > VIX9D(3) > VXN(2)
+        SCORE_NORMALIZATION = 146.25 / 100
         total_normalized = total / SCORE_NORMALIZATION
         
         self.scores = {
@@ -2082,7 +2087,7 @@ class RiskDashboard:
             "📈 TIER SCORES",
             f"T1: {self.scores['tier1']:.1f}/39.25 Credit+Macro ({self.scores['tier1']/39.25*100:.0f}%)",
             f"T2: {self.scores['tier2']:.1f}/61 Positioning+InstFlows ({self.scores['tier2']/61*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.1f}/43.5 Options+Structure ({self.scores['tier3']/43.5*100:.0f}%)",
+            f"T3: {self.scores['tier3']:.1f}/46 Options+Structure ({self.scores['tier3']/46*100:.0f}%)",
             "",
         ])
         
