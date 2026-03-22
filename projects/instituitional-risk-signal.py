@@ -1497,6 +1497,10 @@ class RiskDashboard:
             'tier2': s5 + s6 + s7 + s8 + s9 + s10 + s18 + s19 + s20,  # Positioning + institutional flows
             'tier3': s11 + s12 + s13 + s14 + s15 + s16 + s17,  # Options intelligence + structure
             'credit_score': credit_score,
+            's1': s1,  # HY Spread score
+            's_ig': s_ig,  # IG Spread score
+            's_ratio': s_ratio,  # Credit Stress Ratio score
+            's_nfci': s_nfci,  # NFCI score
             'vix_term': s11,  # VIX Term Structure score
             'skew_score': s14,  # SKEW Index score
             'vvix_score': s15,  # VVIX score
@@ -2246,12 +2250,19 @@ class RiskDashboard:
                 
                 lines.append("")
         
-        # Tier scores
+        # Tier scores with underlying indicator breakdown
+        s = self.scores
         lines.extend([
             "📈 TIER SCORES",
-            f"T1: {self.scores['tier1']:.1f}/39.25 Credit+Macro ({self.scores['tier1']/39.25*100:.0f}%)",
-            f"T2: {self.scores['tier2']:.1f}/61 Positioning+InstFlows ({self.scores['tier2']/61*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.1f}/46 Options+Structure ({self.scores['tier3']/46*100:.0f}%)",
+            f"T1: {s['tier1']:.1f}/39.25 Credit+Macro ({s['tier1']/39.25*100:.0f}%)",
+            f"  Credit {s['credit_score']:.1f}/19.25: HY {s['s1']:.0f}/20 · IG {s['s_ig']:.0f}/20 · Ratio {s['s_ratio']:.0f}/20 · NFCI {s['s_nfci']:.0f}/15",
+            f"  Fed BS {s['s2']:.0f}/15 · DXY {s['s4']:.0f}/5",
+            f"T2: {s['tier2']:.1f}/61 Positioning+Flows ({s['tier2']/61*100:.0f}%)",
+            f"  >50MA {s['s5']:.0f}/12 · <200MA {s['s6']:.0f}/10 · A/D {s['s7']:.0f}/5 · H-L {s['s8']:.1f}/3",
+            f"  Rotation {s['s9']:.0f}/6 · Au/SPY {s['s10']:.0f}/4 · ETF {s['s18']:.0f}/8 · Credit {s['s19']:.0f}/7 · Sect {s['s20']:.0f}/6",
+            f"T3: {s['tier3']:.1f}/46 Options+Structure ({s['tier3']/46*100:.0f}%)",
+            f"  VIXTerm {s['s11']:.0f}/15 · YC {s['s12']:.1f}/3 · VIX {s['s13']:.0f}/10 · SKEW {s['s14']:.0f}/5",
+            f"  VVIX {s['s15']:.0f}/8 · 9D/VIX {s['s16']:.0f}/3 · VXN {s['s17']:.0f}/2",
             "",
         ])
         
