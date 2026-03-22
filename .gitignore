@@ -26,5 +26,6 @@ build/
 
 # Project specific
 *.log
+projects/sp500_cache.json
 
 

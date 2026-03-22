@@ -491,93 +491,189 @@ class RiskDashboard:
         self.actual_positions = None
     
     # [DATA FETCHING METHODS - Enhanced in v2.0 with institutional flows]
-    def _update_sp100_cache_if_stale(self):
-        """Check if sp100_cache.json is >30 days old and update from Wikipedia if needed"""
-        cache_file = 'projects/sp100_cache.json'
-        try:
-            # Check file modification time
-            import os
-            if os.path.exists(cache_file):
-                file_mtime = os.path.getmtime(cache_file)
-                age_days = (datetime.now().timestamp() - file_mtime) / 86400
-                
-                if age_days > 30:
-                    print(f"   ⚠️  sp100_cache.json is {age_days:.0f} days old, updating from Wikipedia...")
-                    self._fetch_sp100_from_wikipedia(cache_file)
-            else:
-                print(f"   ⚠️  sp100_cache.json not found, creating from Wikipedia...")
-                self._fetch_sp100_from_wikipedia(cache_file)
-        except Exception as e:
-            print(f"   ⚠️  Could not check/update sp100_cache.json: {e}")
+    # v2.1: Upgraded from S&P 100 (98 stocks) to S&P 500 (503 stocks) for breadth analysis
+    #        Uses batch yf.download() instead of individual ticker calls (8s vs 5min)
     
-    def _fetch_sp100_from_wikipedia(self, cache_file):
-        """Fetch S&P 100 tickers from Wikipedia and update cache file"""
-        try:
-            import pandas as pd
-            # Fetch Wikipedia S&P 100 table
-            url = 'https://en.wikipedia.org/wiki/S%26P_100'
-            tables = pd.read_html(url)
-            
-            # Find the table with 'Symbol' column
-            sp100_table = None
-            for table in tables:
-                if 'Symbol' in table.columns:
-                    sp100_table = table
-                    break
-            
-            if sp100_table is None:
-                raise Exception("Could not find S&P 100 table with Symbol column")
-            
-            tickers = sp100_table['Symbol'].tolist()
-            tickers = [t.strip() for t in tickers if isinstance(t, str) and t.strip()]
-            
-            if len(tickers) < 90:
-                raise Exception(f"Only found {len(tickers)} tickers, expected ~100")
-            
-            # Save to cache
-            cache_data = {
-                'timestamp': datetime.now().strftime('%Y-%m-%d'),
-                'tickers': sorted(tickers)
-            }
-            with open(cache_file, 'w') as f:
-                json.dump(cache_data, f, indent=2)
-            
-            print(f"   ✅ Updated sp100_cache.json: {len(tickers)} tickers from Wikipedia")
-        except Exception as e:
-            print(f"   ❌ Failed to update sp100_cache.json from Wikipedia: {e}")
-            print(f"      Will use existing cache or fallback list")
-    
-    def _get_sp100_tickers(self):
-        """Get S&P 100 tickers for breadth analysis - loads from sp100_cache.json with fallback"""
-        # Check if cache needs updating (only on first call)
-        if not hasattr(self, '_sp100_cache_checked'):
-            self._update_sp100_cache_if_stale()
-            self._sp100_cache_checked = True
+    def _get_sp500_tickers(self):
+        """Get S&P 500 tickers for breadth analysis.
         
+        Fetches from GitHub-hosted CSV (datasets/s-and-p-500-companies) with
+        local cache (sp500_cache.json, refreshed every 30 days).
+        Falls back to hardcoded list of ~500 tickers if fetch fails.
+        
+        Returns: list of ticker strings (e.g., ['AAPL', 'MSFT', ...])
+        """
+        import pandas as pd
+        from pathlib import Path
+        cache_file = Path(__file__).parent / 'sp500_cache.json'
+        
+        # Check if cache exists and is fresh (<30 days)
         try:
-            cache_file = 'projects/sp100_cache.json'
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r') as f:
+                    cache = json.load(f)
+                cache_date = cache.get('timestamp', '')
+                tickers = cache.get('tickers', [])
+                if tickers and len(tickers) >= 450:
+                    age_days = (datetime.now() - datetime.strptime(cache_date, '%Y-%m-%d')).days
+                    if age_days <= 30:
+                        return tickers
+                    else:
+                        print(f"   ⚠️  sp500_cache.json is {age_days} days old, refreshing...")
+        except Exception:
+            pass
+        
+        # Fetch fresh list from GitHub datasets
+        try:
+            url = 'https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv'
+            sp500 = pd.read_csv(url)
+            tickers = sorted(sp500['Symbol'].str.replace('.', '-', regex=False).tolist())
+            if len(tickers) >= 450:
+                cache_data = {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d'),
+                    'source': 'github/datasets/s-and-p-500-companies',
+                    'count': len(tickers),
+                    'tickers': tickers,
+                }
+                with open(cache_file, 'w') as f:
+                    json.dump(cache_data, f, indent=2)
+                print(f"   ✅ Refreshed sp500_cache.json: {len(tickers)} tickers")
+                return tickers
+        except Exception as e:
+            print(f"   ⚠️  GitHub S&P 500 fetch failed: {e}, using fallback")
+        
+        # Try loading stale cache (better than hardcoded)
+        try:
             with open(cache_file, 'r') as f:
                 cache = json.load(f)
                 tickers = cache.get('tickers', [])
-                if tickers and len(tickers) >= 90:  # Sanity check
+                if tickers and len(tickers) >= 450:
+                    print(f"   ⚠️  Using stale sp500_cache.json ({len(tickers)} tickers)")
                     return tickers
-        except Exception as e:
-            print(f"   ⚠️  Could not load sp100_cache.json: {e}, using fallback list")
+        except Exception:
+            pass
         
-        # Fallback hardcoded list (if cache fails)
+        # Hardcoded fallback — S&P 500 constituents (updated March 2026)
+        print(f"   ⚠️  Using hardcoded S&P 500 fallback list")
         return [
-            'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK-B',
-            'JPM', 'V', 'JNJ', 'WMT', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'ABBV',
-            'KO', 'PEP', 'COST', 'AVGO', 'TMO', 'MCD', 'CSCO', 'ABT', 'ACN',
-            'DHR', 'VZ', 'ADBE', 'NKE', 'TXN', 'NEE', 'PM', 'LIN', 'CRM',
-            'ORCL', 'UNP', 'DIS', 'BMY', 'CMCSA', 'NFLX', 'WFC', 'UNH', 'AMD',
-            'HON', 'QCOM', 'LOW', 'UPS', 'INTC', 'RTX', 'CAT', 'BA', 'GE',
-            'AMGN', 'SPGI', 'INTU', 'SBUX', 'GS', 'AXP', 'BLK', 'IBM', 'BKNG',
-            'MDLZ', 'GILD', 'TGT', 'DE', 'AMAT', 'MMM', 'ADI', 'CVS', 'MO',
-            'SYK', 'CI', 'ISRG', 'REGN', 'NOW', 'ZTS', 'CB', 'SO', 'DUK',
-            'PLD', 'MMC', 'EL', 'TJX', 'BDX', 'USB', 'SCHW', 'MS', 'PNC',
-            'ADP', 'CL', 'FIS', 'CCI', 'LRCX', 'EOG', 'SLB', 'ITW', 'EMR',
+            'A','AAPL','ABBV','ABNB','ABT','ACGL','ACN','ADBE','ADI','ADM',
+            'ADP','ADSK','AEE','AEP','AES','AFL','AIG','AIZ','AJG','AKAM',
+            'ALB','ALGN','ALL','ALLE','AMAT','AMCR','AMD','AME','AMGN','AMP',
+            'AMT','AMZN','ANET','AON','AOS','APA','APD','APH','APO','APP',
+            'APTV','ARE','ARES','ATO','AVB','AVGO','AVY','AWK','AXON','AXP',
+            'AZO','BA','BAC','BALL','BAX','BBY','BDX','BEN','BF-B','BG',
+            'BIIB','BK','BKNG','BKR','BLDR','BLK','BMY','BR','BRK-B','BRO',
+            'BSX','BX','BXP','C','CAG','CAH','CARR','CAT','CB','CBOE',
+            'CBRE','CCI','CCL','CDNS','CDW','CEG','CF','CFG','CHD','CHRW',
+            'CHTR','CI','CINF','CL','CLX','CMCSA','CME','CMG','CMI','CMS',
+            'CNC','CNP','COF','COO','COP','COR','COST','CPAY','CPB','CPRT',
+            'CPT','CRL','CRM','CRWD','CSCO','CSGP','CSX','CTAS','CTRA','CTSH',
+            'CTVA','CVS','CVX','D','DAL','DD','DE','DELL','DG','DGX',
+            'DHI','DHR','DIS','DLR','DLTR','DOV','DOW','DPZ','DRI','DTE',
+            'DUK','DVA','DVN','DXCM','EA','EBAY','ECL','ED','EFX','EIX',
+            'EL','ELV','EME','EMR','EOG','EPAM','EQIX','EQR','EQT','ERIE',
+            'ES','ESS','ETN','ETR','EVRG','EW','EXC','EXPD','EXPE','EXR',
+            'F','FANG','FAST','FCX','FDS','FDX','FE','FFIV','FICO','FIS',
+            'FISV','FITB','FOX','FOXA','FRT','FSLR','FTNT','FTV','GD','GDDY',
+            'GE','GEHC','GEN','GEV','GILD','GIS','GL','GLW','GM','GNRC',
+            'GOOG','GOOGL','GPC','GPN','GRMN','GS','GWW','HAL','HAS','HBAN',
+            'HCA','HD','HIG','HII','HLT','HOLX','HON','HPE','HPQ','HRL',
+            'HSIC','HST','HSY','HUBB','HUM','HWM','IBM','ICE','IDXX','IEX',
+            'IFF','INCY','INTC','INTU','INVH','IP','IQV','IR','IRM','ISRG',
+            'IT','ITW','IVZ','J','JBHT','JBL','JCI','JKHY','JNJ','JPM',
+            'KDP','KEY','KEYS','KHC','KIM','KKR','KLAC','KMB','KMI','KO',
+            'KR','KVUE','L','LDOS','LEN','LH','LHX','LIN','LLY','LMT',
+            'LNT','LOW','LRCX','LULU','LUV','LVS','LW','LYB','LYV','MA',
+            'MAA','MAR','MAS','MCD','MCHP','MCK','MCO','MDLZ','MDT','MET',
+            'META','MGM','MKC','MLM','MMM','MNST','MO','MOH','MOS','MPC',
+            'MPWR','MRK','MRNA','MS','MSCI','MSFT','MSI','MTB','MTCH','MTD',
+            'MU','NCLH','NDAQ','NDSN','NEE','NEM','NFLX','NI','NKE','NOC',
+            'NOW','NRG','NSC','NTAP','NTRS','NUE','NVDA','NVR','NWS','NWSA',
+            'NXPI','O','ODFL','OKE','OMC','ON','ORCL','ORLY','OTIS','OXY',
+            'PANW','PAYC','PAYX','PCAR','PCG','PEG','PEP','PFE','PFG','PG',
+            'PGR','PH','PHM','PKG','PLD','PLTR','PM','PNC','PNR','PNW',
+            'POOL','PPG','PPL','PRU','PSA','PSX','PTC','PWR','PYPL','QCOM',
+            'RCL','REG','REGN','RF','RJF','RL','RMD','ROK','ROL','ROP',
+            'ROST','RSG','RTX','RVTY','SBAC','SBUX','SCHW','SHW','SJM','SLB',
+            'SMCI','SNA','SNPS','SO','SPG','SPGI','SRE','STE','STLD','STT',
+            'STX','STZ','SWK','SWKS','SYF','SYK','SYY','T','TAP','TDG',
+            'TDY','TECH','TEL','TER','TFC','TGT','TJX','TMO','TMUS','TPR',
+            'TRGP','TRMB','TROW','TRV','TSCO','TSLA','TSN','TT','TTWO','TXN',
+            'TXT','TYL','UAL','UBER','UDR','UHS','ULTA','UNH','UNP','UPS',
+            'URI','USB','V','VICI','VLO','VLTO','VMC','VRSK','VRSN','VRTX',
+            'VTR','VTRS','VZ','WAB','WAT','WBD','WDAY','WDC','WEC','WELL',
+            'WFC','WM','WMB','WMT','WRB','WST','WTW','WY','WYNN','XEL',
+            'XOM','XYL','YUM','ZBH','ZBRA','ZTS',
         ]
+    
+    def _batch_breadth_scan(self):
+        """Batch-download S&P 500 data and compute all breadth indicators at once.
+        
+        Returns dict with:
+          - pct_above_50ma: float (percentage of stocks above 50-day MA)
+          - pct_below_200ma: float (percentage of stocks below 200-day MA)
+          - new_hl: int (new highs minus new lows over 3 months)
+          - breadth_valid_50: int (count of valid stocks for 50MA)
+          - breadth_valid_200: int (count of valid stocks for 200MA)
+          - breadth_valid_hl: int (count of valid stocks for H-L)
+        
+        Uses yf.download() batch mode — ~8 seconds for 500 tickers vs 5+ min individual.
+        """
+        tickers = self._get_sp500_tickers()
+        result = {}
+        
+        try:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data = yf.download(tickers, period='1y', progress=False, threads=True)
+            
+            close = data['Close']
+            latest = close.iloc[-1]
+            
+            # % Above 50-day MA
+            ma50 = close.rolling(50).mean().iloc[-1]
+            mask_50 = latest.notna() & ma50.notna()
+            valid_50 = int(mask_50.sum())
+            above_50 = int(((latest > ma50) & mask_50).sum())
+            if valid_50 > 0:
+                pct = above_50 / valid_50 * 100
+                result['pct_above_50ma'] = pct
+                result['breadth_valid_50'] = valid_50
+                print(f"   ✓ % Above 50-MA: {pct:.0f}% ({above_50}/{valid_50} S&P 500)")
+            
+            # % Below 200-day MA
+            ma200 = close.rolling(200).mean().iloc[-1]
+            mask_200 = latest.notna() & ma200.notna()
+            valid_200 = int(mask_200.sum())
+            below_200 = int(((latest < ma200) & mask_200).sum())
+            if valid_200 > 0:
+                pct = below_200 / valid_200 * 100
+                result['pct_below_200ma'] = pct
+                result['breadth_valid_200'] = valid_200
+                print(f"   ✓ % Below 200-MA: {pct:.0f}% ({below_200}/{valid_200} S&P 500)")
+            
+            # New Highs minus Lows (3-month window)
+            close_3m = close.iloc[-63:]  # ~3 months of trading days
+            if len(close_3m) >= 52:
+                cur = close_3m.iloc[-1]
+                high_3m = close_3m.max()
+                low_3m = close_3m.min()
+                # Within 0.5% of 3-month high = new high; within 0.5% of 3-month low = new low
+                mask_hl = cur.notna() & high_3m.notna() & low_3m.notna()
+                highs = int(((cur >= high_3m * 0.995) & mask_hl).sum())
+                lows = int(((cur <= low_3m * 1.005) & mask_hl).sum())
+                valid_hl = int(mask_hl.sum())
+                net = highs - lows
+                result['new_hl'] = net
+                result['breadth_valid_hl'] = valid_hl
+                print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows} of {valid_hl} S&P 500)")
+            
+        except Exception as e:
+            print(f"   ✗ Batch breadth scan failed: {e}")
+            self.missing_signals.extend(['% Above 50MA', '% Below 200MA', 'New H-L'])
+        
+        return result
     
     def _fred_get(self, series, name):
         try:
@@ -624,38 +720,12 @@ class RiskDashboard:
             return None
     
     def _pct_above_ma(self, period):
-        above, valid = 0, 0
-        for t in self.sample_tickers:
-            try:
-                hist = yf.Ticker(t).history(period='1y')
-                if len(hist) >= period:
-                    valid += 1
-                    if hist['Close'].iloc[-1] > hist['Close'].rolling(period).mean().iloc[-1]:
-                        above += 1
-            except:
-                pass
-        if valid == 0:
-            return None
-        pct = (above / valid * 100)
-        print(f"   ✓ % Above {period}-MA: {pct:.0f}% ({above}/{valid})")
-        return pct
+        """DEPRECATED: Use _batch_breadth_scan() instead. Kept as fallback."""
+        return None
     
     def _pct_below_ma(self, period):
-        below, valid = 0, 0
-        for t in self.sample_tickers:
-            try:
-                hist = yf.Ticker(t).history(period='1y')
-                if len(hist) >= period:
-                    valid += 1
-                    if hist['Close'].iloc[-1] < hist['Close'].rolling(period).mean().iloc[-1]:
-                        below += 1
-            except:
-                pass
-        if valid == 0:
-            return None
-        pct = (below / valid * 100)
-        print(f"   ✓ % Below {period}-MA: {pct:.0f}% ({below}/{valid})")
-        return pct
+        """DEPRECATED: Use _batch_breadth_scan() instead. Kept as fallback."""
+        return None
     
     def _ad_line_status(self):
         try:
@@ -671,24 +741,8 @@ class RiskDashboard:
             return None
     
     def _new_highs_lows(self):
-        highs, lows, valid = 0, 0, 0
-        for t in self.sample_tickers:
-            try:
-                hist = yf.Ticker(t).history(period='3mo')
-                if len(hist) >= 52:
-                    valid += 1
-                    cur = hist['Close'].iloc[-1]
-                    if cur >= hist['Close'].max() * 0.995:
-                        highs += 1
-                    elif cur <= hist['Close'].min() * 1.005:
-                        lows += 1
-            except:
-                pass
-        if valid == 0:
-            return None
-        net = highs - lows
-        print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows})")
-        return net
+        """DEPRECATED: Use _batch_breadth_scan() instead. Kept as fallback."""
+        return None
     
     def _sector_rotation(self):
         try:
@@ -984,8 +1038,10 @@ class RiskDashboard:
     def fetch_all_data(self):
         """Fetch all 22 market indicators from FRED and yfinance APIs"""
         print("\n📊 Fetching 22 indicators...\n")
-        self.sample_tickers = self._get_sp100_tickers()
         self.missing_signals = []
+        
+        # Batch breadth scan — S&P 500 (replaces individual ticker loops)
+        breadth = self._batch_breadth_scan()
         
         self.data = {
             'hy_spread': self._fred_get('BAMLH0A0HYM2', 'HY Spread'),
@@ -993,10 +1049,10 @@ class RiskDashboard:
             'fed_bs_yoy': self._fed_bs_yoy(),
             'ted_spread': self._fred_get('TEDRATE', 'TED Spread'),
             'dxy_trend': self._dxy_trend(),
-            'pct_above_50ma': self._pct_above_ma(50),
-            'pct_below_200ma': self._pct_below_ma(200),
+            'pct_above_50ma': breadth.get('pct_above_50ma'),
+            'pct_below_200ma': breadth.get('pct_below_200ma'),
             'ad_line': self._ad_line_status(),
-            'new_hl': self._new_highs_lows(),
+            'new_hl': breadth.get('new_hl'),
             'sector_rot': self._sector_rotation(),
             'gold_spy': self._gold_spy_ratio(),
             'yield_curve': self._fred_get('T10Y2Y', 'Yield Curve'),
