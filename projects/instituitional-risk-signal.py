@@ -669,6 +669,9 @@ class RiskDashboard:
                 result['breadth_valid_hl'] = valid_hl
                 print(f"   ✓ New H-L: {net:+d} (H:{highs} L:{lows} of {valid_hl} S&P 500)")
             
+            # Store close data for A/D Line computation (avoids re-downloading)
+            result['_batch_close'] = close
+            
         except Exception as e:
             print(f"   ✗ Batch breadth scan failed: {e}")
             self.missing_signals.extend(['% Above 50MA', '% Below 200MA', 'New H-L'])
@@ -727,17 +730,57 @@ class RiskDashboard:
         """DEPRECATED: Use _batch_breadth_scan() instead. Kept as fallback."""
         return None
     
-    def _ad_line_status(self):
+    def _ad_line_status(self, batch_close=None):
+        """Real Advance/Decline breadth from S&P 500 batch data.
+        
+        Computes daily advance/decline ratio over recent days and compares
+        to 20-day average to detect breadth divergence.
+        
+        Uses the batch S&P 500 close data already downloaded by _batch_breadth_scan()
+        to avoid redundant API calls.
+        
+        Returns: float — A/D ratio (advances/total). Range 0.0-1.0.
+          >0.55 = Confirming (broad participation)
+          0.45-0.55 = Flat (mixed)
+          <0.45 = Diverging (narrow/weak breadth)
+        """
         try:
-            spy = yf.Ticker('SPY').history(period='3mo')
-            if len(spy) < 20:
+            if batch_close is None or batch_close.empty:
+                print(f"   ✗ AD Line: No batch data")
                 return None
-            pct = ((spy['Close'].iloc[-1] - spy['Close'].iloc[-20:].max()) / spy['Close'].iloc[-20:].max()) * 100
-            status = 'Confirming' if pct >= -1 else 'Flat' if pct >= -5 else 'Diverging'
-            print(f"   ✓ AD Line: {status} ({pct:.1f}% from 20d high)")
-            return status
-        except:
-            print(f"   ✗ AD Line: Error")
+            
+            close = batch_close.dropna(axis=1, how='all')
+            if close.shape[0] < 25 or close.shape[1] < 100:
+                print(f"   ✗ AD Line: Insufficient data ({close.shape[1]} tickers)")
+                return None
+            
+            # Daily advances: stocks that closed higher than previous day
+            daily_returns = close.pct_change(fill_method=None)
+            advances = (daily_returns > 0).sum(axis=1)
+            declines = (daily_returns < 0).sum(axis=1)
+            total = advances + declines
+            
+            # Avoid division by zero
+            ad_ratio = advances / total.replace(0, float('nan'))
+            ad_ratio = ad_ratio.dropna()
+            
+            if len(ad_ratio) < 20:
+                print(f"   ✗ AD Line: Insufficient history")
+                return None
+            
+            # 5-day average A/D ratio (recent breadth)
+            recent_ad = float(ad_ratio.iloc[-5:].mean())
+            # 20-day average (baseline)
+            baseline_ad = float(ad_ratio.iloc[-20:].mean())
+            
+            # Latest day advances/declines for display
+            latest_adv = int(advances.iloc[-1])
+            latest_dec = int(declines.iloc[-1])
+            
+            print(f"   ✓ AD Breadth: {recent_ad:.1%} adv rate (5d), baseline {baseline_ad:.1%} (20d) | Today: {latest_adv}A/{latest_dec}D")
+            return recent_ad
+        except Exception as e:
+            print(f"   ✗ AD Line: Error - {e}")
             return None
     
     def _new_highs_lows(self):
@@ -937,132 +980,195 @@ class RiskDashboard:
     
     def _etf_flow_divergence(self):
         """ETF Flow Divergence: Institutional money flow across 9 major ETFs
-        Tracks volume surge + price momentum to detect inflows/outflows
-        SPY, QQQ, IWM, DIA, EEM, TLT, GLD, HYG, LQD
+        Tracks volume surge + price momentum to detect inflows/outflows.
+        Uses batch yf.download() for efficiency.
+        
+        Risk-on ETFs: SPY, QQQ, IWM, DIA, EEM (equity)
+        Risk-off ETFs: TLT, GLD (safe haven)
+        Credit ETFs: HYG, LQD (credit health)
+        
+        Returns tuple: (inflow_count, outflow_count, net_flow_score)
+        net_flow_score: weighted sum of per-ETF flow signals [-1 to +1 each]
         """
         try:
             etfs = ['SPY', 'QQQ', 'IWM', 'DIA', 'EEM', 'TLT', 'GLD', 'HYG', 'LQD']
+            
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data = yf.download(etfs, period='2mo', progress=False, threads=True)
+            
+            if data.empty:
+                print(f"   ✗ ETF Flows: No data")
+                return None
+            
+            close = data['Close']
+            volume = data['Volume']
+            
             inflow_count = 0
             outflow_count = 0
+            flow_details = []
             
             for etf in etfs:
                 try:
-                    ticker = yf.Ticker(etf)
-                    hist = ticker.history(period='2mo')
+                    if etf not in close.columns:
+                        continue
+                    c = close[etf].dropna()
+                    v = volume[etf].dropna()
+                    if len(c) < 25 or len(v) < 25:
+                        continue
                     
-                    if len(hist) >= 25:
-                        # Volume surge analysis (5d avg vs 20d avg)
-                        vol_5d = hist['Volume'].iloc[-5:].mean()
-                        vol_20d = hist['Volume'].iloc[-20:].mean()
-                        vol_change = ((vol_5d / vol_20d) - 1) * 100
-                        
-                        # Price momentum (5-day)
-                        price_change = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-5]) - 1) * 100
-                        
-                        # Flow classification
-                        if vol_change > 10 and price_change > 0:
-                            inflow_count += 1
-                        elif vol_change > 10 and price_change < 0:
-                            outflow_count += 1
+                    # Volume surge analysis (5d avg vs 20d avg)
+                    vol_5d = v.iloc[-5:].mean()
+                    vol_20d = v.iloc[-20:].mean()
+                    vol_change = ((vol_5d / vol_20d) - 1) * 100 if vol_20d > 0 else 0
+                    
+                    # Price momentum (5-day)
+                    price_change = ((c.iloc[-1] / c.iloc[-5]) - 1) * 100 if c.iloc[-5] > 0 else 0
+                    
+                    # Flow classification
+                    if vol_change > 10 and price_change > 0:
+                        inflow_count += 1
+                    elif vol_change > 10 and price_change < 0:
+                        outflow_count += 1
+                    
+                    flow_details.append(f"{etf}:{vol_change:+.0f}v/{price_change:+.1f}p")
                 except:
                     continue
             
             neutral_count = len(etfs) - inflow_count - outflow_count
             print(f"   ✓ ETF Flows: {inflow_count} in, {outflow_count} out, {neutral_count} neutral")
             
-            # Return tuple: (inflow_count, outflow_count)
             return (inflow_count, outflow_count)
             
         except Exception as e:
-            print(f"   ✗ ETF Flows: Error")
+            print(f"   ✗ ETF Flows: Error - {e}")
             return None
     
     def _credit_flow_stress(self):
         """Credit Market Flow Stress: HYG, LQD, JNK, EMB flow analysis
-        Credit flows lead equity flows by 1-2 weeks
-        Higher threshold (15% vol + 1% price) for credit-specific detection
+        Credit flows lead equity flows by 1-2 weeks.
+        Uses batch download + calibrated thresholds.
+        
+        Classification:
+        - INFLOW: volume above normal AND positive price = healthy credit demand
+        - OUTFLOW: volume above normal AND negative price = credit redemption stress
+        - Neutral: no strong signal
+        
+        Thresholds: 8% vol surge + 0.5% price move (credit ETFs have lower vol/price
+        ranges than equity ETFs — old 15%/1% thresholds missed real stress signals)
         """
         try:
             credit_etfs = ['HYG', 'LQD', 'JNK', 'EMB']
+            
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data = yf.download(credit_etfs, period='2mo', progress=False, threads=True)
+            
+            if data.empty:
+                print(f"   ✗ Credit Flows: No data")
+                return None
+            
+            close = data['Close']
+            volume = data['Volume']
+            
             inflow_count = 0
             outflow_count = 0
             
             for etf in credit_etfs:
                 try:
-                    ticker = yf.Ticker(etf)
-                    hist = ticker.history(period='2mo')
+                    if etf not in close.columns:
+                        continue
+                    c = close[etf].dropna()
+                    v = volume[etf].dropna()
+                    if len(c) < 25 or len(v) < 25:
+                        continue
                     
-                    if len(hist) >= 25:
-                        # Volume surge (5d vs 20d)
-                        vol_5d = hist['Volume'].iloc[-5:].mean()
-                        vol_20d = hist['Volume'].iloc[-20:].mean()
-                        vol_change = ((vol_5d / vol_20d) - 1) * 100
-                        
-                        # Price change (5-day)
-                        price_change = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-5]) - 1) * 100
-                        
-                        # Credit-specific thresholds (stricter)
-                        if vol_change > 15 and price_change > 1:
-                            inflow_count += 1
-                        elif vol_change > 15 and price_change < -1:
-                            outflow_count += 1
+                    # Volume surge (5d vs 20d)
+                    vol_5d = v.iloc[-5:].mean()
+                    vol_20d = v.iloc[-20:].mean()
+                    vol_change = ((vol_5d / vol_20d) - 1) * 100 if vol_20d > 0 else 0
+                    
+                    # Price change (5-day)
+                    price_change = ((c.iloc[-1] / c.iloc[-5]) - 1) * 100 if c.iloc[-5] > 0 else 0
+                    
+                    # Credit-calibrated thresholds (lower than equity ETFs)
+                    # Credit ETFs: HYG/LQD typically have 0.3-0.5% daily moves
+                    # 0.5% over 5 days is a meaningful credit move
+                    if vol_change > 8 and price_change > 0.5:
+                        inflow_count += 1
+                    elif vol_change > 8 and price_change < -0.5:
+                        outflow_count += 1
                 except:
                     continue
             
             neutral_count = len(credit_etfs) - inflow_count - outflow_count
             print(f"   ✓ Credit Flows: {inflow_count} in, {outflow_count} out, {neutral_count} neutral")
             
-            # Return tuple: (inflow_count, outflow_count)
             return (inflow_count, outflow_count)
             
         except Exception as e:
-            print(f"   ✗ Credit Flows: Error")
+            print(f"   ✗ Credit Flows: Error - {e}")
             return None
     
     def _sector_rotation_strength(self):
-        """Sector Rotation Strength: 11-sector flow ranking spread
-        Measures capital rotation intensity via top 3 vs bottom 3 spread
-        Wide spread = healthy rotation, narrow = stagnant capital
+        """Sector Rotation Strength: 11-sector momentum dispersion
+        Measures capital rotation intensity via top 3 vs bottom 3 momentum spread.
+        
+        Uses pure 10-day price momentum (no volume component).
+        Rationale: during broad selloffs, volume declines across ALL sectors equally,
+        making the vol component a universal drag that obscures real rotation signals.
+        Price momentum alone captures where capital is flowing.
+        
+        Wide spread = active rotation (healthy, even in corrections)
+        Narrow spread = correlated moves (panic selling or complacent buying)
+        
+        Uses batch yf.download() for efficiency.
         """
         try:
             sectors = ['XLK', 'XLF', 'XLV', 'XLE', 'XLY', 'XLP', 'XLI', 'XLB', 'XLRE', 'XLU', 'XLC']
-            sector_scores = []
+            
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                data = yf.download(sectors, period='2mo', progress=False, threads=True)
+            
+            if data.empty:
+                print(f"   ✗ Sector Rotation: No data")
+                return None
+            
+            close = data['Close']
+            sector_momentum = []
             
             for etf in sectors:
                 try:
-                    ticker = yf.Ticker(etf)
-                    hist = ticker.history(period='2mo')
+                    if etf not in close.columns:
+                        continue
+                    c = close[etf].dropna()
+                    if len(c) < 15:
+                        continue
                     
-                    if len(hist) >= 25:
-                        # Volume score (5d vs 20d)
-                        vol_5d = hist['Volume'].iloc[-5:].mean()
-                        vol_20d = hist['Volume'].iloc[-20:].mean()
-                        vol_score = ((vol_5d / vol_20d) - 1) * 100
-                        
-                        # Price momentum (10-day)
-                        price_score = ((hist['Close'].iloc[-1] / hist['Close'].iloc[-10]) - 1) * 100
-                        
-                        # Combined flow score (weighted: 30% vol, 70% price)
-                        flow_score = (vol_score * 0.3) + (price_score * 0.7)
-                        sector_scores.append(flow_score)
+                    # 10-day price momentum (percentage)
+                    momentum = ((c.iloc[-1] / c.iloc[-10]) - 1) * 100
+                    sector_momentum.append(momentum)
                 except:
                     continue
             
-            if len(sector_scores) >= 6:
-                # Sort and calculate spread
-                sector_scores = sorted(sector_scores, reverse=True)
-                top3_avg = sum(sector_scores[:3]) / 3
-                bottom3_avg = sum(sector_scores[-3:]) / 3
+            if len(sector_momentum) >= 6:
+                sector_momentum.sort(reverse=True)
+                top3_avg = sum(sector_momentum[:3]) / 3
+                bottom3_avg = sum(sector_momentum[-3:]) / 3
                 rotation_spread = top3_avg - bottom3_avg
                 
-                print(f"   ✓ Sector Rotation: {rotation_spread:.1f} pts spread")
+                print(f"   ✓ Sector Rotation: {rotation_spread:.1f} pts spread (top3: {top3_avg:+.1f}%, bot3: {bottom3_avg:+.1f}%)")
                 return float(rotation_spread)
             else:
-                print(f"   ✗ Sector Rotation: Insufficient data")
+                print(f"   ✗ Sector Rotation: Insufficient data ({len(sector_momentum)} sectors)")
                 return None
                 
         except Exception as e:
-            print(f"   ✗ Sector Rotation: Error")
+            print(f"   ✗ Sector Rotation: Error - {e}")
             return None
     
     def _breadth_extreme_adjustment(self, pct_above_50ma):
@@ -1091,11 +1197,11 @@ class RiskDashboard:
             'hy_spread': self._fred_get('BAMLH0A0HYM2', 'HY Spread'),
             'ig_spread': self._fred_get('BAMLC0A0CM', 'IG Spread'),
             'fed_bs_yoy': self._fed_bs_yoy(),
-            'ted_spread': self._fred_get('TEDRATE', 'TED Spread'),
+            'nfci': self._fred_get('NFCI', 'NFCI (Fin Conditions)'),  # Replaced TEDRATE (LIBOR deprecated)
             'dxy_trend': self._dxy_trend(),
             'pct_above_50ma': breadth.get('pct_above_50ma'),
             'pct_below_200ma': breadth.get('pct_below_200ma'),
-            'ad_line': self._ad_line_status(),
+            'ad_line': self._ad_line_status(batch_close=breadth.get('_batch_close')),
             'new_hl': breadth.get('new_hl'),
             'sector_rot': self._sector_rotation(),
             'gold_spy': self._gold_spy_ratio(),
@@ -1174,13 +1280,17 @@ class RiskDashboard:
             s_ig = max(0, s_ig - 5)
         
         # 3. Credit Stress Ratio (HY/IG): Low ratio = healthy
-        s_ratio = self._score_range(d.get('credit_stress_ratio'), [(2.5,20),(3.0,16),(3.5,10),(4.0,4)], 0, neutral_on_missing=True)
+        # Historical: 2.5-3.5 = tight, 3.5-4.0 = normal, 4.0-4.5 = elevated, 4.5+ = stress
+        s_ratio = self._score_range(d.get('credit_stress_ratio'), [(3.0,20),(3.5,16),(4.0,12),(4.5,6),(5.0,2)], 0, neutral_on_missing=True)
         
-        # 4. TED Spread: Low = healthy interbank lending
-        s_ted = self._score_range(d.get('ted_spread'), [(0.3,15),(0.5,12),(0.75,8),(1,4)], 0, neutral_on_missing=True)
+        # 4. NFCI (Chicago Fed Financial Conditions): Negative = loose (healthy), Positive = tight (stress)
+        # Replaced TEDRATE (TED Spread) — LIBOR was deprecated in 2023, TED always reads near-zero
+        # NFCI is composite of 105 indicators: money markets, debt, equity, banking
+        # Institutional gold standard for funding conditions
+        s_nfci = self._score_range(d.get('nfci'), [(-0.5,15),(-0.25,12),(0,8),(0.25,4),(0.5,2)], 0, neutral_on_missing=True)
         
-        # Combine credit scores (weighted: HY 30%, IG 30%, Ratio 25%, TED 15%)
-        credit_score = (s1 * 0.30) + (s_ig * 0.30) + (s_ratio * 0.25) + (s_ted * 0.15)
+        # Combine credit scores (weighted: HY 30%, IG 30%, Ratio 25%, NFCI 15%)
+        credit_score = (s1 * 0.30) + (s_ig * 0.30) + (s_ratio * 0.25) + (s_nfci * 0.15)
         
         # 5. Fed Balance Sheet YoY: Positive growth = QE = bullish, negative = QT = bearish
         # Thresholds: lowest first so -12% (heavy QT) hits 4pts, >10% (QE) hits 15pts
@@ -1204,8 +1314,10 @@ class RiskDashboard:
         # Use inverse=True: check val > thresh. Thresholds: highest (worst) first
         s6 = self._score_range(d.get('pct_below_200ma'), [(65,1),(50,3),(35,6),(25,8),(15,10)], 10, inverse=True)
         
-        # 9. A/D Line: Confirming = advances outpacing declines = bullish
-        s7 = {'Confirming':5, 'Flat':2, 'Diverging':0}.get(d.get('ad_line'), 0)
+        # 9. A/D Breadth: Real S&P 500 advance/decline ratio (5-day average)
+        # Based on actual daily advances vs declines across 500 stocks
+        # >0.55 = healthy breadth, 0.45-0.55 = mixed, <0.45 = weak/diverging
+        s7 = self._score_range(d.get('ad_line'), [(0.35,0),(0.40,1),(0.45,2),(0.50,3),(0.55,4),(0.60,5)], 5)
         
         # 10. New Highs minus Lows: Positive = bullish, Negative = bearish
         # Thresholds: lowest first so -20 hits 0pts, >10 hits 3pts
@@ -1895,7 +2007,7 @@ class RiskDashboard:
             )
         
         if (d.get('hy_spread') and d['hy_spread'] > 5) or \
-           (d.get('ted_spread') and d['ted_spread'] > 0.8):
+           (d.get('nfci') and d['nfci'] > 0.5):
             add_alert_if_new(
                 'CREDIT WARNING',
                 'HIGH',
@@ -2336,7 +2448,7 @@ Be direct, use specific numbers, focus on actionable insights."""
                 'hy_spread': self.data.get('hy_spread'),
                 'ig_spread': self.data.get('ig_spread'),
                 'credit_stress_ratio': self.data.get('credit_stress_ratio'),
-                'ted_spread': self.data.get('ted_spread'),
+                'nfci': self.data.get('nfci'),
             }
         )
         
