@@ -745,17 +745,61 @@ class RiskDashboard:
         return None
     
     def _sector_rotation(self):
+        """Sector Rotation: Defensive vs Cyclical basket ratio trend
+        Cyclicals: XLY (Consumer Disc), XLF (Financials), XLI (Industrials)
+        Defensives: XLU (Utilities), XLP (Consumer Staples), XLV (Healthcare)
+        
+        Positive trend = defensives outperforming (risk-off)
+        Negative trend = cyclicals outperforming (risk-on)
+        
+        Institutional standard: basket approach eliminates single-sector noise
+        (e.g., tech selling off on regulation doesn't false-flag as risk-off)
+        """
         try:
-            xlu = yf.Ticker('XLU').history(period='2mo')['Close']
-            xlk = yf.Ticker('XLK').history(period='2mo')['Close']
-            if len(xlu) < 20 or len(xlk) < 20:
+            import pandas as pd
+            cyclicals = ['XLY', 'XLF', 'XLI']
+            defensives = ['XLU', 'XLP', 'XLV']
+            all_tickers = cyclicals + defensives
+            
+            data = yf.download(all_tickers, period='2mo', progress=False, threads=True)
+            if data.empty:
                 return None
-            ratio = xlu / xlk
-            trend = ((ratio.iloc[-1] - ratio.rolling(20).mean().iloc[-1]) / ratio.rolling(20).mean().iloc[-1]) * 100
-            print(f"   ✓ XLU/XLK: {trend:+.1f}%")
+            
+            close = data['Close']
+            
+            # Verify sufficient data for all tickers
+            for t in all_tickers:
+                if t not in close.columns or close[t].dropna().shape[0] < 20:
+                    print(f"   ✗ Sector Rotation: Insufficient data for {t}")
+                    return None
+            
+            # Equal-weight basket: normalize each to day-0 = 1, then average
+            # This prevents large-cap ETFs from dominating the basket
+            cyc_norm = close[cyclicals].div(close[cyclicals].iloc[0])
+            def_norm = close[defensives].div(close[defensives].iloc[0])
+            
+            cyc_basket = cyc_norm.mean(axis=1)
+            def_basket = def_norm.mean(axis=1)
+            
+            # Defensive/Cyclical ratio — rising = defensives leading (risk-off)
+            ratio = def_basket / cyc_basket
+            ratio = ratio.dropna()
+            
+            if len(ratio) < 20:
+                return None
+            
+            ma20 = ratio.rolling(20).mean()
+            current = ratio.iloc[-1]
+            ma20_val = ma20.iloc[-1]
+            
+            if pd.isna(current) or pd.isna(ma20_val) or ma20_val == 0:
+                return None
+            
+            trend = ((current - ma20_val) / ma20_val) * 100
+            print(f"   ✓ Def/Cyc Basket: {trend:+.1f}% (XLU+XLP+XLV vs XLY+XLF+XLI)")
             return float(trend)
-        except:
-            print(f"   ✗ XLU/XLK: Error")
+        except Exception as e:
+            print(f"   ✗ Sector Rotation: Error - {e}")
             return None
     
     def _gold_spy_ratio(self):
@@ -1167,14 +1211,22 @@ class RiskDashboard:
         # Thresholds: lowest first so -20 hits 0pts, >10 hits 3pts
         s8 = self._score_range(d.get('new_hl'), [(-10,0.5),(-5,1),(0,2),(5,2.5),(10,3)], 3)
         
-        # 11. Sector Rotation: Cyclicals vs Defensives spread
-        # Negative = defensives leading (risk-off), Positive = cyclicals leading (risk-on)
-        s9 = self._score_range(d.get('sector_rot'), [(-5,0),(-2,2),(2,4),(5,6)], 6)
+        # 11. Sector Rotation: Defensive/Cyclical basket ratio trend
+        # Positive = defensives outperforming (risk-off), Negative = cyclicals leading (risk-on)
+        # Uses 3v3 basket (XLU+XLP+XLV vs XLY+XLF+XLI) — not a single pair
+        s9 = self._score_range(d.get('sector_rot'), [(-5,6),(-2,4),(2,2),(5,0)], 0)
         
         # 12. Gold/SPY Ratio: Gold outperforming = fear/uncertainty = bearish for stocks
         # Positive = gold leading (risk-off), Negative = SPY leading (risk-on)
-        # In a crash, gold can lag short-term too, so cap the bullish read
         s10 = self._score_range(d.get('gold_spy'), [(-5,4),(-1,3),(1,2),(5,1)], 0)
+        # Regime check: during stress (VIX > 25), gold lagging SPY is likely
+        # forced liquidation / margin-call selling, NOT genuine risk-on.
+        # Cap bullish read at 2/4 to avoid false signal.
+        vix_val = d.get('vix')
+        gold_spy_val = d.get('gold_spy')
+        if vix_val is not None and gold_spy_val is not None:
+            if vix_val > 25 and gold_spy_val < -1:
+                s10 = min(s10, 2)
         
         # 13. ETF Flow Divergence (institutional money flow)
         etf_flows = d.get('etf_flows')
