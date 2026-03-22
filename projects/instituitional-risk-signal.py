@@ -1046,108 +1046,202 @@ class RiskDashboard:
         return self.data
     
     def calculate_scores(self):
-        """Calculate risk scores across 3 tiers (Credit+Macro, Positioning+InstFlows, Options+Structure)"""
+        """Calculate risk scores across 3 tiers (Credit+Macro, Positioning+InstFlows, Options+Structure)
+        
+        SCORING CONVENTION for _score_range(val, thresholds, default):
+        - Thresholds are checked left-to-right: first match (val < thresh) returns that score
+        - Order thresholds LOWEST value first → HIGHEST value last
+        - Assign LOW scores to LOW thresholds (bearish conditions)
+        - Assign HIGH scores to HIGH thresholds (bullish conditions)
+        - For "low value = good" indicators (spreads, VIX): use inverse=True
+        """
         d = self.data
         
-        # Credit Market Indicators (Enhanced)
-        # 1. HY Spread with rate of change penalty (neutral on missing = use average score)
+        # =====================================================================
+        # TIER 1: Credit + Macro (max 39.25 pts)
+        # =====================================================================
+        
+        # 1. HY Spread: Low spread = healthy credit = bullish (inverse: high value = bad)
         s1 = self._score_range(d.get('hy_spread'), [(3,20),(4,16),(4.5,12),(5.5,6)], 0, neutral_on_missing=True)
         hy_change = self.history_manager.get_spread_change('hy_spread', 30)
         if hy_change and hy_change['change_pct'] > 20:  # Rapid widening = stress
             s1 = max(0, s1 - 5)
         
-        # 2. IG Spread (new)
+        # 2. IG Spread: Low spread = healthy (inverse: high value = bad)
         s_ig = self._score_range(d.get('ig_spread'), [(1.2,20),(1.5,16),(2.0,12),(2.5,6)], 0, neutral_on_missing=True)
         ig_change = self.history_manager.get_spread_change('ig_spread', 30)
         if ig_change and ig_change['change_pct'] > 20:
             s_ig = max(0, s_ig - 5)
         
-        # 3. Credit Stress Ratio (HY/IG) - new composite
+        # 3. Credit Stress Ratio (HY/IG): Low ratio = healthy
         s_ratio = self._score_range(d.get('credit_stress_ratio'), [(2.5,20),(3.0,16),(3.5,10),(4.0,4)], 0, neutral_on_missing=True)
         
-        # 4. TED Spread (primary short-term credit indicator)
+        # 4. TED Spread: Low = healthy interbank lending
         s_ted = self._score_range(d.get('ted_spread'), [(0.3,15),(0.5,12),(0.75,8),(1,4)], 0, neutral_on_missing=True)
         
         # Combine credit scores (weighted: HY 30%, IG 30%, Ratio 25%, TED 15%)
         credit_score = (s1 * 0.30) + (s_ig * 0.30) + (s_ratio * 0.25) + (s_ted * 0.15)
         
-        # Other existing indicators
-        s2 = self._score_range(d.get('fed_bs_yoy'), [(10,15),(2,12),(-2,9),(-10,4)], 0)
+        # 5. Fed Balance Sheet YoY: Positive growth = QE = bullish, negative = QT = bearish
+        # Thresholds: lowest first so -12% (heavy QT) hits 4pts, >10% (QE) hits 15pts
+        s2 = self._score_range(d.get('fed_bs_yoy'), [(-10,4),(-2,9),(2,12),(10,15)], 15)
+        
+        # 6. DXY Trend: Weak dollar = bullish for risk assets
+        # Negative = dollar weakening (good), positive = strengthening (bad)
         s4 = self._score_range(d.get('dxy_trend'), [(-3,5),(-1,4),(1,3),(3,1)], 0)
         
-        # Breadth with extreme detection
-        s5 = self._score_range(d.get('pct_above_50ma'), [(75,12),(65,10),(55,7),(45,4),(35,2)], 0)
-        s5_adj = self._breadth_extreme_adjustment(d.get('pct_above_50ma'))  # +3 or -5 pts
-        s5 = max(0, s5 + s5_adj)  # Apply adjustment with floor at 0
+        # =====================================================================
+        # TIER 2: Positioning + Institutional Flows (max 61 pts)
+        # =====================================================================
         
-        s6 = self._score_range(d.get('pct_below_200ma'), [(15,10),(25,8),(35,6),(50,3),(65,1)], 0, inverse=True)
+        # 7. % Stocks Above 50MA: High = broad rally = bullish
+        # Thresholds: lowest first so 13% hits 0pts (collapse), >75% hits 12pts
+        s5 = self._score_range(d.get('pct_above_50ma'), [(20,0),(35,2),(45,4),(55,7),(65,10),(75,12)], 12)
+        # Remove the misleading "oversold bonus" — 13% above 50MA is NOT an opportunity,
+        # it's a market in freefall. The bonus was adding +3 to a collapse reading.
+        
+        # 8. % Stocks Below 200MA: Low = healthy market, High = bear market
+        # Use inverse=True: check val > thresh. Thresholds: highest (worst) first
+        s6 = self._score_range(d.get('pct_below_200ma'), [(65,1),(50,3),(35,6),(25,8),(15,10)], 10, inverse=True)
+        
+        # 9. A/D Line: Confirming = advances outpacing declines = bullish
         s7 = {'Confirming':5, 'Flat':2, 'Diverging':0}.get(d.get('ad_line'), 0)
-        s8 = self._score_range(d.get('new_hl'), [(10,3),(5,2.5),(0,2),(-5,1),(-10,0.5)], 0)
-        s9 = self._score_range(d.get('sector_rot'), [(-5,6),(-2,5),(2,4),(5,2)], 0)
-        s10 = self._score_range(d.get('gold_spy'), [(-3,5),(-1,4),(1,3),(3,1)], 0)
         
-        # VIX Term Structure (replaces old VIX struct)
+        # 10. New Highs minus Lows: Positive = bullish, Negative = bearish
+        # Thresholds: lowest first so -20 hits 0pts, >10 hits 3pts
+        s8 = self._score_range(d.get('new_hl'), [(-10,0.5),(-5,1),(0,2),(5,2.5),(10,3)], 3)
+        
+        # 11. Sector Rotation: Cyclicals vs Defensives spread
+        # Negative = defensives leading (risk-off), Positive = cyclicals leading (risk-on)
+        s9 = self._score_range(d.get('sector_rot'), [(-5,0),(-2,2),(2,4),(5,6)], 6)
+        
+        # 12. Gold/SPY Ratio: Gold outperforming = fear/uncertainty = bearish for stocks
+        # Positive = gold leading (risk-off), Negative = SPY leading (risk-on)
+        # In a crash, gold can lag short-term too, so cap the bullish read
+        s10 = self._score_range(d.get('gold_spy'), [(-5,4),(-1,3),(1,2),(5,1)], 0)
+        
+        # 13. ETF Flow Divergence (institutional money flow)
+        etf_flows = d.get('etf_flows')
+        if etf_flows is not None and isinstance(etf_flows, tuple):
+            inflow_count, outflow_count = etf_flows
+            if outflow_count >= 7:       # Strong outflows = risk-off
+                s18 = 0
+            elif outflow_count >= 5:     # Moderate outflows
+                s18 = 2
+            elif inflow_count >= 7:      # Strong inflows = risk-on
+                s18 = 8
+            elif inflow_count >= 5:      # Moderate inflows
+                s18 = 6
+            else:                         # Mixed/neutral
+                s18 = 4
+        else:
+            s18 = 0
+        
+        # 14. Credit Market Flow Stress
+        credit_flows = d.get('credit_flows')
+        if credit_flows is not None and isinstance(credit_flows, tuple):
+            credit_in, credit_out = credit_flows
+            if credit_out >= 2:          # Multiple outflows = stress
+                s19 = 0
+            elif credit_out >= 1:        # Some stress
+                s19 = 2
+            elif credit_in >= 3:         # All inflows = credit healthy
+                s19 = 7
+            elif credit_in >= 2:         # Mostly inflows
+                s19 = 5
+            else:                         # Neutral
+                s19 = 3
+        else:
+            s19 = 0
+        
+        # 15. Sector Rotation Strength
+        rotation_spread = d.get('sector_rotation_strength')
+        if rotation_spread is not None:
+            if rotation_spread > 20:     # Strong rotation = healthy bull
+                s20 = 6
+            elif rotation_spread > 10:   # Moderate rotation
+                s20 = 4
+            else:                         # Weak rotation = choppy/bear
+                s20 = 0
+        else:
+            s20 = 0
+        
+        # =====================================================================
+        # TIER 3: Options Intelligence + Structure (max 43.5 pts)
+        # =====================================================================
+        
+        # 16. VIX Term Structure: Contango = calm, Backwardation = stress
         vix_term = d.get('vix_term_slope')
         if vix_term is not None:
-            if vix_term > 25:      # Extreme contango = complacency
+            if vix_term < -5:          # Backwardation = fear/stress
                 s11 = 0
-            elif vix_term > 15:    # Mild contango = calm
+            elif vix_term < 5:         # Flat = uncertainty
                 s11 = 4
-            elif vix_term > -5:    # Flat = neutral
+            elif vix_term < 15:        # Mild contango = healthy
                 s11 = 8
-            else:                   # Backwardation = fear/opportunity
+            else:                       # Strong contango = calm/complacent
                 s11 = 12
         else:
             s11 = 0
         
-        s12 = self._score_range(d.get('yield_curve'), [(0.5,3),(0.2,2.5),(-0.2,2),(-0.5,1)], 0)
-        s13 = self._score_range(d.get('vix'), [(12,0),(16,1.5),(20,1),(30,0.5)], 0, neutral_on_missing=True)
+        # 17. Yield Curve (10Y-2Y): Positive = normal = bullish
+        # Thresholds: lowest first so deeply inverted hits low score
+        s12 = self._score_range(d.get('yield_curve'), [(-0.5,0),(-0.2,1),(0.2,2),(0.5,2.5)], 3)
         
-        # SKEW Index (tail risk indicator)
+        # 18. VIX Level: Low = calm = bullish, High = fear = bearish
+        # Already correct: low VIX matches first threshold
+        s13 = self._score_range(d.get('vix'), [(15,1.5),(20,1),(25,0.5),(35,0)], 0, neutral_on_missing=True)
+        
+        # 19. SKEW Index: Measures tail risk demand
+        # Normal range 120-140 = healthy. Very low = complacency, very high = fear
         skew = d.get('skew')
         if skew is not None:
-            if skew < 110:         # Extreme complacency
-                s14 = 0
-            elif skew < 130:       # Normal
-                s14 = 6
-            elif skew < 145:       # Healthy caution
+            if skew < 110:         # Extreme complacency (no hedging)
+                s14 = 2
+            elif skew < 120:       # Low caution
+                s14 = 5
+            elif skew < 140:       # Normal/healthy hedging
                 s14 = 8
-            else:                   # Excessive fear = opportunity
-                s14 = 10
+            elif skew < 150:       # Elevated fear
+                s14 = 5
+            else:                   # Extreme fear (tail risk panic)
+                s14 = 2
         else:
             s14 = 0
         
-        # VVIX (VIX of VIX - uncertainty about volatility)
+        # 20. VVIX (VIX of VIX): Measures uncertainty about volatility
+        # Normal 80-100. Very high = crisis uncertainty = BEARISH (not opportunity)
         vvix = d.get('vvix')
         if vvix is not None:
             if vvix < 75:          # Dangerous complacency
-                s15 = 0
-            elif vvix < 95:        # Calm (normal)
-                s15 = 4
-            elif vvix < 110:       # Moderate uncertainty
-                s15 = 6
-            elif vvix < 125:       # Elevated uncertainty (caution)
+                s15 = 2
+            elif vvix < 90:        # Calm (bullish)
                 s15 = 8
-            else:                   # Extreme uncertainty = opportunity
-                s15 = 10
+            elif vvix < 100:       # Normal
+                s15 = 6
+            elif vvix < 115:       # Elevated uncertainty
+                s15 = 3
+            else:                   # Extreme uncertainty = DANGER
+                s15 = 0
         else:
             s15 = 0
         
-        # VIX9D/VIX Ratio (short-term event risk)
+        # 21. VIX9D/VIX Ratio: Short-term fear premium
+        # Positive = near-term fear elevated, Negative = near-term calm
         vix9d_ratio = d.get('vix9d_ratio')
         if vix9d_ratio is not None:
-            if vix9d_ratio < -10:      # Very calm near-term (complacency)
+            if vix9d_ratio > 15:       # Extreme near-term fear = stress
                 s16 = 0
-            elif vix9d_ratio < 0:      # Calm near-term
-                s16 = 4
-            elif vix9d_ratio < 10:     # Elevated near-term (healthy)
+            elif vix9d_ratio > 5:      # Elevated near-term risk
+                s16 = 3
+            elif vix9d_ratio > -5:     # Normal range
                 s16 = 6
-            else:                       # Extreme near-term fear = opportunity
-                s16 = 8
+            else:                       # Near-term calm (complacency or post-event)
+                s16 = 4
         else:
             s16 = 0
         
-        # VXN-VIX Spread (tech vs market fear)
+        # 22. VXN-VIX Spread: Tech fear premium over market
         vxn_vix = d.get('vxn_vix_spread')
         if vxn_vix is not None:
             if vxn_vix > 6:            # Extreme tech fear (tech selling)
@@ -1161,59 +1255,14 @@ class RiskDashboard:
         else:
             s17 = 0
         
-        # ETF Flow Divergence (institutional money flow)
-        etf_flows = d.get('etf_flows')
-        if etf_flows is not None and isinstance(etf_flows, tuple):
-            inflow_count, outflow_count = etf_flows
-            if inflow_count >= 7:          # Strong inflows = risk-on
-                s18 = 8
-            elif inflow_count >= 5:        # Moderate inflows
-                s18 = 6
-            elif outflow_count >= 7:       # Strong outflows = risk-off
-                s18 = 0
-            elif outflow_count >= 5:       # Moderate outflows
-                s18 = 2
-            else:                           # Mixed/neutral
-                s18 = 5
-        else:
-            s18 = 0
-        
-        # Credit Market Flow Stress
-        credit_flows = d.get('credit_flows')
-        if credit_flows is not None and isinstance(credit_flows, tuple):
-            credit_in, credit_out = credit_flows
-            if credit_in >= 3:             # All inflows = credit healthy
-                s19 = 7
-            elif credit_in >= 2:           # Mostly inflows
-                s19 = 5
-            elif credit_out >= 2:          # Multiple outflows = stress
-                s19 = 0
-            elif credit_out >= 1:          # Some stress
-                s19 = 2
-            else:                           # Neutral
-                s19 = 4
-        else:
-            s19 = 0
-        
-        # Sector Rotation Strength
-        rotation_spread = d.get('sector_rotation_strength')
-        if rotation_spread is not None:
-            if rotation_spread > 20:       # Strong rotation = healthy bull
-                s20 = 6
-            elif rotation_spread > 10:     # Moderate rotation
-                s20 = 4
-            else:                           # Weak rotation = choppy/bear
-                s20 = 0
-        else:
-            s20 = 0
-        
-        # Total includes credit_score (composite) + all other indicators
+        # =====================================================================
+        # TOTAL SCORE
+        # =====================================================================
         total = credit_score + s2 + s4 + s5 + s6 + s7 + s8 + s9 + s10 + s11 + s12 + s13 + s14 + s15 + s16 + s17 + s18 + s19 + s20
         
-        # Normalize to /100 scale (max raw score is 154 pts)
-        # Original system was 110 pts designed for /100 scale
-        # After upgrades: Tier1=45, Tier2=60, Tier3=49 = 154 pts
-        SCORE_NORMALIZATION = 154 / 100
+        # Normalize to /100 scale (max raw score is 143.75 pts)
+        # After scoring fix: Tier1=39.25, Tier2=61, Tier3=43.5 = 143.75 pts
+        SCORE_NORMALIZATION = 143.75 / 100
         total_normalized = total / SCORE_NORMALIZATION
         
         self.scores = {
@@ -1975,9 +2024,9 @@ class RiskDashboard:
         # Tier scores
         lines.extend([
             "📈 TIER SCORES",
-            f"T1: {self.scores['tier1']:.1f}/45 Credit+Macro ({self.scores['tier1']/45*100:.0f}%)",
-            f"T2: {self.scores['tier2']:.1f}/60 Positioning+InstFlows ({self.scores['tier2']/60*100:.0f}%)",
-            f"T3: {self.scores['tier3']:.1f}/49 Options+Structure ({self.scores['tier3']/49*100:.0f}%)",
+            f"T1: {self.scores['tier1']:.1f}/39.25 Credit+Macro ({self.scores['tier1']/39.25*100:.0f}%)",
+            f"T2: {self.scores['tier2']:.1f}/61 Positioning+InstFlows ({self.scores['tier2']/61*100:.0f}%)",
+            f"T3: {self.scores['tier3']:.1f}/43.5 Options+Structure ({self.scores['tier3']/43.5*100:.0f}%)",
             "",
         ])
         
