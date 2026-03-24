@@ -1,0 +1,59 @@
+🎯 RISK DASHBOARD v2.0
+📅 Mar 22, 2026 @ 16:57
+
+✅ DATA: 22/22 signals (100%)
+
+📊 SCORE: 45.2/100
+🎚️ ★★☆☆☆ HIGH RISK
+
+💼 PORTFOLIO ALLOCATION (Actual → Target)
+Global Triads: 38.6% → 27.3% (-11.4% ⚠️)
+Four Horsemen: 11.2% → 7.8% (-3.4% ⚡)
+Cash Cow: 9.8% → 0.0% (-9.8% ⚠️)
+The Alpha: 4.3% → 0.0% (-4.3% ⚡)
+The Omega: 1.8% → 2.6%
+The Vault: 8.5% → 19.5% (+11.0% ⚠️)
+War Chest: 25.8% → 42.9% (+17.0% ⚠️)
+
+⚠️ DRIFT: 58% total
+📋 Global Triads: overweight by 11%, Four Horsemen: overweight by 3%
+
+🛡️ Stops: 8-10%
+📈 Options: CLOSE POSITIONS: Roll losing CSPs, collect premium and exit. Use collars (sell calls to fund puts) for cost-neutral hedging
+
+💡 ACTION: GO DEFENSIVE - Sell positions aggressively, raise cash to 33%. Moderate hedging (2%)
+
+🔄 REBALANCING RECOMMENDATIONS
+SELL (Overweight):
+  • Global Triads: $110k (11% over)
+  • Four Horsemen: $33k (3% over)
+  • Cash Cow: $94k (10% over)
+BUY (Underweight):
+  • Vault: $106k (11% under)
+  • War Chest: $165k (17% under)
+
+📊 INCOME STRATEGY POSITIONS
+  • CSPs: 17 active
+  • Covered Calls: 10 active
+  • Stock Holdings: 6 positions ($131k)
+  • Nearest Expiry: 4 days 🟡 Soon
+
+📈 TIER SCORES
+T1: 30.6/39.25 Credit+Macro (78%)
+  Credit 15.6/19.25: HY 16/20 · IG 20/20 · Ratio 12/20 · NFCI 12/15
+  Fed BS 12/15 · DXY 3/5
+T2: 15.5/61 Positioning+Flows (25%)
+  >50MA 2/12 · <200MA 3/10 · A/D 2/5 · H-L 0.5/3
+  Rotation 2/6 · Au/SPY 2/4 · ETF 4/8 · Credit 0/7 · Sect 0/6
+T3: 20.0/46 Options+Structure (43%)
+  VIXTerm 5/15 · YC 3.0/3 · VIX 2/10 · SKEW 5/5
+  VVIX 0/8 · 9D/VIX 3/3 · VXN 2/2
+
+📊 RISK TREND (5 days)
+↗️ Score: 45 → 45 (+0 pts)
+
+📊 KEY SIGNALS
+HY Spread: 3.27%
+VIX: 26.8
+% >50MA: 20%
+F&G: N/A
