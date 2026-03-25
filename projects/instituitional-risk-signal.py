@@ -1330,7 +1330,8 @@ class RiskDashboard:
         
         # 12. Gold/SPY Ratio: Gold outperforming = fear/uncertainty = bearish for stocks
         # Positive = gold leading (risk-off), Negative = SPY leading (risk-on)
-        s10 = self._score_range(d.get('gold_spy'), [(-5,4),(-1,3),(1,2),(5,1)], 0)
+        # default=1: val >= +5% (gold surging hard) scores 1/4, not 0 — valid risk-off signal
+        s10 = self._score_range(d.get('gold_spy'), [(-5,4),(-1,3),(1,2),(5,1)], 1)
         # Regime check: during stress (VIX > 25), gold lagging SPY is likely
         # forced liquidation / margin-call selling, NOT genuine risk-on.
         # Cap bullish read at 2/4 to avoid false signal.
