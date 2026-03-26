@@ -11,17 +11,6 @@ WHAT'S NEW IN v2.0 (Jan 2026):
 🔢 NORMALIZED SCORING - Proper /100 scale (was broken at 106/100, now 64/100)
 ✅ All v1.8 features preserved (2026 Portfolio Mapping, V-Recovery, Kill-Switch, Dual AI CIO)
 
-YOUR 2026 PORTFOLIO STRUCTURE (Aligned with ARTHUR_CONTEXT.md):
-- 30% Global Triads (82846, DHL, ES3, VWRA, VT, XMNE - strategic core)
-- 30% Four Horsemen (CSNDX, CTEC, HEAL, INRA, GRDU - growth engine)
-- 25% Cash Cow (Income Strategy: all options EXCEPT SPY/QQQ insurance)
-  * Multi-leg spreads, CSPs, covered calls, iron condors, LEAPS on income stocks
-  * Stock positions: SPY, QQQ, ADBE, AMD, CRM, CSCO, ORCL, COST, PEP, WMT, XOM, JPM, V, LLY, UNH, AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA
-- 2% The Alpha (Theme stocks + speculative long calls - offensive plays)
-- 2.5% The Omega (Insurance: SPY/QQQ options only - bear spreads, puts, protective hedges)
-- 5% The Vault (Gold - store of value)
-- 5% The War Chest (Cash - dry powder)
-
 ALLOCATION PHILOSOPHY (Institutional Risk Management):
 Score 90+: FULL DEPLOYMENT - Run base allocation (2.5% base Omega)
 Score 75-90: NORMAL - Base allocation, tighter stops, 1% hedging
@@ -39,10 +28,10 @@ HEDGING COST DISCIPLINE (Annual insurance budget: 3% of portfolio max):
 
 22 INDICATORS + INSTITUTIONAL FLOWS + OPTIONS INTELLIGENCE | A+ GRADE
 
-TIER SCORING (154 pts raw → normalized to /100):
-├─ Tier 1 (45 pts): Credit composite + Fed BS + DXY
-├─ Tier 2 (60 pts): Positioning + Institutional flows (ETF/Credit/Sector)
-└─ Tier 3 (49 pts): Options intelligence (VIX Term, SKEW, VVIX, VIX9D, VXN) + Structure
+TIER SCORING (146.25 pts raw → normalized to /100):
+├─ Tier 1 (39.25 pts): Credit composite (HY+IG+Ratio+NFCI weighted) + Fed BS + DXY
+├─ Tier 2 (61 pts):    Positioning + Institutional flows (ETF/Credit/Sector)
+└─ Tier 3 (46 pts):    Options intelligence (VIX Term, SKEW, VVIX, VIX9D, VXN) + Structure
 
 TODO - FUTURE ENHANCEMENTS (Requires Paid Data):
 ❌ CBOE Put/Call Ratio - yfinance options data too unreliable/incomplete
@@ -61,7 +50,6 @@ TODO - FUTURE ENHANCEMENTS (Requires Paid Data):
    • No extra API calls - uses data already collected daily
 
 SYSTEM: 15% Portfolio Risk Monitor (Arthur Protocol)
-CONTEXT: See ARTHUR_CONTEXT.md for full strategy and logic constraints.
 """
 
 import yfinance as yf
@@ -97,17 +85,17 @@ CONFIG = {
     'V_RECOVERY_LOOKBACK': 30,
 }
 
-# Portfolio Configuration (2026 Structure - Aligned with ARTHUR_CONTEXT.md)
+# Portfolio Configuration (2026 Structure)
 PORTFOLIO_2026 = {
     'TOTAL_CAPITAL': 1_000_000,  # $1M active trading capital
     'BASE_ALLOCATION': {
-        'global_triads': 0.30,      # 82846, DHL, ES3, VWRA, VT, XMNE
-        'four_horsemen': 0.30,      # CSNDX, CTEC, HEAL, INRA, GRDU
+        'global_triads': 0.28,      # 82846, DHL, ES3, VWRA, VT
+        'four_horsemen': 0.25,      # INRA, GRDU
         'cash_cow': 0.25,           # Wheel on GOOGL, PEP, V
-        'alpha': 0.02,              # Theme stocks + call options
-        'omega': 0.025,             # QQQ puts + bear spreads
-        'vault': 0.05,              # Gold (GLD/IAU)
-        'war_chest': 0.05           # Cash holdings
+        'alpha': 0.05,              # Theme stocks + call options
+        'omega': 0.02,              # QQQ puts + bear spreads
+        'vault': 0.08,              # Gold (GLD/IAU)
+        'war_chest': 0.07           # Cash holdings
     }
 }
 
@@ -1810,7 +1798,7 @@ class RiskDashboard:
                 'cash_cow': base['cash_cow'] * 0.9,  # More conservative
                 'alpha': base['alpha'] * 0.8,  # Reduce offensive plays
                 'omega': 0.01,  # 1% light hedging (minimal cost)
-                'vault': base['vault'] + 0.02,  # 7% gold
+                'vault': base['vault'] + 0.02,  # 8% gold
                 'war_chest': base['war_chest'] + 0.05,  # 10% cash
                 'stops': '12-15%',
                 'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE. Light put hedging: 1-2 contracts only',
@@ -2022,7 +2010,7 @@ class RiskDashboard:
                 suppress_days=1
             )
         
-        if d.get('vix_struct') == 'Backwardation':
+        if d.get('vix_term_struct') == 'Backwardation':
             streak, avg_mag = self.history_manager.get_backwardation_streak()
             if streak >= 5:
                 add_alert_if_new(
@@ -2299,9 +2287,9 @@ class RiskDashboard:
             f"VIX: {d.get('vix', 'N/A'):.1f}" if d.get('vix') else "VIX: N/A",
         ])
         
-        if d.get('vix_struct'):
-            vix_line = f"VIX: {d['vix_struct']}"
-            if d['vix_struct'] == 'Backwardation':
+        if d.get('vix_term_struct'):
+            vix_line = f"VIX: {d['vix_term_struct']}"
+            if d['vix_term_struct'] == 'Backwardation':
                 streak, _ = self.history_manager.get_backwardation_streak()
                 if streak > 0:
                     vix_line = f"⚠️ VIX: Back Day {streak}"
@@ -2477,7 +2465,7 @@ Be direct, use specific numbers, focus on actionable insights."""
             score=self.scores['total'],
             spy_price=spy_price,
             vix=self.data.get('vix'),
-            vix_structure=self.data.get('vix_struct'),
+            vix_structure=self.data.get('vix_term_struct'),
             vixy_vxx_ratio=self.data.get('vixy_vxx_ratio')
         )
         
@@ -2515,6 +2503,51 @@ Be direct, use specific numbers, focus on actionable insights."""
         
         return self.scores['total']
 
+def patch_backwardation_history(history_file='risk_history.json'):
+    """
+    One-time utility: backfill vix_structure = 'Unknown' for all history entries
+    where the field is missing or None, caused by the vix_struct key-name bug
+    that was silently writing None to history.
+
+    Saves a backup to risk_history_backup.json before modifying.
+    Writes 'backwardation_patched': True to the top-level history dict as a
+    guard flag so this function is a no-op on all subsequent runs.
+    """
+    if not os.path.exists(history_file):
+        print(f"⚠️  patch_backwardation_history: {history_file} not found — skipping.")
+        return
+
+    with open(history_file, 'r') as f:
+        history = json.load(f)
+
+    # Guard: already patched — do nothing
+    if history.get('backwardation_patched'):
+        print("ℹ️  patch_backwardation_history: already patched — skipping.")
+        return
+
+    # Backup first
+    backup_file = history_file.replace('.json', '_backup.json')
+    with open(backup_file, 'w') as f:
+        json.dump(history, f, indent=2)
+    print(f"💾  Backup saved to {backup_file}")
+
+    # Patch entries with missing / None vix_structure
+    patched = 0
+    for entry in history.get('scores', []):
+        if entry.get('vix_structure') is None:
+            entry['vix_structure'] = 'Unknown'
+            patched += 1
+
+    # Write guard flag
+    history['backwardation_patched'] = True
+
+    with open(history_file, 'w') as f:
+        json.dump(history, f, indent=2)
+
+    total = len(history.get('scores', []))
+    print(f"✅  patch_backwardation_history: {patched}/{total} entries patched (vix_structure set to 'Unknown').")
+
+
 def main():
     """Main entry point - initialize dashboard and run daily assessment"""
     print("""
@@ -2523,6 +2556,10 @@ def main():
 ║    22 Indicators + Institutional Flows + Options Intelligence        ║
 ╚══════════════════════════════════════════════════════════════════════╝
     """)
+    # One-time backfill: set vix_structure='Unknown' for all history entries written
+    # before the vix_struct key-name bug was fixed. Guard flag prevents repeat runs.
+    patch_backwardation_history()
+
     dashboard = RiskDashboard()
     dashboard.run_assessment()
     print("\n✅ Assessment complete.\n")

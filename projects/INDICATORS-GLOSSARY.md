@@ -32,7 +32,7 @@ Macro hedge funds, credit portfolio managers, risk desks at investment banks, an
 - **As a divergence signal** — equity markets at highs but spreads widening = hidden risk building
 
 **Scoring in this dashboard:**
-`<3% = 16/20 (healthy) · <4.5% = 12/20 · <5.5% = 6/20 · ≥5.5% = 0/20`
+`<3% = 20/20 · <4% = 16/20 (healthy) · <4.5% = 12/20 · <5.5% = 6/20 · ≥5.5% = 0/20`
 A 30-day rate-of-change penalty: if spreads have widened >20%, score drops by 5 pts.
 
 ---
@@ -85,7 +85,7 @@ Credit strategists at investment banks, distressed debt hedge funds, and systema
 - **Pre-recession signals** — the ratio typically starts rising 6–12 months before a recession
 
 **Scoring in this dashboard:**
-`<3.5 = 16/20 (tight, healthy) · <4.0 = 12/20 (normal) · <4.5 = 6/20 (elevated) · ≥5.0 = 0/20 (stress)`
+`<3.0 = 20/20 · <3.5 = 16/20 (tight, healthy) · <4.0 = 12/20 (normal) · <4.5 = 6/20 (elevated) · <5.0 = 2/20 · ≥5.0 = 0/20 (stress)`
 
 ---
 
@@ -221,7 +221,7 @@ Systematic quant funds use this as a "risk-off" trigger for reducing equity expo
 - **Risk management** — rising from 25% to 40% rapidly = warning sign for portfolio protection
 
 **Scoring in this dashboard:**
-`>65% = 1/10 · >50% = 3/10 · >35% = 6/10 · >25% = 8/10 · ≤15% = 10/10`
+`>65% = 1/10 · >50% = 3/10 · >35% = 6/10 · >25% = 8/10 · ≤25% = 10/10`
 
 ---
 
@@ -327,7 +327,7 @@ Global macro hedge funds, commodity trading advisors (CTAs), and risk-parity str
 - **Safe-haven demand** — gold surging in a selloff = genuine fear; gold falling in a selloff = liquidation (different dynamic)
 
 **Scoring in this dashboard:**
-`< -5% = 4/4 (SPY crushing gold = risk-on, regime-capped to 2/4 if VIX>25) · < -1% = 3/4 · <1% = 2/4 · ≥5% = 1/4 (gold surging = risk-off)`
+`< -5% = 4/4 (SPY crushing gold = risk-on, regime-capped to 2/4 if VIX>25) · < -1% = 3/4 · <1% = 2/4 · <5% = 1/4 · ≥+5% = 1/4 (gold surging = risk-off)`
 
 ---
 
