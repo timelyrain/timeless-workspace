@@ -89,20 +89,23 @@ jobs:
             exit 0
           fi
           # Stash updated files, pull latest, unstash, then commit+push
-          git stash push -m "ibkr-positions-update" projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py
+          # Save the freshly-generated files aside before pulling
+          cp projects/fetch-ibkr-positions.xlsx /tmp/fetch-ibkr-positions.xlsx
+          cp projects/portfolio_categories_mappings.py /tmp/portfolio_categories_mappings.py
           # Retry up to 5 times handling concurrent pushes from other workflows
           for i in 1 2 3 4 5; do
             echo "Attempt $i: pulling latest then committing and pushing..."
             git pull --rebase origin main
-            git stash pop
+            # Restore our freshly-generated files (avoids binary merge conflict on xlsx)
+            cp /tmp/fetch-ibkr-positions.xlsx projects/fetch-ibkr-positions.xlsx
+            cp /tmp/portfolio_categories_mappings.py projects/portfolio_categories_mappings.py
             git add projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py
             git commit -m "Update IBKR positions + auto-categorize mappings (automated)"
             if git push origin main; then
               echo "✅ Push succeeded on attempt $i"
               exit 0
             fi
-            echo "⚠️ Push failed on attempt $i, re-stashing and retrying in 15s..."
-            git stash push -m "ibkr-positions-update" projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py
+            echo "⚠️ Push failed on attempt $i, retrying in 15s..."
             git reset HEAD~1
             sleep 15
           done
