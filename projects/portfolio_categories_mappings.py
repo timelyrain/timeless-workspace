@@ -23,17 +23,18 @@ SYMBOL_MAPPING = {
         'DHL',      # K6: Dividend
         'ES3',      # K7: Singapore banks
         'VWRA',     # K8: VT USD
-        'WORLD',    # K9: VT, no EM, hedged
+        #'WORLD',    # K9: VT, no EM, hedged
         'XMME',     # K10: EM, unhedged
     ],
     'four_horsemen': [
-        'CSNDX',    # K12: Nasdaq
+        #'CSNDX',    # K12: Nasdaq
         'EQCH',     # K13: Nasdaq, hedged
         'CBUK',     # K14: China Tech, unhedged
-        'HEAL',     # K15: Biotic
+        '9807',     # K15: China Robotics (HK)
+        #'HEAL',     # K15: Biotic
         'INRA',     # K16: Energy
         'GRDU',     # K17: Clean energy / infrastructure
-        'LOCK',     # K18: Security
+        #'LOCK',     # K18: Security
     ],
     'cash_cow': [
         # Source of truth: fetch-ibkr-positions-dashboard.xlsx → IncomeStrategy sheet
@@ -46,7 +47,6 @@ SYMBOL_MAPPING = {
     'alpha': [
         # K20: Theme stocks, speculation
         'BITO',
-        'SE',    # Auto-added: SEA LTD-ADR
         'SE',    # Auto-added: SEA LTD-ADR
         '9807',    # Auto-added: GLOBAL X CHINA ROBOTICS
         'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
@@ -64,14 +64,14 @@ SYMBOL_MAPPING = {
 # Aligned with institutional risk scoring
 
 TARGET_ALLOCATIONS = {
-    'ALL_CLEAR': {
-        'global_triads': 0.30, 'four_horsemen': 0.30, 'cash_cow': 0.25,
-        'alpha': 0.02, 'omega': 0.025, 'vault': 0.05, 'war_chest': 0.05
-    },
-    'NORMAL': {
-        'global_triads': 0.30, 'four_horsemen': 0.27, 'cash_cow': 0.225,
-        'alpha': 0.016, 'omega': 0.01, 'vault': 0.07, 'war_chest': 0.10
-    },
+'ALL_CLEAR': {
+    'global_triads': 0.28, 'four_horsemen': 0.25, 'cash_cow': 0.25,
+    'alpha': 0.05, 'omega': 0.02, 'vault': 0.08, 'war_chest': 0.07
+},
+'NORMAL': {
+    'global_triads': 0.28, 'four_horsemen': 0.225, 'cash_cow': 0.225,
+    'alpha': 0.04, 'omega': 0.01, 'vault': 0.08, 'war_chest': 0.10
+},
     'ELEVATED': {
         'global_triads': 0.30, 'four_horsemen': 0.21, 'cash_cow': 0.125,
         'alpha': 0.01, 'omega': 0.01, 'vault': 0.10, 'war_chest': 0.24

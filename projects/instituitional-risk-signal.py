@@ -2391,8 +2391,8 @@ TODAY'S DATA:
 Score: {self.scores['total']:.1f}/100
 Regime: {portfolio['regime']}
 Portfolio Allocation:
-- Global Triads (Strategic Core - 82846/DHL/ES3/VWRA/VT/XMNE): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (Growth Engine - CSNDX/CTEC/HEAL/INRA/GRDU): {portfolio['four_horsemen']*100:.0f}%
+- Global Triads (Strategic Core - VWRA/82846/DHL/ES3/XMME): {portfolio['global_triads']*100:.0f}%
+- Four Horsemen (Growth Engine - EQCH/CBUK/9807/INRA/GRDU): {portfolio['four_horsemen']*100:.0f}%
 - Cash Cow (Income Strategy - all options EXCEPT SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
 - The Alpha (Speculation - theme stocks + long calls): {portfolio['alpha']*100:.0f}%
 - The Omega (Insurance - SPY/QQQ bear spreads ONLY, capped 1-3% by regime): {portfolio['omega']*100:.0f}%
@@ -2400,7 +2400,7 @@ Portfolio Allocation:
 - War Chest (Cash - primary defense mechanism): {portfolio['war_chest']*100:.0f}%
 Action: {portfolio['action']}
 
-HEDGING PHILOSOPHY: Omega capped at 1% (ELEVATED), 2% (HIGH RISK), 3% (EXTREME) to keep annual insurance cost under 3% of portfolio. Primary defense is selling positions and raising cash, not buying expensive puts.
+HEDGING PHILOSOPHY: Omega capped at 1% (REDUCE), 2% (CORE ONLY), 3% (MAX DEFENSE) to keep annual insurance cost under 3% of portfolio. Primary defense is selling positions and raising cash, not buying expensive puts.
 
 Key Indicators:
 - HY Spread: {self.data.get('hy_spread', 'N/A')}%
