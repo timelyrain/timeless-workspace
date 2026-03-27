@@ -1767,16 +1767,31 @@ class RiskDashboard:
     
     def get_portfolio_allocation(self):
         """
-        Map risk score to specific portfolio adjustments
-        Returns: dict with position-specific guidance
+        Map risk score to specific portfolio adjustments.
+        Returns: dict with position-specific guidance.
+
+        Regime bands (new):
+          >85  : FULL DEPLOYMENT  — immediate, no confirmation needed
+          70-85: HOLD             — no allocation change, monitor only
+          55-70: REDUCE           — requires 3-day confirmation
+          40-55: CORE ONLY        — requires 3-day confirmation
+          <40  : MAX DEFENSE      — immediate, no confirmation needed
+
+        3-day confirmation rule:
+          For REDUCE and CORE ONLY regimes, all 3 of the last 3 daily scores
+          must fall within the same band before a reallocation is triggered.
+          If not yet confirmed, the HOLD allocation is returned and a Telegram
+          warning is sent showing how many more days are needed.
         """
         score = self.scores['total']
         base = PORTFOLIO_2026['BASE_ALLOCATION']
-        
-        # Score-based allocation
-        if score >= 90:  # ALL CLEAR
-            base_allocation = {
-                'regime': '★★★★★ ALL CLEAR',
+
+        # ------------------------------------------------------------------
+        # Helper: build each regime's allocation dict
+        # ------------------------------------------------------------------
+        def _full_deployment():
+            return self._normalize_allocation({
+                'regime': '★★★★★ FULL DEPLOYMENT',
                 'global_triads': base['global_triads'],
                 'four_horsemen': base['four_horsemen'],
                 'cash_cow': base['cash_cow'],
@@ -1787,73 +1802,122 @@ class RiskDashboard:
                 'stops': '15-20%',
                 'options_guidance': 'Sell CSPs at 30-45 DTE, 15-20 delta on GOOGL, PEP, V',
                 'action': 'FULL DEPLOYMENT - Run base allocation'
-            }
-            base_allocation = self._normalize_allocation(base_allocation)
-        
-        elif score >= 75:  # NORMAL
-            base_allocation = {
-                'regime': '★★★★☆ NORMAL',
+            })
+
+        def _hold():
+            return self._normalize_allocation({
+                'regime': '★★★★☆ HOLD',
                 'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'] * 0.9,  # Slightly reduce growth
-                'cash_cow': base['cash_cow'] * 0.9,  # More conservative
-                'alpha': base['alpha'] * 0.8,  # Reduce offensive plays
-                'omega': 0.01,  # 1% light hedging (minimal cost)
-                'vault': base['vault'] + 0.02,  # 8% gold
-                'war_chest': base['war_chest'] + 0.05,  # 10% cash
+                'four_horsemen': base['four_horsemen'] * 0.9,
+                'cash_cow': base['cash_cow'] * 0.9,
+                'alpha': base['alpha'] * 0.8,
+                'omega': 0.01,
+                'vault': base['vault'] + 0.02,
+                'war_chest': base['war_chest'] + 0.05,
                 'stops': '12-15%',
-                'options_guidance': 'Tighter strikes: 10-15 delta CSPs, 30 DTE. Light put hedging: 1-2 contracts only',
-                'action': 'STAY COURSE - Tighten stops, minimal hedging (1%)'
-            }
-            base_allocation = self._normalize_allocation(base_allocation)
-        
-        elif score >= 60:  # ELEVATED
-            base_allocation = {
-                'regime': '★★★☆☆ ELEVATED',
+                'options_guidance': 'Monitor only. Tighter strikes: 10-15 delta CSPs, 30 DTE. No new positions.',
+                'action': 'HOLD - No allocation change. Monitor for confirmation.'
+            })
+
+        def _reduce():
+            return self._normalize_allocation({
+                'regime': '★★★☆☆ REDUCE',
                 'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'] * 0.6,  # Cut growth more aggressively
-                'cash_cow': base['cash_cow'] * 0.4,  # Very defensive options
-                'alpha': base['alpha'] * 0.3,  # Cut offensive plays harder
-                'omega': 0.01,  # 1% only (annual cost ~$3k vs $10k at 5%)
-                'vault': 0.10,  # 10% gold
-                'war_chest': 0.24,  # 24% cash (raise cash instead of buying puts)
+                'four_horsemen': base['four_horsemen'] * 0.6,
+                'cash_cow': base['cash_cow'] * 0.4,
+                'alpha': base['alpha'] * 0.3,
+                'omega': 0.01,
+                'vault': 0.10,
+                'war_chest': 0.24,
                 'stops': '10-12%',
                 'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging: 2-3 put spreads max',
-                'action': 'REDUCE RISK - Cut positions, raise cash to 24%. Light hedging (1% only)'
-            }
-            base_allocation = self._normalize_allocation(base_allocation)
-        
-        elif score >= 40:  # HIGH RISK
-            base_allocation = {
-                'regime': '★★☆☆☆ HIGH RISK',
-                'global_triads': base['global_triads'] * 0.7,  # Trim core more
-                'four_horsemen': base['four_horsemen'] * 0.2,  # Skeleton growth
-                'cash_cow': 0,  # Exit all income strategies
-                'alpha': 0,  # Exit all offensive plays
-                'omega': 0.02,  # 2% hedging (annual cost ~$6k vs $15k at 5%)
-                'vault': 0.15,  # 15% gold
-                'war_chest': 0.33,  # 33% cash (sell positions, don't buy puts)
+                'action': 'REDUCE - Cut growth+income, raise cash to 24%. Light hedging (1% only)'
+            })
+
+        def _core_only():
+            return self._normalize_allocation({
+                'regime': '★★☆☆☆ CORE ONLY',
+                'global_triads': base['global_triads'] * 0.7,
+                'four_horsemen': base['four_horsemen'] * 0.2,
+                'cash_cow': 0,
+                'alpha': 0,
+                'omega': 0.02,
+                'vault': 0.15,
+                'war_chest': 0.33,
                 'stops': '8-10%',
-                'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit. Use collars (sell calls to fund puts) for cost-neutral hedging',
-                'action': 'GO DEFENSIVE - Sell positions aggressively, raise cash to 33%. Moderate hedging (2%)'
-            }
-            base_allocation = self._normalize_allocation(base_allocation)
-        
-        else:  # EXTREME (<40)
-            base_allocation = {
-                'regime': '★☆☆☆☆ EXTREME RISK',
-                'global_triads': base['global_triads'] * 0.3,  # Cut core drastically
-                'four_horsemen': 0,  # Exit all growth
-                'cash_cow': 0,  # No options
-                'alpha': 0,  # Exit all offensive plays
-                'omega': 0.03,  # 3% MAX (annual cost ~$10k - at portfolio limit)
-                'vault': 0.25,  # 25% gold
-                'war_chest': 0.39,  # 39% cash (maximum liquidity)
+                'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit. Use collars for cost-neutral hedging',
+                'action': 'CORE ONLY - Exit income, skeleton growth, raise cash to 33%. Moderate hedging (2%)'
+            })
+
+        def _max_defense():
+            return self._normalize_allocation({
+                'regime': '★☆☆☆☆ MAX DEFENSE',
+                'global_triads': base['global_triads'] * 0.3,
+                'four_horsemen': 0,
+                'cash_cow': 0,
+                'alpha': 0,
+                'omega': 0.03,
+                'vault': 0.25,
+                'war_chest': 0.39,
                 'stops': '5-8%',
-                'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price. ONLY use collars (sell calls to fund puts) - zero net cost. VIX >40 makes puts too expensive',
+                'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price. ONLY collars (sell calls to fund puts) - zero net cost.',
                 'action': 'MAX DEFENSE - Liquidate to 39% cash, 25% gold. Hedging at 3% max annual cost limit'
-            }
-            base_allocation = self._normalize_allocation(base_allocation)
-        
+            })
+
+        # ------------------------------------------------------------------
+        # 3-day confirmation helper
+        # Returns (confirmed: bool, days_confirmed: int)
+        # band_check: callable(s) → True if score s falls in the target band
+        # ------------------------------------------------------------------
+        def _check_confirmation(band_check):
+            recent = self.history_manager.get_recent_scores(days=3)
+            if len(recent) < 3:
+                # Not enough history — be conservative, don't confirm yet
+                return False, len(recent)
+            confirmed_count = sum(1 for entry in recent if band_check(entry['score']))
+            return confirmed_count >= 3, confirmed_count
+
+        def _send_pending_warning(regime_name, days_confirmed):
+            days_needed = 3 - days_confirmed
+            msg = (f"⚠️ REGIME PENDING: Score {score:.1f} — "
+                   f"{regime_name} needs {days_needed} more day{'s' if days_needed != 1 else ''} "
+                   f"confirmation before reallocation ({days_confirmed}/3 days confirmed)")
+            print(msg)
+            send_to_telegram(msg)
+
+        # ------------------------------------------------------------------
+        # Regime selection
+        # ------------------------------------------------------------------
+        if score > 85:
+            # Immediate — no confirmation needed
+            base_allocation = _full_deployment()
+
+        elif score > 70:
+            # HOLD band — no allocation change, monitor only
+            base_allocation = _hold()
+
+        elif score > 55:
+            # REDUCE band — requires 3-day confirmation
+            confirmed, days_confirmed = _check_confirmation(lambda s: 55 < s <= 70)
+            if confirmed:
+                base_allocation = _reduce()
+            else:
+                _send_pending_warning('REDUCE', days_confirmed)
+                base_allocation = _hold()  # Stay at HOLD until confirmed
+
+        elif score >= 40:
+            # CORE ONLY band — requires 3-day confirmation
+            confirmed, days_confirmed = _check_confirmation(lambda s: 40 <= s <= 55)
+            if confirmed:
+                base_allocation = _core_only()
+            else:
+                _send_pending_warning('CORE ONLY', days_confirmed)
+                base_allocation = _hold()  # Stay at HOLD until confirmed
+
+        else:
+            # Immediate — no confirmation needed
+            base_allocation = _max_defense()
+
         # Apply V-Recovery override if active
         if self.v_recovery_active and base_allocation:
             return self._apply_v_recovery_to_portfolio(base_allocation)
