@@ -12,14 +12,14 @@ WHAT'S NEW IN v2.0 (Jan 2026):
 ✅ All v1.8 features preserved (2026 Portfolio Mapping, V-Recovery, Kill-Switch, Dual AI CIO)
 
 ALLOCATION PHILOSOPHY (Institutional Risk Management):
-Score 90+: FULL DEPLOYMENT - Run base allocation (2.5% base Omega)
-Score 75-90: NORMAL - Base allocation, tighter stops, 1% hedging
-Score 60-75: ELEVATED - Cut growth/income, raise cash to 24%, 1% hedging only
-Score 40-60: HIGH RISK - Sell positions aggressively, 33% cash, 2% hedging
-Score <40: EXTREME - Liquidate to 39% cash, 25% gold, 3% hedging max
+Score >85: FULL DEPLOYMENT - Run base allocation (2.5% base Omega)
+Score 70-85: HOLD - No allocation change, monitor only
+Score 55-70: REDUCE - Cut growth/income, raise cash to 24%, 1% hedging only [3-day confirm]
+Score 40-55: CORE ONLY - Sell positions aggressively, 33% cash, 2% hedging [3-day confirm]
+Score <40: MAX DEFENSE - Liquidate to 39% cash, 25% gold, 3% hedging max
 
 HEDGING COST DISCIPLINE (Annual insurance budget: 3% of portfolio max):
-- Omega allocation: 1% ELEVATED, 2% HIGH RISK, 3% EXTREME
+- Omega allocation: 1% REDUCE, 2% CORE ONLY, 3% MAX DEFENSE
 - Estimated annual cost: $3k → $6k → $10k (stays under 3% portfolio budget)
 - Primary defense: Sell positions → raise cash (War Chest) - ZERO cost
 - Secondary defense: Gold (Vault) for tail risk - NO decay
@@ -388,11 +388,11 @@ class HistoricalDataManager:
         # Map scores to regimes
         def get_regime(score):
             """Convert numeric risk score to regime label"""
-            if score >= 90: return 'ALL CLEAR'
-            elif score >= 75: return 'NORMAL'
-            elif score >= 60: return 'ELEVATED'
-            elif score >= 40: return 'HIGH RISK'
-            else: return 'EXTREME RISK'
+            if score > 85: return 'FULL DEPLOYMENT'
+            elif score > 70: return 'HOLD'
+            elif score > 55: return 'REDUCE'
+            elif score >= 40: return 'CORE ONLY'
+            else: return 'MAX DEFENSE'
         
         first_regime = get_regime(first_score)
         last_regime = get_regime(last_score)
@@ -2114,17 +2114,17 @@ class RiskDashboard:
                 suppress_days=1
             )
         
-        if not self.alerts and self.scores['total'] >= 85:
-            # Only send ALL CLEAR once every 7 days (don't spam)
-            if not self.history_manager.should_suppress_alert('ALL CLEAR', days=7):
+        if not self.alerts and self.scores['total'] > 85:
+            # Only send FULL DEPLOYMENT alert once every 7 days (don't spam)
+            if not self.history_manager.should_suppress_alert('FULL DEPLOYMENT', days=7):
                 self.alerts.append({
-                    'type': 'ALL CLEAR',
+                    'type': 'FULL DEPLOYMENT',
                     'severity': 'SAFE',
                     'icon': '✅',
                     'msg': 'HEALTHY MARKET CONDITIONS',
-                    'action': 'FULL DEPLOYMENT OK'
+                    'action': 'FULL DEPLOYMENT - Run base allocation'
                 })
-                self.history_manager.add_alert(today, 'ALL CLEAR', 'HEALTHY MARKET CONDITIONS')
+                self.history_manager.add_alert(today, 'FULL DEPLOYMENT', 'HEALTHY MARKET CONDITIONS')
         
         return self.alerts
     
