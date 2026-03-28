@@ -83,14 +83,15 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          # Check if either file actually changed before doing anything
-          if git diff --quiet projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py; then
+          # Check if any tracked file actually changed before doing anything
+          if git diff --quiet projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py && ! git ls-files --others --exclude-standard projects/sleeve_totals.json | grep -q .; then
             echo "No changes to commit"
             exit 0
           fi
           # Save CI-generated files to /tmp — these are always the authoritative versions
           cp projects/fetch-ibkr-positions.xlsx /tmp/fetch-ibkr-positions.xlsx
           cp projects/portfolio_categories_mappings.py /tmp/portfolio_categories_mappings.py
+          [ -f projects/sleeve_totals.json ] && cp projects/sleeve_totals.json /tmp/sleeve_totals.json
           # Retry up to 5 times to handle concurrent pushes from other workflows
           for i in 1 2 3 4 5; do
             echo "Attempt $i: syncing with remote then pushing CI output..."
@@ -101,7 +102,8 @@ jobs:
             # Overwrite with CI-generated files (remote version is irrelevant — CI always wins)
             cp /tmp/fetch-ibkr-positions.xlsx projects/fetch-ibkr-positions.xlsx
             cp /tmp/portfolio_categories_mappings.py projects/portfolio_categories_mappings.py
-            git add projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py
+            [ -f /tmp/sleeve_totals.json ] && cp /tmp/sleeve_totals.json projects/sleeve_totals.json
+            git add projects/fetch-ibkr-positions.xlsx projects/portfolio_categories_mappings.py projects/sleeve_totals.json
             git commit -m "Update IBKR positions + auto-categorize mappings (automated)"
             if git push origin main; then
               echo "✅ Push succeeded on attempt $i"

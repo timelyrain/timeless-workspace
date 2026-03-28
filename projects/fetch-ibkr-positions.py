@@ -34,6 +34,7 @@ OUTPUT:
 import os
 import sys
 import time
+import json
 import requests
 import pandas as pd
 from datetime import datetime
@@ -430,6 +431,63 @@ def send_telegram_notification(success=True, timestamp=None, position_count=0, s
         print(f"⚠️  Error sending Telegram notification: {e}")
 
 
+def write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al):
+    """
+    Calculate sleeve totals from positions data and write to sleeve_totals.json.
+    This sidecar file is read by instituitional-risk-signal.py instead of relying
+    on stale cached formula values in fetch-ibkr-positions-dashboard.xlsx.
+    """
+    try:
+        from portfolio_categories_mappings import SYMBOL_MAPPING
+
+        combined = pd.concat(
+            [df for df in [df_hk, df_al] if df is not None],
+            ignore_index=True
+        )
+
+        sleeve_totals = {sleeve: 0.0 for sleeve in SYMBOL_MAPPING}
+        sleeve_totals['war_chest'] = cash_hk + cash_al
+
+        for _, row in combined.iterrows():
+            symbol = str(row.get('Symbol', '')).strip()
+            value = float(row.get('PositionValueUSD', 0) or 0)
+            asset_class = str(row.get('AssetClass', '')).strip()
+
+            # Omega: SPY/QQQ bear spreads (options only)
+            if asset_class in ('OPT', 'FOP') and (symbol.startswith('SPY') or symbol.startswith('QQQ')):
+                sleeve_totals['omega'] += value
+                continue
+
+            # Match against sleeve symbol lists (first match wins)
+            for sleeve, symbols in SYMBOL_MAPPING.items():
+                if sleeve in ('omega', 'war_chest'):
+                    continue
+                if symbol in symbols:
+                    sleeve_totals[sleeve] += value
+                    break
+
+        grand_total = sum(sleeve_totals.values())
+
+        output = {
+            'timestamp': datetime.now().isoformat(),
+            'sleeve_totals_usd': sleeve_totals,
+            'grand_total_usd': grand_total,
+        }
+
+        json_path = Path(__file__).parent / 'sleeve_totals.json'
+        with open(json_path, 'w') as f:
+            json.dump(output, f, indent=2)
+
+        print(f"\n📋 Sleeve totals written to sleeve_totals.json")
+        for sleeve, val in sleeve_totals.items():
+            pct = (val / grand_total * 100) if grand_total > 0 else 0
+            print(f"   {sleeve}: ${val:,.0f} ({pct:.1f}%)")
+        print(f"   TOTAL: ${grand_total:,.0f}")
+
+    except Exception as e:
+        print(f"⚠️  Could not write sleeve_totals.json: {e}")
+
+
 def main():
     """Main execution flow"""
     print("=" * 70)
@@ -499,7 +557,10 @@ def main():
         
         # Update Excel with both accounts and cash
         timestamp, total_positions, all_symbols = update_excel_file(df_hk, df_al, cash_hk, cash_al)
-        
+
+        # Write sleeve totals sidecar JSON for instituitional-risk-signal.py
+        write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al)
+
         # Send Telegram notification
         hk_count = len(df_hk) if df_hk is not None else 0
         al_count = len(df_al) if df_al is not None else 0

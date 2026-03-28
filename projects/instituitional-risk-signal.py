@@ -1522,20 +1522,40 @@ class RiskDashboard:
     # =============================================================================
     
     def load_actual_positions(self):
-        """Load actual positions from IBKR Dashboard (Column K has combined HK+AL totals)"""
+        """Load actual positions from sleeve_totals.json (written by fetch-ibkr-positions.py).
+        Falls back to Dashboard K cells if JSON is not available."""
         try:
-            import openpyxl
             from pathlib import Path
-            
+
+            # --- Primary: sleeve_totals.json (always fresh after each IBKR sync) ---
+            json_path = Path(__file__).parent / 'sleeve_totals.json'
+            if json_path.exists():
+                with open(json_path) as f:
+                    data = json.load(f)
+                totals = data['sleeve_totals_usd']
+                grand_total = data['grand_total_usd']
+                if grand_total > 0:
+                    positions = {k: v / grand_total for k, v in totals.items()}
+                    positions['total'] = grand_total
+                    positions['position_details'] = {
+                        'total_value': grand_total,
+                        'by_category': {},
+                        'by_symbol': {}
+                    }
+                    self.actual_positions = positions
+                    print(f"   📊 Portfolio loaded from sleeve_totals.json: ${grand_total:,.0f} (as of {data.get('timestamp', 'unknown')})")
+                    return positions
+
+            # --- Fallback: Dashboard K cells (may have stale cached formula values) ---
+            import openpyxl
             dashboard_path = Path(__file__).parent / 'fetch-ibkr-positions-dashboard.xlsx'
-            
             if not dashboard_path.exists():
                 return None
-            
+
             # Read values directly from Dashboard sheet Column K (HK + AL combined)
             wb = openpyxl.load_workbook(dashboard_path, data_only=True)
             ws = wb['Dashboard']
-            
+
             # Column K contains the combined totals (F + I columns)
             positions = {
                 'global_triads': ws['K4'].value or 0,      # Global Triads
@@ -1547,32 +1567,28 @@ class RiskDashboard:
                 'war_chest': ws['K23'].value or 0,         # The War Chest
                 'total': ws['G42'].value or 0,             # Combined Total
             }
-            
             wb.close()
-            
+
             total_value = positions['total']
             if total_value == 0:
                 return None
-            
-            print(f"   📊 Portfolio loaded from Dashboard: ${total_value:,.0f}")
-            
-            # Convert to percentages for compatibility with rest of code
+
+            print(f"   📊 Portfolio loaded from Dashboard (fallback): ${total_value:,.0f}")
+
             position_details = {
                 'total_value': total_value,
                 'by_category': {},
                 'by_symbol': {}
             }
-            
             positions['position_details'] = position_details
-            
-            # Convert dollar values to percentages
+
             for key in positions:
                 if key not in ['total', 'position_details']:
                     positions[key] = positions[key] / total_value
-            
+
             self.actual_positions = positions
             return positions
-            
+
         except Exception as e:
             print(f"   ⚠️  Could not load IBKR positions: {e}")
             return None
