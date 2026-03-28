@@ -27,5 +27,7 @@ build/
 # Project specific
 *.log
 projects/sp500_cache.json
+projects/fetch-ibkr-positions-dashboard.xlsx
+projects/~$*.xlsx
 
 
