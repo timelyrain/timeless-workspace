@@ -972,18 +972,12 @@ class CycleDetector:
 
         L = []
 
-        title = "MARKET CYCLE DETECTOR v1.0"
-        width = max(len(title), len(date_str)) + 4
-        L.append("╔" + "═" * width + "╗")
-        L.append(f"║  {title.center(width - 4)}  ║")
-        L.append(f"║  {date_str.center(width - 4)}  ║")
-        L.append("╚" + "═" * width + "╝\n")
+        L.append(f"MARKET CYCLE DETECTOR v1.0")
+        L.append(f"{date_str}\n")
 
         L.append(f"PHASE:   {pm['icon']} {pm['label']}")
         L.append(f"REGIME:  {rm['icon']} {rm['label']}\n")
 
-        # ── Layer 1: Economic Regime ──────────────────────────────────────────
-        L.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         L.append("LAYER 1 — ECONOMIC REGIME\n")
 
         g_dir = "Accelerating ↑" if self.growth_score >= 25 else "Decelerating ↓"
@@ -1006,8 +1000,7 @@ class CycleDetector:
         L.append(f"→ Favoured: {rm['assets']}")
 
         # ── Layer 2: Market Cycle Phase ───────────────────────────────────────
-        L.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        L.append("LAYER 2 — MARKET CYCLE PHASE\n")
+        L.append("\nLAYER 2 — MARKET CYCLE PHASE\n")
         L.append(f"Cycle Score: {self.cycle_score:.1f}/100 → {pm['icon']} {pm['label']}\n")
 
         L.append("Credit (0–30 pts):")
@@ -1030,8 +1023,7 @@ class CycleDetector:
         L.append(f"→ Favoured: {pm['assets']}")
 
         # ── Sleeve Guidance ───────────────────────────────────────────────────
-        L.append("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        L.append(f"SLEEVE GUIDANCE — {pm['icon']} {self.phase} CYCLE\n")
+        L.append(f"\nSLEEVE GUIDANCE — {pm['icon']} {self.phase} CYCLE\n")
         guidance = PHASE_SLEEVE_GUIDANCE[self.phase]
         sleeves = {
             'global_triads': 'Global Triads  (VWRA/82846/DHL/ES3/XMME)',
@@ -1047,7 +1039,6 @@ class CycleDetector:
             L.append(f"  → {guidance[key]}\n")
 
         # ── Glossary ──────────────────────────────────────────────────────────
-        L.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         L.append("GLOSSARY\n")
         L.append("Economic Regime (Growth × Inflation direction):")
         L.append("  🟢 GOLDILOCKS  — Growth↑, Inflation↓. Best equity environment.")
