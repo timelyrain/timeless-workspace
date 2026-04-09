@@ -377,14 +377,14 @@ def send_telegram_message(message):
     print("📱 Sending to Telegram...")
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     
+    # Telegram has a 4096 character limit - truncate BEFORE any processing
+    if len(message) > 4096:
+        print(f"⚠️  Message too long ({len(message)} chars), truncating to 4090...")
+        message = message[:4090] + "\n\n[...]"
+    
     # Convert Markdown to plain text to avoid formatting issues
     # Remove ** for bold and _ for italics
     plain_message = message.replace('**', '').replace('_', '')
-    
-    # Telegram has a 4096 character limit
-    if len(plain_message) > 4096:
-        print(f"⚠️  Message too long ({len(plain_message)} chars), truncating to 4096...")
-        plain_message = plain_message[:4090] + "\n\n[...]"
     
     payload = {
         "chat_id": CHAT_ID,
