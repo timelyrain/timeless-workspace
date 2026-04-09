@@ -1,0 +1,77 @@
+# Market Cycle Detector - Daily automated cycle phase + economic regime detection
+#
+# Required GitHub Secrets (same as institutional-risk-signal):
+#   - FRED_API_KEY
+#   - ANTHROPIC_API_KEY
+#   - GEMINI_API_KEY
+#   - TELEGRAM_TOKEN_RISK
+#   - CHAT_ID
+#
+# Schedule: Daily at 7:00 PM US Eastern Time — 10 minutes after the risk signal.
+# This ensures the risk signal completes before cycle detection runs.
+# 7:00 PM ET (EST/UTC-5) = 00:00 UTC next day
+# 7:00 PM ET (EDT/UTC-4) = 23:00 UTC same day
+# Using 23:55 UTC as a stable slot that lands near 7 PM ET in both EST and EDT.
+
+name: Market Cycle Detector
+
+on:
+  schedule:
+    - cron: '55 23 * * *'   # ~7:10 PM ET daily (10 min after risk signal)
+  workflow_dispatch:         # Allow manual triggers
+
+jobs:
+  cycle-detection:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # Allow committing cycle_history.json
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create .env file
+        run: |
+          cat > projects/.env << EOF
+          FRED_API_KEY=${{ secrets.FRED_API_KEY }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_TOKEN_RISK=${{ secrets.TELEGRAM_TOKEN_RISK }}
+          CHAT_ID=${{ secrets.CHAT_ID }}
+          EOF
+          echo "✅ Created .env file"
+
+      - name: Run Market Cycle Detector
+        run: |
+          python projects/market-cycle-detector.py
+        env:
+          TZ: 'America/New_York'
+
+      - name: Commit cycle_history.json back to repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add cycle_history.json
+          git diff --staged --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Update cycle history [$(date +'%Y-%m-%d %H:%M')]"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && echo "✅ Push succeeded on attempt $i" && exit 0
+            echo "⚠️ Push attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "❌ All push attempts failed"
+          exit 1
+        continue-on-error: true
