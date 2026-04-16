@@ -1,14 +1,6 @@
 {
   "scores": [
     {
-      "date": "2026-01-14",
-      "score": 80.8,
-      "spy": 693.8088989257812,
-      "vix": 15.699999809265137,
-      "vix_structure": "Backwardation",
-      "vixy_vxx_ratio": 0.9678284131385709
-    },
-    {
       "date": "2026-01-20",
       "score": 78.3,
       "spy": 684.2000122070312,
@@ -797,6 +789,13 @@
       "score": 69.94871794871796,
       "spy": 694.4600219726562,
       "vix": 18.360000610351562,
+      "vix_structure": "Flat"
+    },
+    {
+      "date": "2026-04-15",
+      "score": 68.12307692307692,
+      "spy": 699.9400024414062,
+      "vix": 18.170000076293945,
       "vix_structure": "Flat"
     }
   ],
@@ -1781,6 +1780,19 @@
         "vault": -0.011465660975112521,
         "war_chest": -0.017421044895119864
       }
+    },
+    {
+      "date": "2026-04-15",
+      "total_drift": 0.17267414560096267,
+      "categories": {
+        "global_triads": 0.06859590019161044,
+        "four_horsemen": -0.0026687722270865855,
+        "cash_cow": -0.045831961055071105,
+        "alpha": 0.013916952324420574,
+        "omega": 0.0038242202844502946,
+        "vault": -0.011617378661068448,
+        "war_chest": -0.026218960857255225
+      }
     }
   ],
   "indicators": [
@@ -2329,6 +2341,13 @@
       "ig_spread": 0.82,
       "credit_stress_ratio": 3.5975609756097566,
       "nfci": -0.433
+    },
+    {
+      "date": "2026-04-15",
+      "hy_spread": null,
+      "ig_spread": null,
+      "credit_stress_ratio": null,
+      "nfci": null
     }
   ],
   "backwardation_patched": true
