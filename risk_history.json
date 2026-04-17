@@ -804,6 +804,13 @@
       "spy": 701.6599731445312,
       "vix": 17.940000534057617,
       "vix_structure": "Contango"
+    },
+    {
+      "date": "2026-04-17",
+      "score": 76.1025641025641,
+      "spy": 710.1400146484375,
+      "vix": 17.479999542236328,
+      "vix_structure": "Contango"
     }
   ],
   "overrides": [],
@@ -1813,6 +1820,19 @@
         "vault": 0.0013324171570258114,
         "war_chest": 0.11296966249933545
       }
+    },
+    {
+      "date": "2026-04-17",
+      "total_drift": 0.4345714885789932,
+      "categories": {
+        "global_triads": 0.10164532629465539,
+        "four_horsemen": -0.05856889308626376,
+        "cash_cow": -0.15871685120323284,
+        "alpha": 0.0024208483271967243,
+        "omega": 0.0038752356596768126,
+        "vault": 0.019440639679011537,
+        "war_chest": 0.08990369432895613
+      }
     }
   ],
   "indicators": [
@@ -2375,6 +2395,13 @@
       "ig_spread": null,
       "credit_stress_ratio": null,
       "nfci": null
+    },
+    {
+      "date": "2026-04-17",
+      "hy_spread": 2.86,
+      "ig_spread": 0.81,
+      "credit_stress_ratio": 3.530864197530864,
+      "nfci": -0.465
     }
   ],
   "backwardation_patched": true
