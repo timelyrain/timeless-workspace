@@ -823,6 +823,13 @@
       "spy": 704.0800170898438,
       "vix": 19.5,
       "vix_structure": "Flat"
+    },
+    {
+      "date": "2026-04-22",
+      "score": 68.58119658119658,
+      "spy": 711.2100219726562,
+      "vix": 18.920000076293945,
+      "vix_structure": "Flat"
     }
   ],
   "overrides": [],
@@ -1897,6 +1904,19 @@
         "vault": 0.01851355726005914,
         "war_chest": 0.08908470455942903
       }
+    },
+    {
+      "date": "2026-04-22",
+      "total_drift": 0.43361610246912713,
+      "categories": {
+        "global_triads": 0.10243662485871968,
+        "four_horsemen": -0.057245723927658504,
+        "cash_cow": -0.15956232730690512,
+        "alpha": 0.002687257207381881,
+        "omega": 0.0039169224296606575,
+        "vault": 0.018028643412155557,
+        "war_chest": 0.08973860332664575
+      }
     }
   ],
   "indicators": [
@@ -2494,6 +2514,13 @@
       "ig_spread": 0.81,
       "credit_stress_ratio": 3.5432098765432096,
       "nfci": -0.465
+    },
+    {
+      "date": "2026-04-22",
+      "hy_spread": 2.85,
+      "ig_spread": 0.8,
+      "credit_stress_ratio": 3.5625,
+      "nfci": -0.497
     }
   ],
   "backwardation_patched": true
