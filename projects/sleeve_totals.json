@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-05-07T23:49:43.193933",
+  "timestamp": "2026-05-08T23:50:28.704499",
   "sleeve_totals_usd": {
-    "global_triads": 395999.8816,
-    "four_horsemen": 181364.432,
+    "global_triads": 396991.72890000005,
+    "four_horsemen": 164861.08905,
     "cash_cow": 0.0,
-    "alpha": 55165.97,
-    "omega": 10566.060000000001,
-    "vault": 120731.68592,
-    "war_chest": 278308.309065033
+    "alpha": 51810.232,
+    "omega": 10524.02,
+    "vault": 121165.98800000001,
+    "war_chest": 295546.981883611
   },
-  "grand_total_usd": 1042136.338585033
+  "grand_total_usd": 1040900.0398336111
 }
