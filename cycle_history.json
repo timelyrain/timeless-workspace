@@ -737,6 +737,24 @@
         "sahm_value": 0.20000000000000018,
         "nfci": -0.524
       }
+    },
+    {
+      "date": "2026-05-19",
+      "phase": "EARLY",
+      "regime": "REFLATION",
+      "cycle_score": 70,
+      "growth_score": 36,
+      "inflation_score": 32,
+      "snapshot": {
+        "hy_spread": 2.83,
+        "ig_spread": 0.75,
+        "spy_vs_200dma_pct": 8.784412292704689,
+        "t10y2y": 0.54,
+        "cpi_yoy": 3.9470269087042724,
+        "t5yie": 2.66,
+        "sahm_value": 0.20000000000000018,
+        "nfci": -0.524
+      }
     }
   ]
 }
