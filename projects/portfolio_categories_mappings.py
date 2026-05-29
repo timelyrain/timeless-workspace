@@ -47,7 +47,6 @@ SYMBOL_MAPPING = {
     'alpha': [
         # K20: Theme stocks, speculation
         'BITO',
-        'SE',    # Auto-added: SEA LTD-ADR
         '9807',    # Auto-added: GLOBAL X CHINA ROBOTICS
         'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
         'HY9H',    # Auto-added: SK HYNIX INC-GDS
