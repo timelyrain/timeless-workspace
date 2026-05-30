@@ -1,13 +1,6 @@
 {
   "scores": [
     {
-      "date": "2026-02-27",
-      "score": 67.04545454545455,
-      "spy": 685.989990234375,
-      "vix": 19.860000610351562,
-      "vix_structure": "Unknown"
-    },
-    {
       "date": "2026-02-28",
       "score": 67.04545454545455,
       "spy": 685.989990234375,
@@ -650,23 +643,17 @@
       "spy": 754.5999755859375,
       "vix": 15.739999771118164,
       "vix_structure": "Contango"
+    },
+    {
+      "date": "2026-05-29",
+      "score": 69.57264957264958,
+      "spy": 756.47998046875,
+      "vix": 15.319999694824219,
+      "vix_structure": "Contango"
     }
   ],
   "overrides": [],
   "drift_history": [
-    {
-      "date": "2026-02-27",
-      "total_drift": 0.1860933415530679,
-      "categories": {
-        "global_triads": 0.06298502319925359,
-        "four_horsemen": 0.018873341167691904,
-        "cash_cow": -0.002573512782507531,
-        "alpha": 0.008151061689589036,
-        "omega": 0.00303724471999944,
-        "vault": -0.06074446626928284,
-        "war_chest": -0.029728691724743544
-      }
-    },
     {
       "date": "2026-02-28",
       "total_drift": 0.1860933415530679,
@@ -1836,16 +1823,22 @@
         "vault": 0.0004481554240357011,
         "war_chest": 0.1262249049045988
       }
+    },
+    {
+      "date": "2026-05-29",
+      "total_drift": 0.6888390706924237,
+      "categories": {
+        "global_triads": 0.2089536050544456,
+        "four_horsemen": -0.09262361718932369,
+        "cash_cow": -0.225,
+        "alpha": 0.0075432845129991405,
+        "omega": -0.01,
+        "vault": -0.016795918156888162,
+        "war_chest": 0.12792264577876705
+      }
     }
   ],
   "indicators": [
-    {
-      "date": "2026-02-27",
-      "hy_spread": 2.98,
-      "ig_spread": 0.82,
-      "credit_stress_ratio": 3.6341463414634148,
-      "ted_spread": 0.09
-    },
     {
       "date": "2026-02-28",
       "hy_spread": 2.98,
@@ -2475,6 +2468,13 @@
       "ig_spread": null,
       "credit_stress_ratio": null,
       "nfci": null
+    },
+    {
+      "date": "2026-05-29",
+      "hy_spread": 2.72,
+      "ig_spread": 0.73,
+      "credit_stress_ratio": 3.726027397260274,
+      "nfci": -0.51
     }
   ],
   "backwardation_patched": true
