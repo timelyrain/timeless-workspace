@@ -971,6 +971,24 @@
         "sahm_value": null,
         "nfci": -0.51
       }
+    },
+    {
+      "date": "2026-06-01",
+      "phase": "EARLY",
+      "regime": "GOLDILOCKS",
+      "cycle_score": 67,
+      "growth_score": 30,
+      "inflation_score": 24,
+      "snapshot": {
+        "hy_spread": null,
+        "ig_spread": 0.74,
+        "spy_vs_200dma_pct": 11.669582668281883,
+        "t10y2y": 0.42,
+        "cpi_yoy": null,
+        "t5yie": null,
+        "sahm_value": 0.20000000000000018,
+        "nfci": -0.51
+      }
     }
   ]
 }
