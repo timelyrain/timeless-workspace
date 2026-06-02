@@ -17,16 +17,15 @@ SETUP:
    - Generate token and note it
 
 3. Add to .env file:
-   IBKR_FLEX_TOKEN_HK=your_token_here
-   IBKR_QUERY_ID_HK=your_query_id_here
-   IBKR_FLEX_TOKEN_AL=your_token_here
-   IBKR_QUERY_ID_AL=your_query_id_here
+   IBKR_FLEX_TOKEN=your_token_here
+   IBKR_QUERY_ID=your_query_id_here
+   IBKR_CASH_QUERY_ID=your_cash_query_id_here
 
 USAGE:
 python fetch-ibkr-positions.py
 
 OUTPUT:
-- Creates/updates: daily-open-positions.xlsx
+- Creates/updates: fetch-ibkr-positions.xlsx
 - Sheet name: "Positions"
 - Includes timestamp of last update
 """
@@ -45,15 +44,10 @@ from io import StringIO
 # Load environment variables
 load_dotenv()
 
-# Configuration - HK Account
-IBKR_FLEX_TOKEN_HK = os.getenv('IBKR_FLEX_TOKEN_HK')
-IBKR_QUERY_ID_HK = os.getenv('IBKR_QUERY_ID_HK')
-IBKR_CASH_QUERY_ID_HK = os.getenv('IBKR_CASH_QUERY_ID_HK')
-
-# Configuration - AL Account
-IBKR_FLEX_TOKEN_AL = os.getenv('IBKR_FLEX_TOKEN_AL')
-IBKR_QUERY_ID_AL = os.getenv('IBKR_QUERY_ID_AL')
-IBKR_CASH_QUERY_ID_AL = os.getenv('IBKR_CASH_QUERY_ID_AL')
+# Configuration
+IBKR_FLEX_TOKEN = os.getenv('IBKR_FLEX_TOKEN')
+IBKR_QUERY_ID = os.getenv('IBKR_QUERY_ID')
+IBKR_CASH_QUERY_ID = os.getenv('IBKR_CASH_QUERY_ID')
 
 # Telegram Configuration
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -65,34 +59,34 @@ REQUEST_URL = 'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexState
 STATEMENT_URL = 'https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService.GetStatement'
 
 
-def validate_config(account_name, flex_token, query_id):
+def validate_config(flex_token, query_id):
     """Validate that required configuration is present"""
     if not flex_token or flex_token == 'your_flex_token_here':
-        print(f"❌ ERROR: IBKR_FLEX_TOKEN_{account_name} not configured in .env file")
+        print("❌ ERROR: IBKR_FLEX_TOKEN not configured in .env file")
         print("   Get token from: IBKR Account Management → Settings → FlexWeb Service")
         return False
-    
+
     if not query_id or query_id == 'your_query_id_here':
-        print(f"❌ ERROR: IBKR_QUERY_ID_{account_name} not configured in .env file")
+        print("❌ ERROR: IBKR_QUERY_ID not configured in .env file")
         print("   Get Query ID from: IBKR Reports → Flex Queries")
         return False
-    
-    print(f"✅ Configuration validated for {account_name} account")
+
+    print("✅ Configuration validated")
     return True
 
 
-def request_flex_report(account_name, flex_token, query_id):
+def request_flex_report(label, flex_token, query_id):
     """
 Step 1: Request flex report generation
     Returns: Reference code for retrieving the report
     """
     # Transient IBKR errors that resolve with a retry
-    RETRYABLE_CODES = {'1003', '1004'}
+    RETRYABLE_CODES = {'1001', '1003', '1004'}
     max_request_retries = 5
     request_retry_delay = 30  # seconds between retries
 
     for attempt in range(1, max_request_retries + 1):
-        print(f"\n📊 Requesting Flex Query report from IBKR ({account_name})... (attempt {attempt}/{max_request_retries})")
+        print(f"\n📊 Requesting Flex Query report from IBKR ({label})... (attempt {attempt}/{max_request_retries})")
 
         params = {
             't': flex_token,
@@ -111,10 +105,9 @@ Step 1: Request flex report generation
                 error_code = content.split('<ErrorCode>')[1].split('</ErrorCode>')[0] if '<ErrorCode>' in content else 'Unknown'
                 error_msg = content.split('<ErrorMessage>')[1].split('</ErrorMessage>')[0] if '<ErrorMessage>' in content else 'Unknown error'
                 print(f"❌ IBKR API Error {error_code}: {error_msg}")
-                # Distinguish token/auth errors from transient timing errors
-                if error_code in ('1001', '1002'):
-                    print(f"🔑 TOKEN/AUTH ERROR — check IBKR_FLEX_TOKEN in GitHub Secrets (Settings → Secrets → Actions)")
-                    print(f"   Token may have expired or been regenerated in IBKR Account Management → Settings → FlexWeb Service")
+                if error_code == '1002':
+                    print("🔑 TOKEN/AUTH ERROR — check IBKR_FLEX_TOKEN in GitHub Secrets (Settings → Secrets → Actions)")
+                    print("   Token may have expired or been regenerated in IBKR Account Management → Settings → FlexWeb Service")
                     return None
                 if error_code in RETRYABLE_CODES and attempt < max_request_retries:
                     print(f"⏳ Transient error — retrying in {request_retry_delay}s...")
@@ -128,7 +121,7 @@ Step 1: Request flex report generation
                 print(f"✅ Report requested successfully (Reference: {ref_code})")
                 return ref_code
             else:
-                print(f"❌ Unexpected response format:")
+                print("❌ Unexpected response format:")
                 print(content)
                 return None
 
@@ -143,36 +136,36 @@ Step 1: Request flex report generation
     return None
 
 
-def fetch_flex_report(account_name, flex_token, reference_code, max_retries=20, retry_delay=5):
+def fetch_flex_report(label, flex_token, reference_code, max_retries=20, retry_delay=5):
     """
     Step 2: Fetch the generated flex report (with retries)
     IBKR takes a few seconds to generate the report
-    
+
     Returns: CSV data as string
     """
-    print(f"\n⏳ Waiting for report generation ({account_name}, max {max_retries * retry_delay}s)...")
-    
+    print(f"\n⏳ Waiting for report generation ({label}, max {max_retries * retry_delay}s)...")
+
     params = {
         't': flex_token,
         'q': reference_code,
         'v': '3'
     }
-    
+
     for attempt in range(max_retries):
         try:
             response = requests.get(STATEMENT_URL, params=params, timeout=30)
             response.raise_for_status()
             content = response.text
-            
+
             # Check if this is CSV data (starts with quotes or field names)
             if content.startswith('"') or content.startswith('ClientAccountID'):
                 print(f"✅ Report generated successfully (attempt {attempt + 1})")
                 return content
-            
+
             # Check if report is ready (XML response)
             if '<Status>Success</Status>' in content:
                 print(f"✅ Report generated successfully (attempt {attempt + 1})")
-                
+
                 # Extract CSV data (everything after the XML header)
                 if '</FlexStatementResponse>' in content:
                     csv_data = content.split('</FlexStatementResponse>')[1].strip()
@@ -183,224 +176,183 @@ def fetch_flex_report(account_name, flex_token, reference_code, max_retries=20, 
                         return None
                 else:
                     return content  # Entire response is CSV
-            
+
             # Check if still processing
             if '<Status>Warn</Status>' in content or 'Statement generation in progress' in content:
                 print(f"   Attempt {attempt + 1}/{max_retries} - Still generating...")
                 time.sleep(retry_delay)
                 continue
-            
+
             # Check for errors
             if '<Status>Fail</Status>' in content:
                 error_msg = content.split('<ErrorMessage>')[1].split('</ErrorMessage>')[0] if '<ErrorMessage>' in content else 'Unknown error'
                 print(f"❌ Error retrieving report: {error_msg}")
                 return None
-                
+
         except requests.exceptions.RequestException as e:
             print(f"❌ Network error on attempt {attempt + 1}: {e}")
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
             else:
                 return None
-    
+
     print(f"❌ Timeout: Report not ready after {max_retries * retry_delay} seconds")
     return None
 
 
-def parse_csv_to_dataframe(csv_data, account_name):
+def parse_csv_to_dataframe(csv_data):
     """
     Parse CSV data into pandas DataFrame
     """
     if not csv_data:
-        print(f"⚠️  No data to parse for {account_name}")
+        print("⚠️  No data to parse")
         return None
-    
+
     try:
         df = pd.read_csv(StringIO(csv_data))
-        
+
         # Convert Symbol column to string for consistent Excel formula matching
         if 'Symbol' in df.columns:
             df['Symbol'] = df['Symbol'].astype(str)
-        
+
         # Add PositionValueUSD column if possible
         if 'PositionValue' in df.columns and 'FXRateToBase' in df.columns:
             df['PositionValueUSD'] = df['PositionValue'] * df['FXRateToBase']
-            print(f"✅ Parsed {len(df)} positions for {account_name} (added PositionValueUSD)")
+            print(f"✅ Parsed {len(df)} positions (added PositionValueUSD)")
         else:
-            print(f"✅ Parsed {len(df)} positions for {account_name}")
-            print(f"   ⚠️  Warning: PositionValue or FXRateToBase column not found")
-        
+            print(f"✅ Parsed {len(df)} positions")
+            print("   ⚠️  Warning: PositionValue or FXRateToBase column not found")
+
         return df
     except Exception as e:
-        print(f"❌ Error parsing CSV for {account_name}: {e}")
+        print(f"❌ Error parsing CSV: {e}")
         print(f"CSV preview: {csv_data[:500]}")
         return None
 
 
-def fetch_cash_balance(account_name, flex_token, cash_query_id):
+def fetch_cash_balance(flex_token, cash_query_id):
     """
-    Fetch cash balance and return as a simple dollar amount (not merged with positions)
+    Fetch cash balance and return as a simple dollar amount
     """
     if not cash_query_id:
-        print(f"   ⚠️  No cash query ID configured for {account_name}, skipping cash fetch")
+        print("   ⚠️  No cash query ID configured, skipping cash fetch")
         return 0.0
-    
-    print(f"\n💵 Fetching cash balance for {account_name}...")
-    
-    # Request cash report
-    reference_code = request_flex_report(f"{account_name}-CASH", flex_token, cash_query_id)
+
+    print("\n💵 Fetching cash balance...")
+
+    reference_code = request_flex_report("CASH", flex_token, cash_query_id)
     if not reference_code:
-        print(f"   ⚠️  Failed to request cash report for {account_name}")
+        print("   ⚠️  Failed to request cash report")
         return 0.0
-    
-    # Fetch cash report
-    csv_data = fetch_flex_report(f"{account_name}-CASH", flex_token, reference_code)
+
+    csv_data = fetch_flex_report("CASH", flex_token, reference_code)
     if not csv_data:
-        print(f"   ⚠️  No cash data received for {account_name}")
+        print("   ⚠️  No cash data received")
         return 0.0
-    
+
     try:
         df_cash = pd.read_csv(StringIO(csv_data))
-        
+
         if len(df_cash) == 0:
-            print(f"   ℹ️  No cash balances found for {account_name}")
+            print("   ℹ️  No cash balances found")
             return 0.0
-        
+
         # Get total cash in USD (case-insensitive column lookup)
         for col in ['EndingCash', 'endingcash']:
             if col in df_cash.columns:
                 total_cash_usd = float(df_cash[col].iloc[0])
                 print(f"   ✅ Cash balance: ${total_cash_usd:,.2f} USD")
                 return total_cash_usd
-        
-        # Column not found
-        print(f"   ⚠️  EndingCash column not found in cash report for {account_name}")
+
+        print("   ⚠️  EndingCash column not found in cash report")
         print(f"   Available columns: {df_cash.columns.tolist()}")
         return 0.0
-            
+
     except Exception as e:
-        print(f"   ⚠️  Error processing cash data for {account_name}: {e}")
+        print(f"   ⚠️  Error processing cash data: {e}")
         return 0.0
 
 
-def update_excel_file(df_hk, df_al, cash_hk, cash_al):
+def update_excel_file(df, cash):
     """
-    Update Excel file with new position data for both accounts
-    Creates file if it doesn't exist
-    Now includes a Summary sheet with cash balances
+    Update Excel file with new position data.
+    Creates file if it doesn't exist.
     """
     print(f"\n📝 Updating Excel file: {EXCEL_FILE.name}")
-    
+
     try:
-        # Add metadata
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Create a writer object
+
         with pd.ExcelWriter(EXCEL_FILE, engine='openpyxl', mode='w') as writer:
-            # Calculate totals
-            hk_stocks_total = df_hk['PositionValueUSD'].sum() if df_hk is not None else 0.0
-            al_stocks_total = df_al['PositionValueUSD'].sum() if df_al is not None else 0.0
-            
-            # Write HK positions data (stocks/ETFs/options only)
-            if df_hk is not None:
-                df_hk.to_excel(writer, sheet_name='PositionsHK', index=False)
-                print(f"   ✅ Wrote {len(df_hk)} HK positions")
-            
-            # Write AL positions data (stocks/ETFs/options only)
-            if df_al is not None:
-                df_al.to_excel(writer, sheet_name='PositionsAL', index=False)
-                print(f"   ✅ Wrote {len(df_al)} AL positions")
-            total_stocks = hk_stocks_total + al_stocks_total
-            total_cash = cash_hk + cash_al
-            grand_total = total_stocks + total_cash
-            
-            # Create Summary sheet with account totals and cash
+            stocks_total = df['PositionValueUSD'].sum() if df is not None else 0.0
+            grand_total = stocks_total + cash
+
+            # Write positions data
+            if df is not None:
+                df.to_excel(writer, sheet_name='Positions', index=False)
+                print(f"   ✅ Wrote {len(df)} positions")
+
+            # Summary sheet
             summary_data = {
-                'Account': ['HK', 'AL', '', 'TOTAL'],
-                'Positions Value': [f'${hk_stocks_total:,.2f}', f'${al_stocks_total:,.2f}', '', f'${total_stocks:,.2f}'],
-                'Cash Balance': [f'${cash_hk:,.2f}', f'${cash_al:,.2f}', '', f'${total_cash:,.2f}'],
-                'Account Total': [f'${hk_stocks_total + cash_hk:,.2f}', f'${al_stocks_total + cash_al:,.2f}', '', f'${grand_total:,.2f}']
+                'Category': ['Positions Value', 'Cash Balance', 'Total'],
+                'Amount': [f'${stocks_total:,.2f}', f'${cash:,.2f}', f'${grand_total:,.2f}']
             }
-            df_summary = pd.DataFrame(summary_data)
-            df_summary.to_excel(writer, sheet_name='Summary', index=False)
-            print(f"   ✅ Wrote Summary sheet with cash balances")
-            
-            # Write metadata
+            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+            print("   ✅ Wrote Summary sheet")
+
+            # Metadata sheet
             metadata_data = {
                 'Last Updated': [timestamp],
-                'HK Positions': [len(df_hk) if df_hk is not None else 0],
-                'AL Positions': [len(df_al) if df_al is not None else 0],
-                'HK Query ID': [IBKR_QUERY_ID_HK],
-                'AL Query ID': [IBKR_QUERY_ID_AL]
+                'Positions': [len(df) if df is not None else 0],
+                'Query ID': [IBKR_QUERY_ID]
             }
-            metadata = pd.DataFrame(metadata_data)
-            metadata.to_excel(writer, sheet_name='Metadata', index=False)
-        
-        print(f"✅ Excel file updated successfully")
+            pd.DataFrame(metadata_data).to_excel(writer, sheet_name='Metadata', index=False)
+
+        print("✅ Excel file updated successfully")
         print(f"   Location: {EXCEL_FILE.absolute()}")
         print(f"   Timestamp: {timestamp}")
-        
-        # Collect summary data
-        hk_count = len(df_hk) if df_hk is not None else 0
-        al_count = len(df_al) if df_al is not None else 0
-        total_positions = hk_count + al_count
-        
+
+        position_count = len(df) if df is not None else 0
         all_symbols = []
-        if df_hk is not None and 'Symbol' in df_hk.columns:
-            all_symbols.extend(df_hk['Symbol'].astype(str).unique().tolist())
-        if df_al is not None and 'Symbol' in df_al.columns:
-            all_symbols.extend(df_al['Symbol'].astype(str).unique().tolist())
-        
-        # Display summary
-        print(f"\n📊 Position Summary:")
-        if hk_count > 0:
-            print(f"   HK Account: {hk_count} positions")
-            if df_hk is not None and 'Symbol' in df_hk.columns:
-                symbols_hk = df_hk['Symbol'].unique()[:5]
-                print(f"      Symbols: {', '.join(symbols_hk)}")
-                if len(df_hk['Symbol'].unique()) > 5:
-                    print(f"      ... and {len(df_hk['Symbol'].unique()) - 5} more")
-        
-        if al_count > 0:
-            print(f"   AL Account: {al_count} positions")
-            if df_al is not None and 'Symbol' in df_al.columns:
-                symbols_al = df_al['Symbol'].unique()[:5]
-                print(f"      Symbols: {', '.join(symbols_al)}")
-                if len(df_al['Symbol'].unique()) > 5:
-                    print(f"      ... and {len(df_al['Symbol'].unique()) - 5} more")
-        
-        return timestamp, total_positions, all_symbols
-        
+        if df is not None and 'Symbol' in df.columns:
+            all_symbols = df['Symbol'].astype(str).unique().tolist()
+
+        print(f"\n📊 Position Summary: {position_count} positions")
+        if all_symbols:
+            preview = ', '.join(all_symbols[:5])
+            if len(all_symbols) > 5:
+                preview += f" ... and {len(all_symbols) - 5} more"
+            print(f"   Symbols: {preview}")
+
+        return timestamp, position_count, all_symbols
+
     except Exception as e:
         print(f"❌ Error updating Excel file: {e}")
         return None, 0, []
 
 
-def send_telegram_notification(success=True, timestamp=None, position_count=0, symbols=None, hk_count=0, al_count=0):
+def send_telegram_notification(success=True, timestamp=None, position_count=0, symbols=None):
     """
     Send Telegram notification about position update
     """
     if not TELEGRAM_TOKEN or not CHAT_ID:
         print("⚠️  Telegram credentials not configured, skipping notification")
         return
-    
+
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        
+
         if success:
-            # Build symbol list preview
             symbol_preview = ""
             if symbols and len(symbols) > 0:
                 symbol_list = ', '.join(symbols[:8])
                 if len(symbols) > 8:
                     symbol_list += f" +{len(symbols) - 8} more"
                 symbol_preview = f"\n📈 Symbols: {symbol_list}\n"
-            
+
             message = (
                 f"✅ *IBKR Positions Updated*\n\n"
                 f"📊 Total Positions: {position_count}\n"
-                f"   • HK Account: {hk_count}\n"
-                f"   • AL Account: {al_count}\n"
                 f"{symbol_preview}"
                 f"🕐 Updated: {timestamp}\n"
                 f"📁 File: fetch-ibkr-positions.xlsx\n\n"
@@ -413,25 +365,25 @@ def send_telegram_notification(success=True, timestamp=None, position_count=0, s
                 f"🕐 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
                 f"Please check logs for details."
             )
-        
+
         payload = {
             'chat_id': CHAT_ID,
             'text': message,
             'parse_mode': 'Markdown'
         }
-        
+
         response = requests.post(url, json=payload, timeout=10)
-        
+
         if response.status_code == 200:
             print("✅ Telegram notification sent")
         else:
             print(f"⚠️  Telegram notification failed: {response.status_code}")
-            
+
     except Exception as e:
         print(f"⚠️  Error sending Telegram notification: {e}")
 
 
-def write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al):
+def write_sleeve_totals_json(df, cash):
     """
     Calculate sleeve totals from positions data and write to sleeve_totals.json.
     This sidecar file is read by instituitional-risk-signal.py instead of relying
@@ -440,31 +392,27 @@ def write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al):
     try:
         from portfolio_categories_mappings import SYMBOL_MAPPING
 
-        combined = pd.concat(
-            [df for df in [df_hk, df_al] if df is not None],
-            ignore_index=True
-        )
-
         sleeve_totals = {sleeve: 0.0 for sleeve in SYMBOL_MAPPING}
-        sleeve_totals['war_chest'] = cash_hk + cash_al
+        sleeve_totals['war_chest'] = cash
 
-        for _, row in combined.iterrows():
-            symbol = str(row.get('Symbol', '')).strip()
-            value = float(row.get('PositionValueUSD', 0) or 0)
-            asset_class = str(row.get('AssetClass', '')).strip()
+        if df is not None:
+            for _, row in df.iterrows():
+                symbol = str(row.get('Symbol', '')).strip()
+                value = float(row.get('PositionValueUSD', 0) or 0)
+                asset_class = str(row.get('AssetClass', '')).strip()
 
-            # Omega: SPY/QQQ bear spreads (options only)
-            if asset_class in ('OPT', 'FOP') and (symbol.startswith('SPY') or symbol.startswith('QQQ')):
-                sleeve_totals['omega'] += value
-                continue
-
-            # Match against sleeve symbol lists (first match wins)
-            for sleeve, symbols in SYMBOL_MAPPING.items():
-                if sleeve in ('omega', 'war_chest'):
+                # Omega: SPY/QQQ bear spreads (options only)
+                if asset_class in ('OPT', 'FOP') and (symbol.startswith('SPY') or symbol.startswith('QQQ')):
+                    sleeve_totals['omega'] += value
                     continue
-                if symbol in symbols:
-                    sleeve_totals[sleeve] += value
-                    break
+
+                # Match against sleeve symbol lists (first match wins)
+                for sleeve, symbols in SYMBOL_MAPPING.items():
+                    if sleeve in ('omega', 'war_chest'):
+                        continue
+                    if symbol in symbols:
+                        sleeve_totals[sleeve] += value
+                        break
 
         grand_total = sum(sleeve_totals.values())
 
@@ -491,93 +439,58 @@ def write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al):
 def main():
     """Main execution flow"""
     print("=" * 70)
-    print("IBKR FLEX QUERY TO EXCEL UPDATER (HK + AL)")
+    print("IBKR FLEX QUERY TO EXCEL UPDATER")
     print("=" * 70)
-    
+
     try:
-        df_hk = None
-        df_al = None
-        
-        # ===== STEP 1: Fetch position reports =====
-        # Fetch HK positions
+        df = None
+
+        # ===== STEP 1: Fetch positions =====
         print("\n" + "=" * 70)
-        print("FETCHING HK ACCOUNT POSITIONS")
+        print("FETCHING POSITIONS")
         print("=" * 70)
-        
-        if validate_config("HK", IBKR_FLEX_TOKEN_HK, IBKR_QUERY_ID_HK):
-            reference_code = request_flex_report("HK", IBKR_FLEX_TOKEN_HK, IBKR_QUERY_ID_HK)
+
+        if validate_config(IBKR_FLEX_TOKEN, IBKR_QUERY_ID):
+            reference_code = request_flex_report("POSITIONS", IBKR_FLEX_TOKEN, IBKR_QUERY_ID)
             if reference_code:
-                csv_data = fetch_flex_report("HK", IBKR_FLEX_TOKEN_HK, reference_code)
+                csv_data = fetch_flex_report("POSITIONS", IBKR_FLEX_TOKEN, reference_code)
                 if csv_data:
-                    df_hk = parse_csv_to_dataframe(csv_data, "HK")
-        
-        # Add delay before next account query to avoid rate limiting
-        if df_hk is not None:
-            print("\n⏳ Waiting 5 seconds before next query to avoid rate limiting...")
+                    df = parse_csv_to_dataframe(csv_data)
+
+        # ===== STEP 2: Fetch cash balance =====
+        if df is not None:
+            print("\n⏳ Waiting 5 seconds before cash query to avoid rate limiting...")
             time.sleep(5)
-        
-        # Fetch AL positions
+
         print("\n" + "=" * 70)
-        print("FETCHING AL ACCOUNT POSITIONS")
+        print("FETCHING CASH BALANCE")
         print("=" * 70)
-        
-        if validate_config("AL", IBKR_FLEX_TOKEN_AL, IBKR_QUERY_ID_AL):
-            reference_code = request_flex_report("AL", IBKR_FLEX_TOKEN_AL, IBKR_QUERY_ID_AL)
-            if reference_code:
-                csv_data = fetch_flex_report("AL", IBKR_FLEX_TOKEN_AL, reference_code)
-                if csv_data:
-                    df_al = parse_csv_to_dataframe(csv_data, "AL")
-        
-        # ===== STEP 2: Now fetch cash balances =====
-        # Add delay before cash queries to avoid rate limiting
-        if df_hk is not None or df_al is not None:
-            print("\n⏳ Waiting 5 seconds before cash queries to avoid rate limiting...")
-            time.sleep(5)
-        
-        print("\n" + "=" * 70)
-        print("FETCHING CASH BALANCES")
-        print("=" * 70)
-        
-        # Fetch cash balances (function handles missing query IDs gracefully)
-        cash_hk = fetch_cash_balance("HK", IBKR_FLEX_TOKEN_HK, IBKR_CASH_QUERY_ID_HK) if df_hk is not None else 0.0
-        
-        # Add delay between cash queries to avoid IBKR rate limiting (Error 1018)
-        if df_hk is not None and df_al is not None:
-            print("\n⏳ Waiting 5 seconds before next cash query to avoid rate limiting...")
-            time.sleep(5)
-        
-        cash_al = fetch_cash_balance("AL", IBKR_FLEX_TOKEN_AL, IBKR_CASH_QUERY_ID_AL) if df_al is not None else 0.0
-        
+
+        cash = fetch_cash_balance(IBKR_FLEX_TOKEN, IBKR_CASH_QUERY_ID) if df is not None else 0.0
+
         # ===== Update Excel File =====
-        if df_hk is None and df_al is None:
-            print("\n❌ No position data available from either account")
+        if df is None:
+            print("\n❌ No position data available")
             print("⚠️  IBKR statements not available — skipping update (will retry tomorrow)")
             send_telegram_notification(success=False)
             sys.exit(0)  # Exit 0 so GitHub Action doesn't fail red on transient IBKR errors
-        
-        # Update Excel with both accounts and cash
-        timestamp, total_positions, all_symbols = update_excel_file(df_hk, df_al, cash_hk, cash_al)
+
+        timestamp, total_positions, all_symbols = update_excel_file(df, cash)
 
         # Write sleeve totals sidecar JSON for instituitional-risk-signal.py
-        write_sleeve_totals_json(df_hk, df_al, cash_hk, cash_al)
+        write_sleeve_totals_json(df, cash)
 
-        # Send Telegram notification
-        hk_count = len(df_hk) if df_hk is not None else 0
-        al_count = len(df_al) if df_al is not None else 0
-        
         send_telegram_notification(
-            success=True, 
-            timestamp=timestamp, 
+            success=True,
+            timestamp=timestamp,
             position_count=total_positions,
-            symbols=all_symbols,
-            hk_count=hk_count,
-            al_count=al_count
+            symbols=all_symbols
         )
-        
+
         print("\n" + "=" * 70)
         print("✅ COMPLETE - Excel file updated with latest IBKR positions")
         print("=" * 70)
-        
+
     except Exception as e:
         print(f"\n❌ UNEXPECTED ERROR: {e}")
         import traceback

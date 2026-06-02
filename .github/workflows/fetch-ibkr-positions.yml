@@ -1,10 +1,9 @@
 # IBKR Open Positions Fetcher - Daily automated sync
-# 
+#
 # Required GitHub Secrets (Settings → Secrets and variables → Actions):
-#   - IBKR_FLEX_TOKEN_HK: Your IBKR FlexWeb Service token (HK Account)
-#   - IBKR_QUERY_ID_HK: Your Flex Query ID (HK Account)
-#   - IBKR_FLEX_TOKEN_AL: Your IBKR FlexWeb Service token (AL Account)
-#   - IBKR_QUERY_ID_AL: Your Flex Query ID (AL Account)
+#   - IBKR_FLEX_TOKEN: Your IBKR FlexWeb Service token
+#   - IBKR_QUERY_ID: Your Flex Query ID (combined positions query)
+#   - IBKR_CASH_QUERY_ID: Your Flex Query ID (cash balance query)
 #   - TELEGRAM_TOKEN: Your Telegram bot token from @BotFather
 #   - CHAT_ID: Your Telegram channel/chat ID
 #
@@ -48,27 +47,13 @@ jobs:
       - name: Create .env file
         run: |
           cat > projects/.env << EOF
-          IBKR_FLEX_TOKEN_HK=${{ secrets.IBKR_FLEX_TOKEN_HK }}
-          IBKR_QUERY_ID_HK=${{ secrets.IBKR_QUERY_ID_HK }}
-          IBKR_FLEX_TOKEN_AL=${{ secrets.IBKR_FLEX_TOKEN_AL }}
-          IBKR_QUERY_ID_AL=${{ secrets.IBKR_QUERY_ID_AL }}
-          IBKR_CASH_QUERY_ID_HK=${{ secrets.IBKR_CASH_QUERY_ID_HK }}
-          IBKR_CASH_QUERY_ID_AL=${{ secrets.IBKR_CASH_QUERY_ID_AL }}
+          IBKR_FLEX_TOKEN=${{ secrets.IBKR_FLEX_TOKEN }}
+          IBKR_QUERY_ID=${{ secrets.IBKR_QUERY_ID }}
+          IBKR_CASH_QUERY_ID=${{ secrets.IBKR_CASH_QUERY_ID }}
           TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID=${{ secrets.CHAT_ID }}
           EOF
           echo "✅ Created .env file in projects directory"
-          echo "🔍 Verifying cash query IDs are set..."
-          if [ -z "${{ secrets.IBKR_CASH_QUERY_ID_HK }}" ]; then
-            echo "❌ ERROR: IBKR_CASH_QUERY_ID_HK is empty!"
-          else
-            echo "✅ IBKR_CASH_QUERY_ID_HK is set (length: ${#IBKR_CASH_QUERY_ID_HK})"
-          fi
-          if [ -z "${{ secrets.IBKR_CASH_QUERY_ID_AL }}" ]; then
-            echo "❌ ERROR: IBKR_CASH_QUERY_ID_AL is empty!"
-          else
-            echo "✅ IBKR_CASH_QUERY_ID_AL is set (length: ${#IBKR_CASH_QUERY_ID_AL})"
-          fi
       
       - name: Fetch IBKR positions
         run: |
