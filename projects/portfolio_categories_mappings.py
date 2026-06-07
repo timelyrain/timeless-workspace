@@ -8,33 +8,33 @@ Single source of truth for portfolio structure across all scripts:
 - institutional-risk-signal.py
 
 Last updated: 2026-02-02
-Dashboard source: fetch-ibkr-positions-dashboard.xlsx (K4-K23)
+Dashboard source: fetch-ibkr-positions-dashboard.xlsx (F2-F18, total B19)
 """
 
 # =============================================================================
 # PORTFOLIO CATEGORY MAPPING (2026 Structure)
 # =============================================================================
 # Source of truth: fetch-ibkr-positions-dashboard.xlsx
-# Synced with Dashboard columns K4-K23
+# Synced with Dashboard: Actual $ in col F, rows 2-18; total in B19
 
 SYMBOL_MAPPING = {
     'global_triads': [
-        '82846',    # K5: China ETF
-        'DHL',      # K6: Dividend
-        'ES3',      # K7: Singapore banks
-        'VWRA',     # K8: VT USD
-        #'WORLD',    # K9: VT, no EM, hedged
-        'XMME',     # K10: EM, unhedged
+        '82846',    # row3: China ETF
+        'DHL',      # row4: Dividend
+        'ES3',      # row5: Singapore banks
+        'VWRA',     # row6: VT USD
+        #'WORLD',    # VT, no EM, hedged
+        'XMME',     # row7: EM, unhedged
     ],
     'four_horsemen': [
-        #'CSNDX',    # K12: Nasdaq
-        'EQCH',     # K13: Nasdaq, hedged
-        'CBUK',     # K14: China Tech, unhedged
-        '9807',     # K15: China Robotics (HK)
-        #'HEAL',     # K15: Biotic
-        'INRA',     # K16: Energy
-        'GRDU',     # K17: Clean energy / infrastructure
-        #'LOCK',     # K18: Security
+        #'CSNDX',    # Nasdaq
+        'EQCH',     # row9: Nasdaq, hedged
+        'CBUK',     # row10: China Tech, unhedged
+        '9807',     # row11: China Robotics (HK)
+        #'HEAL',     # Biotic
+        'INRA',     # row12: Energy
+        'GRDU',     # row13: Clean energy / infrastructure
+        #'LOCK',     # Security
     ],
     'cash_cow': [
         # Source of truth: fetch-ibkr-positions-dashboard.xlsx → IncomeStrategy sheet
@@ -45,16 +45,16 @@ SYMBOL_MAPPING = {
         'SMH',
     ],
     'alpha': [
-        # K20: Theme stocks, speculation
+        # row15: Theme stocks, speculation
         'BITO',
         '9807',    # Auto-added: GLOBAL X CHINA ROBOTICS
         'IBKR',    # Auto-added: INTERACTIVE BROKERS GRO-CL A
         'HY9H',    # Auto-added: SK HYNIX INC-GDS
         'NEM',    # Auto-added: NEWMONT CORP
     ],
-    'omega': [],  # K21: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
-    'vault': ['GSD', 'AEM'],  # K22: Gold (GSD: Singapore Gold ETF, AEM: Agnico Eagle Mines)
-    'war_chest': [],  # K23: Cash (tracked in Dashboard, not in positions file)
+    'omega': [],  # row16: SPY/QQQ/ES options only (loaded dynamically in Phase 2)
+    'vault': ['GSD', 'AEM'],  # row17: Gold (GSD: Singapore Gold ETF, AEM: Agnico Eagle Mines)
+    'war_chest': [],  # row18: Cash (tracked in Dashboard, not in positions file)
 }
 
 # =============================================================================
@@ -65,8 +65,8 @@ SYMBOL_MAPPING = {
 
 TARGET_ALLOCATIONS = {
 'ALL_CLEAR': {
-    'global_triads': 0.28, 'four_horsemen': 0.25, 'cash_cow': 0.25,
-    'alpha': 0.05, 'omega': 0.02, 'vault': 0.08, 'war_chest': 0.07
+    'global_triads': 0.28, 'four_horsemen': 0.25, 'cash_cow': 0.20,
+    'alpha': 0.05, 'omega': 0.02, 'vault': 0.05, 'war_chest': 0.15
 },
 'NORMAL': {
     'global_triads': 0.28, 'four_horsemen': 0.225, 'cash_cow': 0.225,

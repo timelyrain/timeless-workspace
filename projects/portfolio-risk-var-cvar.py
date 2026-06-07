@@ -270,7 +270,7 @@ class PortfolioRiskAnalyzer:
             self.positions_value_for_var = var_positions['PositionValueUSD'].sum()
             
             # Load War Chest (cash) from sleeve_totals.json (written by fetch-ibkr-positions.py)
-            # Falls back to Dashboard K23 if JSON is absent (local use only)
+            # Falls back to Dashboard F18 (War Chest) if JSON is absent (local use only)
             json_path = Path(os.path.dirname(self.positions_file)) / 'sleeve_totals.json'
             dashboard_file = Path(os.path.dirname(self.positions_file)) / 'fetch-ibkr-positions-dashboard.xlsx'
             if json_path.exists():
@@ -280,7 +280,7 @@ class PortfolioRiskAnalyzer:
                 print(f"  ✓ War Chest loaded from sleeve_totals.json")
             elif dashboard_file.exists():
                 df_dashboard = pd.read_excel(dashboard_file, sheet_name='Dashboard', header=None)
-                war_chest_value = df_dashboard.iloc[22, 10]  # K23 (row 22, col 10)
+                war_chest_value = df_dashboard.iloc[17, 5]  # F18 (row 17, col 5)
                 print(f"  ✓ War Chest loaded from Dashboard (fallback)")
             else:
                 war_chest_value = 0.0

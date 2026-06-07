@@ -60,7 +60,7 @@ The master risk score drives portfolio allocation via 5 regimes:
 
 ### Portfolio Structure (7 sleeves — single source of truth)
 
-Defined in `projects/portfolio_categories_mappings.py`. Target allocations: global_triads=0.28, four_horsemen=0.25, cash_cow=0.25, alpha=0.05, omega=0.02, vault=0.08, war_chest=0.07.
+Defined in `projects/portfolio_categories_mappings.py`. Target allocations: global_triads=0.28, four_horsemen=0.25, cash_cow=0.20, alpha=0.05, omega=0.02, vault=0.05, war_chest=0.15.
 
 | Sleeve | Weight | Holdings | Role |
 |---|---|---|---|
@@ -136,7 +136,7 @@ Gate 3: ≥ 7 days since last trade per underlying
 ## Code Conventions
 
 - **Do not modify scoring logic, indicator weights, or thresholds without explicit instruction**
-- Base allocation weights: global_triads=0.28, four_horsemen=0.25, cash_cow=0.25, alpha=0.05, omega=0.02, vault=0.08, war_chest=0.07
+- Base allocation weights: global_triads=0.28, four_horsemen=0.25, cash_cow=0.20, alpha=0.05, omega=0.02, vault=0.05, war_chest=0.15
 - `vix_term_struct` is the correct data key (not `vix_struct` — was a silent bug, now fixed)
 - `patch_backwardation_history()` runs once on startup via guard flag — do not remove
 - Bear spreads = insurance. Never sell during market stress for small profit.

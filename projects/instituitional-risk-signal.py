@@ -91,11 +91,11 @@ PORTFOLIO_2026 = {
     'BASE_ALLOCATION': {
         'global_triads': 0.28,      # 82846, DHL, ES3, VWRA, VT
         'four_horsemen': 0.25,      # INRA, GRDU
-        'cash_cow': 0.25,           # Wheel on GOOGL, PEP, V
+        'cash_cow': 0.20,           # Wheel on GOOGL, PEP, V
         'alpha': 0.05,              # Theme stocks + call options
         'omega': 0.02,              # QQQ puts + bear spreads
-        'vault': 0.08,              # Gold (GLD/IAU)
-        'war_chest': 0.07           # Cash holdings
+        'vault': 0.05,              # Gold (GLD/IAU)
+        'war_chest': 0.15           # Cash holdings
     }
 }
 
@@ -1556,16 +1556,16 @@ class RiskDashboard:
             wb = openpyxl.load_workbook(dashboard_path, data_only=True)
             ws = wb['Dashboard']
 
-            # Column K contains the combined totals (F + I columns)
+            # Column F = Actual USD values; B19 = portfolio total
             positions = {
-                'global_triads': ws['K4'].value or 0,      # Global Triads
-                'four_horsemen': ws['K11'].value or 0,     # Four Horsemen
-                'cash_cow': ws['K19'].value or 0,          # Cash Cow
-                'alpha': ws['K20'].value or 0,             # The Alpha
-                'omega': ws['K21'].value or 0,             # The Omega
-                'vault': ws['K22'].value or 0,             # The Vault
-                'war_chest': ws['K23'].value or 0,         # The War Chest
-                'total': ws['G42'].value or 0,             # Combined Total
+                'global_triads': ws['F2'].value or 0,      # Global Triads
+                'four_horsemen': ws['F8'].value or 0,      # Four Horsemen
+                'cash_cow': ws['F14'].value or 0,          # Cash Cow
+                'alpha': ws['F15'].value or 0,             # The Alpha
+                'omega': ws['F16'].value or 0,             # The Omega
+                'vault': ws['F17'].value or 0,             # The Vault
+                'war_chest': ws['F18'].value or 0,         # The War Chest
+                'total': ws['B19'].value or 0,             # Portfolio total
             }
             wb.close()
 
