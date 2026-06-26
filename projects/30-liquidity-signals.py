@@ -114,6 +114,11 @@ def format_alert_message(signals):
 def send_telegram_message(message):
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        
+        # Telegram has a 4096 character limit
+        if len(message) > 4096:
+            message = message[:4090] + "\n\n[...]"
+        
         response = requests.post(url, json={'chat_id': CHAT_ID, 'text': message})
         return response.status_code == 200
     except:
