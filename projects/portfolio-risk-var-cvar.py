@@ -115,7 +115,7 @@ class PortfolioRiskAnalyzer:
         }
     
     def _categorize_symbol(self, symbol):
-        """Classify symbol into one of the 7 portfolio categories"""
+        """Classify symbol into portfolio category via SYMBOL_MAPPING (Dashboard categories)"""
         for category, symbols in SYMBOL_MAPPING.items():
             if symbol in symbols:
                 return category
@@ -171,12 +171,8 @@ class PortfolioRiskAnalyzer:
         print("📂 Loading positions...")
         
         try:
-            # Load both accounts
-            df_hk = pd.read_excel(self.positions_file, sheet_name='PositionsHK')
-            df_al = pd.read_excel(self.positions_file, sheet_name='PositionsAL')
-            
-            # Combine positions
-            df = pd.concat([df_hk, df_al], ignore_index=True)
+            # Load combined positions (both accounts in single sheet)
+            df = pd.read_excel(self.positions_file, sheet_name='Positions')
             
             # Separate stocks and options
             stocks_df = df[df['AssetClass'] == 'STK'].copy()
@@ -211,13 +207,11 @@ class PortfolioRiskAnalyzer:
                 'Multiplier': 'first'
             }).reset_index()
             
-            # Categorize options: SPY/QQQ/ES = Omega, others = Cash Cow
-            options_agg['Category'] = options_agg['Symbol'].apply(
-                lambda s: 'omega' if any(x in str(s) for x in ['SPY', 'QQQ', 'ES', 'EW']) else 'cash_cow'
-            )
-            
             # Extract underlying symbol for options (for tracking underlying price)
             options_agg['UnderlyingSymbol'] = options_agg['Symbol'].apply(self._extract_underlying_symbol)
+
+            # Categorize options by underlying symbol (returns 'uncategorized' if not in SYMBOL_MAPPING)
+            options_agg['Category'] = options_agg['UnderlyingSymbol'].apply(self._categorize_symbol)
             options_agg['YFinanceTicker'] = options_agg['UnderlyingSymbol']
             
             # Calculate delta-adjusted notional for options
@@ -261,34 +255,36 @@ class PortfolioRiskAnalyzer:
             # Calculate portfolio value from positions (stocks + options)
             positions_value = self.positions['PositionValueUSD'].sum()
             
-            # For VaR/CVaR: EXCLUDE options (only stocks from Global Triads, Four Horsemen, Alpha, Vault)
+            # For VaR/CVaR: EXCLUDE options and cash (stocks only, all non-cash categories)
             # Options have non-linear risk and no delta data - tracked separately via theta decay
             var_positions = self.positions[
-                (self.positions['AssetClass'] == 'STK') & 
-                (self.positions['Category'].isin(['global_triads', 'four_horsemen', 'alpha', 'vault']))
+                (self.positions['AssetClass'] == 'STK') &
+                (self.positions['Category'] != 'cash')
             ]
             self.positions_value_for_var = var_positions['PositionValueUSD'].sum()
             
-            # Load War Chest (cash) from sleeve_totals.json (written by fetch-ibkr-positions.py)
-            # Falls back to Dashboard F18 (War Chest) if JSON is absent (local use only)
+            # Load Cash from sleeve_totals.json (written by fetch-ibkr-positions.py)
+            # Falls back to Dashboard 'Cash' row if JSON is absent (local use only)
             json_path = Path(os.path.dirname(self.positions_file)) / 'sleeve_totals.json'
             dashboard_file = Path(os.path.dirname(self.positions_file)) / 'fetch-ibkr-positions-dashboard.xlsx'
             if json_path.exists():
                 with open(json_path) as f:
                     sleeve_data = json.load(f)
-                war_chest_value = sleeve_data['sleeve_totals_usd'].get('war_chest', 0.0)
-                print(f"  ✓ War Chest loaded from sleeve_totals.json")
+                cash_value = sleeve_data['sleeve_totals_usd'].get('cash', 0.0)
+                print(f"  ✓ Cash loaded from sleeve_totals.json")
             elif dashboard_file.exists():
-                df_dashboard = pd.read_excel(dashboard_file, sheet_name='Dashboard', header=None)
-                war_chest_value = df_dashboard.iloc[17, 5]  # F18 (row 17, col 5)
-                print(f"  ✓ War Chest loaded from Dashboard (fallback)")
+                df_d2 = pd.read_excel(dashboard_file, sheet_name='Dashboard', header=0)
+                # col B (index 1) = Category, col E (index 4) = Market USD
+                cash_row = df_d2[df_d2.iloc[:, 1].str.lower().str.strip() == 'cash']
+                cash_value = float(cash_row.iloc[0, 4]) if not cash_row.empty else 0.0
+                print(f"  ✓ Cash loaded from Dashboard (fallback)")
             else:
-                war_chest_value = 0.0
-                print(f"  ⚠️  No war chest data source found — defaulting to 0")
-            
+                cash_value = 0.0
+                print(f"  ⚠️  No cash data source found — defaulting to 0")
+
             # Total portfolio value = positions + cash
-            self.portfolio_value = positions_value + war_chest_value
-            self.war_chest_value = war_chest_value
+            self.portfolio_value = positions_value + cash_value
+            self.war_chest_value = cash_value  # kept for downstream compatibility
             self.positions_value = positions_value
             
             # Calculate position weights (based on TOTAL portfolio including cash)
@@ -301,7 +297,7 @@ class PortfolioRiskAnalyzer:
             print(f"  ✓ Loaded {num_stocks} stock/ETF positions + {num_options} options positions")
             print(f"  ✓ Positions value: ${positions_value:,.2f}")
             print(f"  ✓ VaR/CVaR calculation base: ${self.positions_value_for_var:,.2f}")
-            print(f"  ✓ War Chest (cash): ${war_chest_value:,.2f}")
+            print(f"  ✓ Cash: ${cash_value:,.2f}")
             print(f"  ✓ Total portfolio: ${self.portfolio_value:,.2f}")
             
             # Show category breakdown
@@ -343,10 +339,10 @@ class PortfolioRiskAnalyzer:
         """Fetch historical price data for VaR-eligible positions (stocks only - excludes options and cash)"""
         print(f"\n📊 Fetching {HISTORICAL_DAYS} days of historical data...")
         
-        # Filter to VaR-eligible positions only (stocks from Global Triads, Four Horsemen, Alpha, Vault)
+        # Filter to VaR-eligible positions only (all stock categories except cash)
         var_positions = self.positions[
-            (self.positions['AssetClass'] == 'STK') & 
-            (self.positions['Category'].isin(['global_triads', 'four_horsemen', 'alpha', 'vault']))
+            (self.positions['AssetClass'] == 'STK') &
+            (self.positions['Category'] != 'cash')
         ].copy()
         
         if len(var_positions) == 0:
@@ -695,8 +691,8 @@ class PortfolioRiskAnalyzer:
         print("📂 CATEGORY-LEVEL RISK (Aligned with Dashboard)")
         print("=" * 80)
         
-        # Order: Global Triads, Four Horsemen, Alpha, Vault (then any others)
-        category_order = ['global_triads', 'four_horsemen', 'alpha', 'vault']
+        # Order: Dashboard categories (then any others / uncategorized)
+        category_order = ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto']
         sorted_categories = []
         for cat in category_order:
             if cat in category_risks:
@@ -713,9 +709,9 @@ class PortfolioRiskAnalyzer:
             print(f"   95% CVaR: ${risk['cvar_95_dollar']:>10,.2f} ({risk['cvar_95_pct']:>6.2%})")
             print(f"   Volatility: {risk['volatility']:>6.2%} daily | Positions: {risk['positions']}")
         
-        # Add War Chest (zero VaR since cash doesn't move)
+        # Add Cash (zero VaR since cash doesn't move)
         if hasattr(self, 'war_chest_value') and self.war_chest_value > 0:
-            print(f"\n📊 WAR CHEST (CASH)")
+            print(f"\n📊 CASH")
             print(f"   Value: ${self.war_chest_value:>12,.2f} ({self.war_chest_value/self.portfolio_value:>6.2%} of portfolio)")
             print(f"   95% VaR:  ${0:>10,.2f} (0.00%)")
             print(f"   95% CVaR: ${0:>10,.2f} (0.00%)")
@@ -768,9 +764,9 @@ class PortfolioRiskAnalyzer:
         message += f"VaR (Historical): ${var_95_hist:,.2f} ({var_95_hist/self.positions_value_for_var:.2%})\n"
         message += f"CVaR (Historical): ${cvar_95_hist:,.2f} ({cvar_95_hist/self.positions_value_for_var:.2%})\n\n"
         
-        # Category risk breakdown - ordered: Global Triads, Four Horsemen, Alpha, Vault
+        # Category risk breakdown — Dashboard order
         message += f"*📂 CATEGORY RISK (CVaR @ 95%):*\n"
-        category_order = ['global_triads', 'four_horsemen', 'alpha', 'vault']
+        category_order = ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto']
         for category in category_order:
             if category in self.results['category_risk']:
                 risk = self.results['category_risk'][category]

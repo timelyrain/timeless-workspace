@@ -385,15 +385,16 @@ def send_telegram_notification(success=True, timestamp=None, position_count=0, s
 
 def write_sleeve_totals_json(df, cash):
     """
-    Calculate sleeve totals from positions data and write to sleeve_totals.json.
+    Calculate category totals from positions data and write to sleeve_totals.json.
     This sidecar file is read by instituitional-risk-signal.py instead of relying
     on stale cached formula values in fetch-ibkr-positions-dashboard.xlsx.
+    Categories match Dashboard column B (see portfolio_categories_mappings.py).
     """
     try:
         from portfolio_categories_mappings import SYMBOL_MAPPING
 
-        sleeve_totals = {sleeve: 0.0 for sleeve in SYMBOL_MAPPING}
-        sleeve_totals['war_chest'] = cash
+        category_totals = {cat: 0.0 for cat in SYMBOL_MAPPING}
+        category_totals['cash'] = cash
 
         if df is not None:
             for _, row in df.iterrows():
@@ -401,24 +402,23 @@ def write_sleeve_totals_json(df, cash):
                 value = float(row.get('PositionValueUSD', 0) or 0)
                 asset_class = str(row.get('AssetClass', '')).strip()
 
-                # Omega: SPY/QQQ bear spreads (options only)
-                if asset_class in ('OPT', 'FOP') and (symbol.startswith('SPY') or symbol.startswith('QQQ')):
-                    sleeve_totals['omega'] += value
+                # Skip options — not tracked in Dashboard categories
+                if asset_class in ('OPT', 'FOP'):
                     continue
 
-                # Match against sleeve symbol lists (first match wins)
-                for sleeve, symbols in SYMBOL_MAPPING.items():
-                    if sleeve in ('omega', 'war_chest'):
+                # Match against category symbol lists (first match wins)
+                for cat, symbols in SYMBOL_MAPPING.items():
+                    if cat == 'cash':
                         continue
                     if symbol in symbols:
-                        sleeve_totals[sleeve] += value
+                        category_totals[cat] += value
                         break
 
-        grand_total = sum(sleeve_totals.values())
+        grand_total = sum(category_totals.values())
 
         output = {
             'timestamp': datetime.now().isoformat(),
-            'sleeve_totals_usd': sleeve_totals,
+            'sleeve_totals_usd': category_totals,
             'grand_total_usd': grand_total,
         }
 
@@ -426,10 +426,10 @@ def write_sleeve_totals_json(df, cash):
         with open(json_path, 'w') as f:
             json.dump(output, f, indent=2)
 
-        print(f"\n📋 Sleeve totals written to sleeve_totals.json")
-        for sleeve, val in sleeve_totals.items():
+        print(f"\n📋 Category totals written to sleeve_totals.json")
+        for cat, val in category_totals.items():
             pct = (val / grand_total * 100) if grand_total > 0 else 0
-            print(f"   {sleeve}: ${val:,.0f} ({pct:.1f}%)")
+            print(f"   {cat}: ${val:,.0f} ({pct:.1f}%)")
         print(f"   TOTAL: ${grand_total:,.0f}")
 
     except Exception as e:

@@ -89,13 +89,16 @@ CONFIG = {
 PORTFOLIO_2026 = {
     'TOTAL_CAPITAL': 1_000_000,  # $1M active trading capital
     'BASE_ALLOCATION': {
-        'global_triads': 0.28,      # 82846, DHL, ES3, VWRA, VT
-        'four_horsemen': 0.25,      # INRA, GRDU
-        'cash_cow': 0.20,           # Wheel on GOOGL, PEP, V
-        'alpha': 0.05,              # Theme stocks + call options
-        'omega': 0.02,              # QQQ puts + bear spreads
-        'vault': 0.05,              # Gold (GLD/IAU)
-        'war_chest': 0.15           # Cash holdings
+        'global':           0.30,   # SPYI, VWRA
+        'dividend':         0.08,   # DHL, ES3
+        'china':            0.05,   # 82846
+        'emerging_markets': 0.08,   # XMME
+        'developed_ex_us':  0.06,   # EXUS
+        'theme':            0.05,   # GRDU, HY9H, INRA, SE
+        'us':               0.20,   # BKR.B, CNDX
+        'gold':             0.08,   # GSD, AEM, NEM
+        'crypto':           0.02,   # BITO
+        'cash':             0.08,   # USD cash
     }
 }
 
@@ -389,8 +392,8 @@ class HistoricalDataManager:
         def get_regime(score):
             """Convert numeric risk score to regime label"""
             if score > 85: return 'FULL DEPLOYMENT'
-            elif score > 70: return 'HOLD'
-            elif score > 55: return 'REDUCE'
+            elif score >= 70: return 'HOLD'
+            elif score >= 55: return 'REDUCE'
             elif score >= 40: return 'CORE ONLY'
             else: return 'MAX DEFENSE'
         
@@ -1546,29 +1549,40 @@ class RiskDashboard:
                     print(f"   📊 Portfolio loaded from sleeve_totals.json: ${grand_total:,.0f} (as of {data.get('timestamp', 'unknown')})")
                     return positions
 
-            # --- Fallback: Dashboard K cells (may have stale cached formula values) ---
+            # --- Fallback: Dashboard rows (col A = ticker, col E = market USD) ---
             import openpyxl
             dashboard_path = Path(__file__).parent / 'fetch-ibkr-positions-dashboard.xlsx'
             if not dashboard_path.exists():
                 return None
 
-            # Read values directly from Dashboard sheet Column K (HK + AL combined)
             wb = openpyxl.load_workbook(dashboard_path, data_only=True)
             ws = wb['Dashboard']
 
-            # Column F = Actual USD values; B19 = portfolio total
-            positions = {
-                'global_triads': ws['F2'].value or 0,      # Global Triads
-                'four_horsemen': ws['F8'].value or 0,      # Four Horsemen
-                'cash_cow': ws['F14'].value or 0,          # Cash Cow
-                'alpha': ws['F15'].value or 0,             # The Alpha
-                'omega': ws['F16'].value or 0,             # The Omega
-                'vault': ws['F17'].value or 0,             # The Vault
-                'war_chest': ws['F18'].value or 0,         # The War Chest
-                'total': ws['B19'].value or 0,             # Portfolio total
+            ticker_to_cat = {
+                ticker: cat
+                for cat, tickers in SYMBOL_MAPPING.items()
+                for ticker in tickers
             }
+
+            positions = {k: 0.0 for k in SYMBOL_MAPPING}
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                ticker = str(row[0]).strip() if row[0] else None
+                market_usd = row[4] or 0  # col E = market value USD
+                category = str(row[1]).strip().lower() if row[1] else None
+                if not ticker or ticker == 'None':
+                    continue
+                # Cash row identified by category column
+                if category == 'cash':
+                    positions['cash'] += float(market_usd)
+                    continue
+                cat = ticker_to_cat.get(ticker)
+                if cat:
+                    positions[cat] += float(market_usd)
+                else:
+                    print(f"   ⚠️  Dashboard ticker '{ticker}' not in SYMBOL_MAPPING — excluded from fallback")
             wb.close()
 
+            positions['total'] = sum(v for k, v in positions.items() if k != 'total')
             total_value = positions['total']
             if total_value == 0:
                 return None
@@ -1605,7 +1619,7 @@ class RiskDashboard:
         
         # Calculate drift for each category
         print(f"🎯 DRIFT CALCULATION:")
-        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
+        for category in ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto', 'cash']:
             target_pct = target_allocation.get(category, 0)
             actual_pct = actual.get(category, 0)
             diff = actual_pct - target_pct
@@ -1653,14 +1667,14 @@ class RiskDashboard:
         }
         
         # Identify what to sell (overweight categories)
-        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
+        for category in ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto', 'cash']:
             drift = drift_analysis['drift'].get(category, 0)
             
             if drift > 0.03:  # Overweight by >3%
                 amount = drift * total_value
                 recommendations['sells'].append({
                     'category': category,
-                    'current_pct': actual[category] * 100,
+                    'current_pct': actual.get(category, 0) * 100,
                     'target_pct': target_allocation[category] * 100,
                     'drift_pct': drift * 100,
                     'amount': amount
@@ -1668,14 +1682,14 @@ class RiskDashboard:
                 recommendations['total_to_sell'] += amount
         
         # Identify what to buy (underweight categories)
-        for category in ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']:
+        for category in ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto', 'cash']:
             drift = drift_analysis['drift'].get(category, 0)
             
             if drift < -0.03:  # Underweight by >3%
                 amount = abs(drift) * total_value
                 recommendations['buys'].append({
                     'category': category,
-                    'current_pct': actual[category] * 100,
+                    'current_pct': actual.get(category, 0) * 100,
                     'target_pct': target_allocation[category] * 100,
                     'drift_pct': drift * 100,
                     'amount': amount
@@ -1695,8 +1709,7 @@ class RiskDashboard:
             if not excel_path.exists():
                 return None
             
-            df_hk = pd.read_excel(excel_path, sheet_name='PositionsHK')
-            df_al = pd.read_excel(excel_path, sheet_name='PositionsAL')
+            df = pd.read_excel(excel_path, sheet_name='Positions')
             
             analysis = {
                 'csps': [],
@@ -1711,51 +1724,50 @@ class RiskDashboard:
             nearest_expiry = None
             
             # Analyze all options
-            for df in [df_hk, df_al]:
-                opts = df[df['AssetClass'].isin(['OPT', 'FOP'])]
-                for _, row in opts.iterrows():
-                    symbol = row['Symbol']
-                    side = row.get('Side', '')
-                    put_call = row.get('Put/Call', '')
-                    value = row['PositionValueUSD']
-                    expiry = row.get('Expiry', '')
-                    
-                    # Calculate days to expiry
-                    days_to_expiry = None
-                    if pd.notna(expiry):
-                        try:
-                            expiry_date = pd.to_datetime(expiry)
-                            days_to_expiry = (expiry_date - today).days
-                            
-                            if nearest_expiry is None or days_to_expiry < nearest_expiry:
-                                nearest_expiry = days_to_expiry
-                        except:
-                            pass
-                    
-                    # Categorize
-                    if side == 'Short':
-                        if put_call == 'P':
-                            analysis['csps'].append({
-                                'symbol': symbol,
-                                'value': value,
-                                'days_to_expiry': days_to_expiry
-                            })
-                        elif put_call == 'C':
-                            analysis['covered_calls'].append({
-                                'symbol': symbol,
-                                'value': value,
-                                'days_to_expiry': days_to_expiry
-                            })
-                        analysis['total_premium'] += abs(value)
-                
-                # Get stocks in income strategy (Cash Cow)
-                income_tickers = SYMBOL_MAPPING['cash_cow']
-                stocks = df[(df['AssetClass'] == 'STK') & (df['Symbol'].isin(income_tickers))]
-                for _, row in stocks.iterrows():
-                    analysis['stocks'].append({
-                        'symbol': row['Symbol'],
-                        'value': row['PositionValueUSD']
-                    })
+            opts = df[df['AssetClass'].isin(['OPT', 'FOP'])]
+            for _, row in opts.iterrows():
+                symbol = row['Symbol']
+                side = row.get('Side', '')
+                put_call = row.get('Put/Call', '')
+                value = row['PositionValueUSD']
+                expiry = row.get('Expiry', '')
+
+                # Calculate days to expiry
+                days_to_expiry = None
+                if pd.notna(expiry):
+                    try:
+                        expiry_date = pd.to_datetime(expiry)
+                        days_to_expiry = (expiry_date - today).days
+
+                        if nearest_expiry is None or days_to_expiry < nearest_expiry:
+                            nearest_expiry = days_to_expiry
+                    except:
+                        pass
+
+                # Categorize
+                if side == 'Short':
+                    if put_call == 'P':
+                        analysis['csps'].append({
+                            'symbol': symbol,
+                            'value': value,
+                            'days_to_expiry': days_to_expiry
+                        })
+                    elif put_call == 'C':
+                        analysis['covered_calls'].append({
+                            'symbol': symbol,
+                            'value': value,
+                            'days_to_expiry': days_to_expiry
+                        })
+                    analysis['total_premium'] += abs(value)
+
+            # Stock positions (look up from SYMBOL_MAPPING)
+            all_known = {t for tickers in SYMBOL_MAPPING.values() for t in tickers}
+            stocks = df[(df['AssetClass'] == 'STK') & (df['Symbol'].isin(all_known))]
+            for _, row in stocks.iterrows():
+                analysis['stocks'].append({
+                    'symbol': row['Symbol'],
+                    'value': row['PositionValueUSD']
+                })
             
             analysis['days_to_nearest_expiry'] = nearest_expiry
             return analysis
@@ -1768,17 +1780,68 @@ class RiskDashboard:
     # v2.0: 2026 PORTFOLIO ALLOCATION LOGIC (score normalized to /100)
     # =============================================================================
     
-    def _normalize_allocation(self, alloc):
-        """Normalize allocation percentages to sum to exactly 100%."""
-        # Extract allocation percentages
-        categories = ['global_triads', 'four_horsemen', 'cash_cow', 'alpha', 'omega', 'vault', 'war_chest']
-        total = sum(alloc[cat] for cat in categories)
-        
-        # Normalize to 100%
-        if total > 0 and abs(total - 1.0) > 0.0001:  # Only normalize if off by more than 0.01%
-            for cat in categories:
-                alloc[cat] = alloc[cat] / total
-        
+    def load_portfolio_dist(self):
+        """
+        Read target allocations from Portfolio-Dist sheet in the dashboard Excel file.
+        Returns a dict {category_key: fraction} matching SYMBOL_MAPPING keys.
+        Falls back to PORTFOLIO_2026['BASE_ALLOCATION'] if the sheet is unavailable.
+        """
+        _name_map = {
+            'cash':     'cash',
+            'china':    'china',
+            'crypto':   'crypto',
+            'exus':     'developed_ex_us',
+            'dividend': 'dividend',
+            'emerging': 'emerging_markets',
+            'global':   'global',
+            'gold':     'gold',
+            'theme':    'theme',
+            'us':       'us',
+        }
+        try:
+            import pandas as pd
+            dashboard_path = Path(__file__).parent / 'fetch-ibkr-positions-dashboard.xlsx'
+            if not dashboard_path.exists():
+                raise FileNotFoundError("Dashboard file not found")
+            df = pd.read_excel(dashboard_path, sheet_name='Portfolio-Dist', header=0)
+            # col 0 = Category, col 1 = Percentage (decimal fraction)
+            base = {}
+            for _, row in df.iterrows():
+                name = str(row.iloc[0]).strip()
+                pct = row.iloc[1]
+                if name.lower() == 'nan' or pd.isna(pct):
+                    continue
+                key = _name_map.get(name.lower().replace('-', '').replace(' ', ''))
+                if key:
+                    base[key] = float(pct)
+            if len(base) == 10:
+                return base
+            raise ValueError(f"Expected 10 categories, got {len(base)}: {list(base.keys())}")
+        except Exception as e:
+            print(f"   ⚠️  Portfolio-Dist read failed ({e}) — using hardcoded BASE_ALLOCATION")
+            send_to_telegram(f"⚠️ RISK SIGNAL: Portfolio-Dist sheet unreadable — allocation targets using stale fallback. Error: {e}")
+            return PORTFOLIO_2026['BASE_ALLOCATION']
+
+    def _normalize_allocation(self, alloc, pinned=None):
+        """Normalize allocation percentages to sum to exactly 100%.
+
+        pinned: list of category keys treated as absolute targets (e.g. 'cash', 'gold'
+                in defensive regimes). These are not rescaled; the flex categories fill
+                the remaining budget. Without pinned, all categories are rescaled together.
+        """
+        categories = ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'gold', 'crypto', 'cash']
+        pinned = pinned or []
+        flex_cats = [c for c in categories if c not in pinned]
+
+        pinned_total = sum(alloc.get(c, 0) for c in pinned)
+        flex_raw = sum(alloc.get(c, 0) for c in flex_cats)
+        flex_budget = 1.0 - pinned_total
+
+        if flex_raw > 0 and flex_budget >= 0:
+            scale = flex_budget / flex_raw
+            for cat in flex_cats:
+                alloc[cat] = alloc.get(cat, 0) * scale
+
         return alloc
     
     def get_portfolio_allocation(self):
@@ -1800,7 +1863,7 @@ class RiskDashboard:
           warning is sent showing how many more days are needed.
         """
         score = self.scores['total']
-        base = PORTFOLIO_2026['BASE_ALLOCATION']
+        base = self.load_portfolio_dist()
 
         # ------------------------------------------------------------------
         # Helper: build each regime's allocation dict
@@ -1808,28 +1871,34 @@ class RiskDashboard:
         def _full_deployment():
             return self._normalize_allocation({
                 'regime': '★★★★★ FULL DEPLOYMENT',
-                'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'],
-                'cash_cow': base['cash_cow'],
-                'alpha': base['alpha'],
-                'omega': base['omega'],
-                'vault': base['vault'],
-                'war_chest': base['war_chest'],
+                'global':           base['global'],
+                'dividend':         base['dividend'],
+                'china':            base['china'],
+                'emerging_markets': base['emerging_markets'],
+                'developed_ex_us':  base['developed_ex_us'],
+                'theme':            base['theme'],
+                'us':               base['us'],
+                'gold':             base['gold'],
+                'crypto':           base['crypto'],
+                'cash':             base['cash'],
                 'stops': '15-20%',
-                'options_guidance': 'Sell CSPs at 30-45 DTE, 15-20 delta on GOOGL, PEP, V',
+                'options_guidance': 'Sell CSPs at 30-45 DTE, 15-20 delta on AAPL, MSFT',
                 'action': 'FULL DEPLOYMENT - Run base allocation'
             })
 
         def _hold():
             return self._normalize_allocation({
                 'regime': '★★★★☆ HOLD',
-                'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'] * 0.9,
-                'cash_cow': base['cash_cow'] * 0.9,
-                'alpha': base['alpha'] * 0.8,
-                'omega': 0.01,
-                'vault': base['vault'] + 0.02,
-                'war_chest': base['war_chest'] + 0.05,
+                'global':           base['global'],
+                'dividend':         base['dividend'],
+                'china':            base['china'],
+                'emerging_markets': base['emerging_markets'],
+                'developed_ex_us':  base['developed_ex_us'],
+                'theme':            base['theme'] * 0.9,
+                'us':               base['us'] * 0.9,
+                'gold':             base['gold'] + 0.02,
+                'crypto':           base['crypto'] * 0.8,
+                'cash':             base['cash'] + 0.05,
                 'stops': '12-15%',
                 'options_guidance': 'Monitor only. Tighter strikes: 10-15 delta CSPs, 30 DTE. No new positions.',
                 'action': 'HOLD - No allocation change. Monitor for confirmation.'
@@ -1838,47 +1907,56 @@ class RiskDashboard:
         def _reduce():
             return self._normalize_allocation({
                 'regime': '★★★☆☆ REDUCE',
-                'global_triads': base['global_triads'],
-                'four_horsemen': base['four_horsemen'] * 0.6,
-                'cash_cow': base['cash_cow'] * 0.4,
-                'alpha': base['alpha'] * 0.3,
-                'omega': 0.01,
-                'vault': 0.10,
-                'war_chest': 0.24,
+                'global':           base['global'],
+                'dividend':         base['dividend'],
+                'china':            base['china'],
+                'emerging_markets': base['emerging_markets'],
+                'developed_ex_us':  base['developed_ex_us'] * 0.7,
+                'theme':            base['theme'] * 0.6,
+                'us':               base['us'] * 0.6,
+                'gold':             0.10,
+                'crypto':           base['crypto'] * 0.3,
+                'cash':             0.24,
                 'stops': '10-12%',
-                'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging: 2-3 put spreads max',
-                'action': 'REDUCE - Cut growth+income, raise cash to 24%. Light hedging (1% only)'
-            })
+                'options_guidance': 'DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging.',
+                'action': 'REDUCE - Cut growth + speculative, raise cash to 24%'
+            }, pinned=['cash', 'gold'])
 
         def _core_only():
             return self._normalize_allocation({
                 'regime': '★★☆☆☆ CORE ONLY',
-                'global_triads': base['global_triads'] * 0.7,
-                'four_horsemen': base['four_horsemen'] * 0.2,
-                'cash_cow': 0,
-                'alpha': 0,
-                'omega': 0.02,
-                'vault': 0.15,
-                'war_chest': 0.33,
+                'global':           base['global'] * 0.7,
+                'dividend':         base['dividend'],
+                'china':            base['china'] * 0.5,
+                'emerging_markets': base['emerging_markets'] * 0.5,
+                'developed_ex_us':  base['developed_ex_us'] * 0.3,
+                'theme':            0,
+                'us':               base['us'] * 0.2,
+                'gold':             0.15,
+                'crypto':           0,
+                'cash':             0.33,
                 'stops': '8-10%',
-                'options_guidance': 'CLOSE POSITIONS: Roll losing CSPs, collect premium and exit. Use collars for cost-neutral hedging',
-                'action': 'CORE ONLY - Exit income, skeleton growth, raise cash to 33%. Moderate hedging (2%)'
-            })
+                'options_guidance': 'CLOSE POSITIONS: Roll losing positions, collect premium and exit. Use collars for cost-neutral hedging.',
+                'action': 'CORE ONLY - Skeleton global/dividend, raise cash to 33%'
+            }, pinned=['cash', 'gold'])
 
         def _max_defense():
             return self._normalize_allocation({
                 'regime': '★☆☆☆☆ MAX DEFENSE',
-                'global_triads': base['global_triads'] * 0.3,
-                'four_horsemen': 0,
-                'cash_cow': 0,
-                'alpha': 0,
-                'omega': 0.03,
-                'vault': 0.25,
-                'war_chest': 0.39,
+                'global':           base['global'] * 0.3,
+                'dividend':         base['dividend'] * 0.5,
+                'china':            0,
+                'emerging_markets': 0,
+                'developed_ex_us':  0,
+                'theme':            0,
+                'us':               0,
+                'gold':             0.25,
+                'crypto':           0,
+                'cash':             0.39,
                 'stops': '5-8%',
-                'options_guidance': 'CLOSE ALL: Exit CSPs at any reasonable price. ONLY collars (sell calls to fund puts) - zero net cost.',
-                'action': 'MAX DEFENSE - Liquidate to 39% cash, 25% gold. Hedging at 3% max annual cost limit'
-            })
+                'options_guidance': 'CLOSE ALL: Exit all non-core positions. No new trades.',
+                'action': 'MAX DEFENSE - 39% cash, 25% gold, exit all growth'
+            }, pinned=['cash', 'gold'])
 
         # ------------------------------------------------------------------
         # 3-day confirmation helper
@@ -1908,13 +1986,13 @@ class RiskDashboard:
             # Immediate — no confirmation needed
             base_allocation = _full_deployment()
 
-        elif score > 70:
+        elif score >= 70:
             # HOLD band — no allocation change, monitor only
             base_allocation = _hold()
 
-        elif score > 55:
+        elif score >= 55:
             # REDUCE band — requires 3-day confirmation
-            confirmed, days_confirmed = _check_confirmation(lambda s: 55 < s <= 70)
+            confirmed, days_confirmed = _check_confirmation(lambda s: 55 <= s < 70)
             if confirmed:
                 base_allocation = _reduce()
             else:
@@ -1923,7 +2001,7 @@ class RiskDashboard:
 
         elif score >= 40:
             # CORE ONLY band — requires 3-day confirmation
-            confirmed, days_confirmed = _check_confirmation(lambda s: 40 <= s <= 55)
+            confirmed, days_confirmed = _check_confirmation(lambda s: 40 <= s < 55)
             if confirmed:
                 base_allocation = _core_only()
             else:
@@ -1940,28 +2018,24 @@ class RiskDashboard:
         return base_allocation if base_allocation else self.get_portfolio_allocation()  # Fallback
     
     def _apply_v_recovery_to_portfolio(self, base_alloc):
-        """Apply V-Recovery override - cut reserves by 50% and redeploy"""
-        old_gold = base_alloc['vault']
-        old_cash = base_alloc['war_chest']
+        """Apply V-Recovery override - cut gold/cash reserves by 50% and redeploy to active categories"""
+        old_gold = base_alloc['gold']
+        old_cash = base_alloc['cash']
         total_reserves = old_gold + old_cash
-        new_reserves = total_reserves * 0.5
-        freed_capital = total_reserves - new_reserves
-        
-        # Redistribute freed capital proportionally to core/growth/income
-        total_active = base_alloc['global_triads'] + base_alloc['four_horsemen'] + base_alloc['cash_cow']
-        
+        freed_capital = total_reserves * 0.5
+
+        active_cats = ['global', 'dividend', 'china', 'emerging_markets', 'developed_ex_us', 'theme', 'us', 'crypto']
+        total_active = sum(base_alloc.get(c, 0) for c in active_cats)
+
         if total_active > 0:
             boost_factor = 1 + (freed_capital / total_active)
-            v_alloc = {
-                **base_alloc,
-                'regime': base_alloc['regime'] + ' + V-RECOVERY',
-                'global_triads': base_alloc['global_triads'] * boost_factor,
-                'four_horsemen': base_alloc['four_horsemen'] * boost_factor,
-                'cash_cow': base_alloc['cash_cow'] * boost_factor,
-                'vault': old_gold * 0.5,  # Cut gold 50%
-                'war_chest': old_cash * 0.5,  # Cut cash 50%
-                'action': base_alloc['action'] + ' | V-RECOVERY: Reserves cut 50%, redeployed to core/growth/income'
-            }
+            v_alloc = {**base_alloc}
+            v_alloc['regime'] = base_alloc['regime'] + ' + V-RECOVERY'
+            v_alloc['gold'] = old_gold * 0.5
+            v_alloc['cash'] = old_cash * 0.5
+            v_alloc['action'] = base_alloc['action'] + ' | V-RECOVERY: Reserves cut 50%, redeployed to active categories'
+            for c in active_cats:
+                v_alloc[c] = base_alloc.get(c, 0) * boost_factor
             return self._normalize_allocation(v_alloc)
         else:
             return base_alloc
@@ -2201,19 +2275,22 @@ class RiskDashboard:
             lines.extend(["💼 PORTFOLIO ALLOCATION (Actual → Target)"])
             
             categories = [
-                ('Global Triads', 'global_triads'),
-                ('Four Horsemen', 'four_horsemen'),
-                ('Cash Cow', 'cash_cow'),
-                ('The Alpha', 'alpha'),
-                ('The Omega', 'omega'),
-                ('The Vault', 'vault'),
-                ('War Chest', 'war_chest')
+                ('Global',          'global'),
+                ('Dividend',        'dividend'),
+                ('China',           'china'),
+                ('Emerging Mkts',   'emerging_markets'),
+                ('Developed ex-US', 'developed_ex_us'),
+                ('Theme',           'theme'),
+                ('US',              'us'),
+                ('Gold',            'gold'),
+                ('Crypto',          'crypto'),
+                ('Cash',            'cash'),
             ]
             
             for label, key in categories:
                 target = portfolio[key] * 100
-                actual = self.actual_positions[key] * 100
-                diff = drift_analysis['drift'][key] * 100
+                actual = self.actual_positions.get(key, 0) * 100
+                diff = drift_analysis['drift'].get(key, 0) * 100
                 
                 if abs(diff) > 3:
                     indicator = "⚠️" if abs(diff) > 5 else "⚡"
@@ -2259,13 +2336,16 @@ class RiskDashboard:
             # Show target allocation only
             lines.extend([
                 "💼 PORTFOLIO ALLOCATION (Target)",
-                f"Global Triads: {portfolio['global_triads']*100:.0f}%",
-                f"Four Horsemen: {portfolio['four_horsemen']*100:.0f}%",
-                f"Cash Cow: {portfolio['cash_cow']*100:.0f}%",
-                f"The Alpha: {portfolio['alpha']*100:.0f}%",
-                f"The Omega: {portfolio['omega']*100:.0f}%",
-                f"The Vault: {portfolio['vault']*100:.0f}%",
-                f"War Chest: {portfolio['war_chest']*100:.0f}%",
+                f"Global: {portfolio['global']*100:.0f}%",
+                f"Dividend: {portfolio['dividend']*100:.0f}%",
+                f"China: {portfolio['china']*100:.0f}%",
+                f"Emerging Mkts: {portfolio['emerging_markets']*100:.0f}%",
+                f"Developed ex-US: {portfolio['developed_ex_us']*100:.0f}%",
+                f"Theme: {portfolio['theme']*100:.0f}%",
+                f"US: {portfolio['us']*100:.0f}%",
+                f"Gold: {portfolio['gold']*100:.0f}%",
+                f"Crypto: {portfolio['crypto']*100:.0f}%",
+                f"Cash: {portfolio['cash']*100:.0f}%",
                 ""
             ])
         
@@ -2407,16 +2487,19 @@ TODAY'S DATA:
 Score: {self.scores['total']:.1f}/100
 Regime: {portfolio['regime']}
 Portfolio Allocation:
-- Global Triads (Strategic Core - VWRA/82846/DHL/ES3/XMME): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (Growth Engine - EQCH/CBUK/9807/INRA/GRDU): {portfolio['four_horsemen']*100:.0f}%
-- Cash Cow (Income Strategy - all options EXCEPT SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
-- The Alpha (Speculation - theme stocks + long calls): {portfolio['alpha']*100:.0f}%
-- The Omega (Insurance - SPY/QQQ bear spreads ONLY, capped 1-3% by regime): {portfolio['omega']*100:.0f}%
-- The Vault (Gold - tail risk protection): {portfolio['vault']*100:.0f}%
-- War Chest (Cash - primary defense mechanism): {portfolio['war_chest']*100:.0f}%
+- Global (SPYI/VWRA): {portfolio['global']*100:.0f}%
+- Dividend (DHL/ES3): {portfolio['dividend']*100:.0f}%
+- China (82846): {portfolio['china']*100:.0f}%
+- Emerging Markets (XMME): {portfolio['emerging_markets']*100:.0f}%
+- Developed ex-US (EXUS): {portfolio['developed_ex_us']*100:.0f}%
+- Theme (GRDU/HY9H/INRA/SE): {portfolio['theme']*100:.0f}%
+- US (BKR.B/CNDX): {portfolio['us']*100:.0f}%
+- Gold (GSD/AEM/NEM): {portfolio['gold']*100:.0f}%
+- Crypto (BITO): {portfolio['crypto']*100:.0f}%
+- Cash: {portfolio['cash']*100:.0f}%
 Action: {portfolio['action']}
 
-HEDGING PHILOSOPHY: Omega capped at 1% (REDUCE), 2% (CORE ONLY), 3% (MAX DEFENSE) to keep annual insurance cost under 3% of portfolio. Primary defense is selling positions and raising cash, not buying expensive puts.
+DEFENSE PHILOSOPHY: Primary defense is selling positions and raising cash. Gold as tail hedge. No options-based hedging.
 
 Key Indicators:
 - HY Spread: {self.data.get('hy_spread', 'N/A')}%
@@ -2463,17 +2546,20 @@ Risk Score: {self.scores['total']:.1f}/100
 Market Regime: {portfolio['regime']}
 
 Current Portfolio Allocation:
-- Global Triads (Strategic Core - diversified ETFs): {portfolio['global_triads']*100:.0f}%
-- Four Horsemen (Growth Engine - thematic ETFs): {portfolio['four_horsemen']*100:.0f}%
-- Cash Cow (Income Strategy - multi-leg options on mega-caps, excludes SPY/QQQ): {portfolio['cash_cow']*100:.0f}%
-- The Alpha (Speculation - theme stocks, long calls): {portfolio['alpha']*100:.0f}%
-- The Omega (Insurance - SPY/QQQ bear spreads, strictly capped by regime): {portfolio['omega']*100:.0f}%
-- The Vault (Gold - store of value, tail risk): {portfolio['vault']*100:.0f}%
-- War Chest (Cash - dry powder, primary defense): {portfolio['war_chest']*100:.0f}%
+- Global (SPYI/VWRA): {portfolio['global']*100:.0f}%
+- Dividend (DHL/ES3): {portfolio['dividend']*100:.0f}%
+- China (82846): {portfolio['china']*100:.0f}%
+- Emerging Markets (XMME): {portfolio['emerging_markets']*100:.0f}%
+- Developed ex-US (EXUS): {portfolio['developed_ex_us']*100:.0f}%
+- Theme (GRDU/HY9H/INRA/SE): {portfolio['theme']*100:.0f}%
+- US (BKR.B/CNDX): {portfolio['us']*100:.0f}%
+- Gold (GSD/AEM/NEM): {portfolio['gold']*100:.0f}%
+- Crypto (BITO): {portfolio['crypto']*100:.0f}%
+- Cash: {portfolio['cash']*100:.0f}%
 
 Recommended Action: {portfolio['action']}
 
-RISK MANAGEMENT APPROACH: Institutional practice - hedge via position sizing (selling) not expensive options. Omega capped at 1-3% max depending on regime to keep annual insurance cost under 3% of portfolio. Cash raising is primary defense.
+RISK MANAGEMENT APPROACH: Institutional practice — hedge via position sizing (selling) not expensive options. Primary defense is raising cash; gold as tail hedge.
 
 Key Market Indicators:
 - High Yield Spread: {self.data.get('hy_spread', 'N/A')}% (credit stress)
