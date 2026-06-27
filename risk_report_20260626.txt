@@ -1,0 +1,58 @@
+🎯 RISK DASHBOARD v2.0
+📅 Jun 26, 2026 @ 15:02
+
+✅ DATA: 22/22 signals (100%)
+
+📊 SCORE: 64.1/100
+🎚️ ★★★☆☆ REDUCE
+
+💼 PORTFOLIO ALLOCATION (Actual → Target)
+Global: 0.0% → 28.6% (+28.6% ⚠️)
+Dividend: 0.0% → 7.6% (+7.6% ⚠️)
+China: 0.0% → 4.8% (+4.8% ⚡)
+Emerging Mkts: 0.0% → 7.6% (+7.6% ⚠️)
+Developed ex-US: 0.0% → 4.0% (+4.0% ⚡)
+Theme: 0.0% → 2.9%
+US: 0.0% → 11.5% (+11.5% ⚠️)
+Gold: 0.0% → 9.5% (+9.5% ⚠️)
+Crypto: 0.0% → 0.6%
+Cash: 100.0% → 22.9% (-77.1% ⚠️)
+
+⚠️ DRIFT: 154% total 🚨 URGENT: Increasing fast (+95% in 8d)
+📋 Global: underweight by 29%, Dividend: underweight by 8%
+
+🛡️ Stops: 10-12%
+📈 Options: DEFENSIVE: Far OTM CSPs (5-10 delta), close losing positions. Minimal hedging.
+
+💡 ACTION: REDUCE - Cut growth + speculative, raise cash to 24%
+
+🔄 REBALANCING RECOMMENDATIONS
+SELL (Overweight):
+  • Cash: $87k (77% over)
+BUY (Underweight):
+  • Global: $32k (29% under)
+  • Dividend: $9k (8% under)
+  • China: $5k (5% under)
+
+📈 TIER SCORES
+T1: 30.2/39.25 Credit+Macro (77%)
+  Credit 17.2/19.25: HY 20/20 · IG 20/20 · Ratio 12/20 · NFCI 15/15
+  Fed BS 12/15 · DXY 1/5
+T2: 36.0/61 Positioning+Flows (59%)
+  >50MA 10/12 · <200MA 6/10 · A/D 5/5 · H-L 3.0/3
+  Rotation 2/6 · Au/SPY 3/4 · ETF 4/8 · Credit 3/7 · Sect 0/6
+T3: 27.5/46 Options+Structure (60%)
+  VIXTerm 5/15 · YC 2.5/3 · VIX 7/10 · SKEW 5/5
+  VVIX 6/8 · 9D/VIX 2/3 · VXN 0/2
+
+📊 RISK TREND (9 days)
+📉 Score: 72 → 64 (-8 pts)
+⚠️ Regime: HOLD → REDUCE
+  • VIX: 16.8 → 18.9 (↑13%)
+
+📊 KEY SIGNALS
+HY Spread: 2.76%
+VIX: 18.9
+VIX: Flat
+% >50MA: 64%
+F&G: N/A

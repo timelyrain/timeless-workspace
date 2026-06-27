@@ -1787,16 +1787,17 @@ class RiskDashboard:
         Falls back to PORTFOLIO_2026['BASE_ALLOCATION'] if the sheet is unavailable.
         """
         _name_map = {
-            'cash':     'cash',
-            'china':    'china',
-            'crypto':   'crypto',
-            'exus':     'developed_ex_us',
-            'dividend': 'dividend',
-            'emerging': 'emerging_markets',
-            'global':   'global',
-            'gold':     'gold',
-            'theme':    'theme',
-            'us':       'us',
+            'cash':            'cash',
+            'china':           'china',
+            'crypto':          'crypto',
+            'developedexus':   'developed_ex_us',
+            'dividend':        'dividend',
+            'emerging':        'emerging_markets',
+            'emergingmarkets': 'emerging_markets',
+            'global':          'global',
+            'gold':            'gold',
+            'theme':           'theme',
+            'us':              'us',
         }
         try:
             import pandas as pd
