@@ -1457,6 +1457,24 @@
         "sahm_value": 0.09999999999999964,
         "nfci": -0.516
       }
+    },
+    {
+      "date": "2026-06-28",
+      "phase": "MID",
+      "regime": "REFLATION",
+      "cycle_score": 72,
+      "growth_score": 29,
+      "inflation_score": 28,
+      "snapshot": {
+        "hy_spread": 2.78,
+        "ig_spread": 0.76,
+        "spy_vs_200dma_pct": 6.136646628426085,
+        "t10y2y": 0.31,
+        "cpi_yoy": 4.270032656680247,
+        "t5yie": 2.21,
+        "sahm_value": 0.09999999999999964,
+        "nfci": -0.516
+      }
     }
   ]
 }
